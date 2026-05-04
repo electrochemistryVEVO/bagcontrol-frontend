@@ -1,8 +1,17 @@
+@import "@fontsource/jetbrains-mono/100.css";
+@import "@fontsource/inter/100.css";
 @import "tailwindcss";
 
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --semaforo-verde: #76FB47;
+  --semaforo-rojo: #FF3232;
+  --semaforo-amarillo: #FFD749;
+  --pane-foreground: #2F2F2F;
+  --pane-selected: #EEECEC;
+  --font-geist-mono: "Jetbrains Mono";
+  --font-geist-sans: "Inter", sans-serif;
 }
 
 @theme inline {
