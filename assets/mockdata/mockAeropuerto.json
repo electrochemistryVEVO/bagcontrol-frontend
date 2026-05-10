@@ -1,0 +1,314 @@
+{
+  "data": [
+    {
+      "codigoIata": "LIM",
+      "ciudad": "Lima",
+      "pais": "Perú",
+      "continente": "América",
+      "gmt": -5,
+      "capacidadAlmacen": 12000,
+      "latitud": -12.0219,
+      "longitud": -77.1143
+    },
+    {
+      "codigoIata": "JFK",
+      "ciudad": "Nueva York",
+      "pais": "Estados Unidos",
+      "continente": "América",
+      "gmt": -5,
+      "capacidadAlmacen": 25000,
+      "latitud": 40.6413,
+      "longitud": -73.7781
+    },
+    {
+      "codigoIata": "MAD",
+      "ciudad": "Madrid",
+      "pais": "España",
+      "continente": "Europa",
+      "gmt": 1,
+      "capacidadAlmacen": 18000,
+      "latitud": 40.4983,
+      "longitud": -3.5676
+    },
+    {
+      "codigoIata": "CDG",
+      "ciudad": "París",
+      "pais": "Francia",
+      "continente": "Europa",
+      "gmt": 1,
+      "capacidadAlmacen": 21000,
+      "latitud": 49.0097,
+      "longitud": 2.5479
+    },
+    {
+      "codigoIata": "NRT",
+      "ciudad": "Tokio",
+      "pais": "Japón",
+      "continente": "Asia",
+      "gmt": 9,
+      "capacidadAlmacen": 30000,
+      "latitud": 35.772,
+      "longitud": 140.3929
+    },
+    {
+      "codigoIata": "SYD",
+      "ciudad": "Sídney",
+      "pais": "Australia",
+      "continente": "Oceanía",
+      "gmt": 10,
+      "capacidadAlmacen": 17000,
+      "latitud": -33.9399,
+      "longitud": 151.1753
+    },
+    {
+      "codigoIata": "GRU",
+      "ciudad": "São Paulo",
+      "pais": "Brasil",
+      "continente": "América",
+      "gmt": -3,
+      "capacidadAlmacen": 22000,
+      "latitud": -23.4356,
+      "longitud": -46.4731
+    },
+    {
+      "codigoIata": "MEX",
+      "ciudad": "Ciudad de México",
+      "pais": "México",
+      "continente": "América",
+      "gmt": -6,
+      "capacidadAlmacen": 19500,
+      "latitud": 19.4361,
+      "longitud": -99.0719
+    },
+    {
+      "codigoIata": "EZE",
+      "ciudad": "Buenos Aires",
+      "pais": "Argentina",
+      "continente": "América",
+      "gmt": -3,
+      "capacidadAlmacen": 14500,
+      "latitud": -34.8222,
+      "longitud": -58.5358
+    },
+    {
+      "codigoIata": "BOG",
+      "ciudad": "Bogotá",
+      "pais": "Colombia",
+      "continente": "América",
+      "gmt": -5,
+      "capacidadAlmacen": 16000,
+      "latitud": 4.7016,
+      "longitud": -74.1469
+    },
+    {
+      "codigoIata": "SCL",
+      "ciudad": "Santiago",
+      "pais": "Chile",
+      "continente": "América",
+      "gmt": -4,
+      "capacidadAlmacen": 13000,
+      "latitud": -33.3929,
+      "longitud": -70.7858
+    },
+    {
+      "codigoIata": "AMS",
+      "ciudad": "Ámsterdam",
+      "pais": "Países Bajos",
+      "continente": "Europa",
+      "gmt": 1,
+      "capacidadAlmacen": 24000,
+      "latitud": 52.3105,
+      "longitud": 4.7683
+    },
+    {
+      "codigoIata": "FRA",
+      "ciudad": "Fráncfort",
+      "pais": "Alemania",
+      "continente": "Europa",
+      "gmt": 1,
+      "capacidadAlmacen": 26000,
+      "latitud": 50.0379,
+      "longitud": 8.5622
+    },
+    {
+      "codigoIata": "DXB",
+      "ciudad": "Dubái",
+      "pais": "Emiratos Árabes Unidos",
+      "continente": "Asia",
+      "gmt": 4,
+      "capacidadAlmacen": 32000,
+      "latitud": 25.2532,
+      "longitud": 55.3657
+    },
+    {
+      "codigoIata": "PEK",
+      "ciudad": "Pekín",
+      "pais": "China",
+      "continente": "Asia",
+      "gmt": 8,
+      "capacidadAlmacen": 28000,
+      "latitud": 40.0799,
+      "longitud": 116.6031
+    },
+    {
+      "codigoIata": "ICN",
+      "ciudad": "Seúl",
+      "pais": "Corea del Sur",
+      "continente": "Asia",
+      "gmt": 9,
+      "capacidadAlmacen": 20000,
+      "latitud": 37.4602,
+      "longitud": 126.4407
+    },
+    {
+      "codigoIata": "SIN",
+      "ciudad": "Singapur",
+      "pais": "Singapur",
+      "continente": "Asia",
+      "gmt": 8,
+      "capacidadAlmacen": 27000,
+      "latitud": 1.3644,
+      "longitud": 103.9915
+    },
+    {
+      "codigoIata": "LHR",
+      "ciudad": "Londres",
+      "pais": "Reino Unido",
+      "continente": "Europa",
+      "gmt": 0,
+      "capacidadAlmacen": 29000,
+      "latitud": 51.47,
+      "longitud": -0.4543
+    },
+    {
+      "codigoIata": "FCO",
+      "ciudad": "Roma",
+      "pais": "Italia",
+      "continente": "Europa",
+      "gmt": 1,
+      "capacidadAlmacen": 15500,
+      "latitud": 41.8003,
+      "longitud": 12.2389
+    },
+    {
+      "codigoIata": "YYZ",
+      "ciudad": "Toronto",
+      "pais": "Canadá",
+      "continente": "América",
+      "gmt": -5,
+      "capacidadAlmacen": 17500,
+      "latitud": 43.6777,
+      "longitud": -79.6248
+    },
+    {
+      "codigoIata": "JNB",
+      "ciudad": "Johannesburgo",
+      "pais": "Sudáfrica",
+      "continente": "África",
+      "gmt": 2,
+      "capacidadAlmacen": 14000,
+      "latitud": -26.1337,
+      "longitud": 28.242
+    },
+    {
+      "codigoIata": "CAI",
+      "ciudad": "El Cairo",
+      "pais": "Egipto",
+      "continente": "África",
+      "gmt": 2,
+      "capacidadAlmacen": 13500,
+      "latitud": 30.1219,
+      "longitud": 31.4056
+    },
+    {
+      "codigoIata": "IST",
+      "ciudad": "Estambul",
+      "pais": "Turquía",
+      "continente": "Europa",
+      "gmt": 3,
+      "capacidadAlmacen": 25000,
+      "latitud": 41.2753,
+      "longitud": 28.7519
+    },
+    {
+      "codigoIata": "DEL",
+      "ciudad": "Nueva Delhi",
+      "pais": "India",
+      "continente": "Asia",
+      "gmt": 5.5,
+      "capacidadAlmacen": 21000,
+      "latitud": 28.5562,
+      "longitud": 77.1
+    },
+    {
+      "codigoIata": "BKK",
+      "ciudad": "Bangkok",
+      "pais": "Tailandia",
+      "continente": "Asia",
+      "gmt": 7,
+      "capacidadAlmacen": 19000,
+      "latitud": 13.69,
+      "longitud": 100.7501
+    },
+    {
+      "codigoIata": "AKL",
+      "ciudad": "Auckland",
+      "pais": "Nueva Zelanda",
+      "continente": "Oceanía",
+      "gmt": 12,
+      "capacidadAlmacen": 12500,
+      "latitud": -37.0082,
+      "longitud": 174.785
+    },
+    {
+      "codigoIata": "MIA",
+      "ciudad": "Miami",
+      "pais": "Estados Unidos",
+      "continente": "América",
+      "gmt": -5,
+      "capacidadAlmacen": 23000,
+      "latitud": 25.7959,
+      "longitud": -80.287
+    },
+    {
+      "codigoIata": "LAX",
+      "ciudad": "Los Ángeles",
+      "pais": "Estados Unidos",
+      "continente": "América",
+      "gmt": -8,
+      "capacidadAlmacen": 31000,
+      "latitud": 33.9416,
+      "longitud": -118.4085
+    },
+    {
+      "codigoIata": "HND",
+      "ciudad": "Tokio",
+      "pais": "Japón",
+      "continente": "Asia",
+      "gmt": 9,
+      "capacidadAlmacen": 33000,
+      "latitud": 35.5494,
+      "longitud": 139.7798
+    },
+    {
+      "codigoIata": "ATH",
+      "ciudad": "Atenas",
+      "pais": "Grecia",
+      "continente": "Europa",
+      "gmt": 2,
+      "capacidadAlmacen": 11000,
+      "latitud": 37.9364,
+      "longitud": 23.9475
+    },
+    {
+      "codigoIata": "CPT",
+      "ciudad": "Ciudad del Cabo",
+      "pais": "Sudáfrica",
+      "continente": "África",
+      "gmt": 2,
+      "capacidadAlmacen": 10000,
+      "latitud": -33.97,
+      "longitud": 18.5972
+    }
+  ]
+}
