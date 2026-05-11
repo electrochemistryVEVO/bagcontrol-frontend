@@ -1,13 +1,14 @@
 import { AeropuertoService } from '@/app/services/aeropueto.service';
-import { MapaSimulacion } from './components/mapa-simulacion';
+import { ContenedorSimulacion } from './components/contenedor-simulacion';
 
 export default async function SimulacionPage() {
-  const { data: aeropuertos } = await AeropuertoService.listarAeropuertos();
 
   return (
-    <div style={{ height: '80vh' }}>
-      <h1>Página de simulación</h1>
-      <MapaSimulacion aeropuertosIniciales={aeropuertos} />
+    <div style={{ height: '80vh', display: 'flex', flexDirection: 'column' }}>
+      <h1>Panel de Simulación</h1>
+      
+      {/* Delegamos la lógica del botón y el WebSocket al cliente */}
+      <ContenedorSimulacion />
     </div>
   );
 }
