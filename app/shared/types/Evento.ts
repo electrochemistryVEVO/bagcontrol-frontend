@@ -1,3 +1,16 @@
+
+export class EventoBatch {
+    public numeroLote !: string;
+    public ventanaInicio !: Date;
+    public ventanaFin !: Date;
+    public cantidadEventos !: number;
+    public eventos : Evento[] = [];
+
+    constructor(obj : Partial<EventoBatch>){
+        Object.assign(this,obj);
+    }
+}
+
 export class Evento{
     public tipo!: string;
 }
@@ -32,11 +45,13 @@ export class EventoVuelo extends Evento{
     }
 }
 
-export class SimulationEvent extends CustomEvent<Evento[]>{
+export class SimulationEvent extends CustomEvent<EventoBatch>{
     public event!:Evento[];
-    constructor(obj:Evento[]) {
+    public horaActual!:Date;
+    constructor(obj:EventoBatch) {
         super("eventoSimulacion",{detail:obj});
-        this.event = obj;
+        this.event = obj.eventos;
+        this.horaActual = obj.ventanaFin;
     }
     static subscribe(cb:(eventoSim:Event)=>void){
         document.addEventListener("eventoSimulacion", cb);

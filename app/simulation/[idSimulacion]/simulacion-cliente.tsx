@@ -68,7 +68,7 @@ export function SimulacionCliente({ id, topic, aeropuertosIniciales }: Props) {
             //Activar evento
 
           });
-            document.dispatchEvent(new SimulationEvent(lote.eventos));
+            document.dispatchEvent(new SimulationEvent(lote));
         }, 
         async () => {
           if (!arrancadoRef.current) {

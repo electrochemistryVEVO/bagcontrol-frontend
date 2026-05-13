@@ -10,6 +10,7 @@ export function ContenedorSimulacion() {
   const router = useRouter();
 
   const handlePreparar = async () => {
+      localStorage.setItem("fechaInicio",'2026-02-10')
     const params : ParametrosSimulacion = { fechaInicio: '2026-02-10',fechaFin: '2026-02-15' , k: 300};
     const { data } = await SimulacionService.prepararInicio(params); 
     router.push(`/simulation/${data.simulacionId}?topic=${encodeURIComponent(data.websocketTopic)}`);
