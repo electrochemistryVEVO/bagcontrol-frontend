@@ -69,7 +69,7 @@ interface AvionesSimulacionProps{
 }
 
 function AvionesSimulacion({aeropuertos,vuelos,_tiempoActual}:AvionesSimulacionProps){
-  const SIM_SECONDS_TO_REAL_SECONDS = 300; //Hardcodeado por el momento, deberia de pasarse como un valor al back
+  const SIM_SECONDS_TO_REAL_SECONDS = 600; //Hardcodeado por el momento, deberia de pasarse como un valor al back
   //const [initTime,setInitTime] = useState(new Date());
   const [actualMs,setActualMs] = useState(0);
   const [tiempoActual,setTiempoActual] = useState(new Date(_tiempoActual));
@@ -133,6 +133,8 @@ function AvionesSimulacion({aeropuertos,vuelos,_tiempoActual}:AvionesSimulacionP
     console.log(`Porcentaje viajado: ${percTraveled}`)
     return percTraveled
   },[actualMs, tiempoActual])
+
+
   const planeCoords = useCallback(
       (flight:EventoVuelo) => {
         const aeropuertoOrigen = aeropuertos.find((e)=>e.codigoIata===flight.origenIata)
@@ -149,6 +151,7 @@ function AvionesSimulacion({aeropuertos,vuelos,_tiempoActual}:AvionesSimulacionP
         return res
       }
       ,[aeropuertos, getPercTraveled])
+
   const initFeatures : Feature[] = [];
   const geojson: FeatureCollection = useMemo(() => ({
     type: 'FeatureCollection',
@@ -156,14 +159,19 @@ function AvionesSimulacion({aeropuertos,vuelos,_tiempoActual}:AvionesSimulacionP
       if((getPercTraveled(vuelo)??1.0)>=1.0)return acum;
       return [...acum,({
         type: 'Feature',
-        properties: { ...vuelo },
+        properties: { ...vuelo,bearing:Math.atan2(
+              (aeropuertos.find((e)=>e.codigoIata===vuelo.destinoIata)?.latitud ?? 0)
+              - (aeropuertos.find((e)=>e.codigoIata===vuelo.destinoIata)?.latitud ?? 0),
+              (aeropuertos.find((e)=>e.codigoIata===vuelo.destinoIata)?.longitud ?? 0)
+              - (aeropuertos.find((e)=>e.codigoIata===vuelo.destinoIata)?.longitud ?? 0)
+          ) },
         geometry: {
           type: 'Point',
           coordinates: planeCoords(vuelo) ?? [0,0],
         },
       })]
     },initFeatures),
-  }), [actualMs]);
+  }), [vuelos,actualMs]);
   return (
       <Source id="aviones-data" type="geojson" data={geojson}>
         <Layer {...layerStyleAirplane} />
@@ -174,6 +182,7 @@ function AvionesSimulacion({aeropuertos,vuelos,_tiempoActual}:AvionesSimulacionP
 function RutasSimulacion({aeropuertos}:RutasSimulacionProps){
   //state of current flights
   const [currentFlights,setCurrentFlights] = useState<Record<string, EventoVuelo>>(JSON.parse(localStorage.getItem("currentFlights") ?? "{}"))
+  const futureFlightRef = useRef(currentFlights);
   const [initTime,setInitTime] = useState(new Date(localStorage.getItem("fechaInicio") ?? 0));
   console.log("Vuelos actuales")
   console.log(currentFlights)
@@ -182,19 +191,21 @@ function RutasSimulacion({aeropuertos}:RutasSimulacionProps){
       if(!(_event instanceof SimulationEvent))return;
       const eventoSim = _event as SimulationEvent;
       const evSimArr = eventoSim.event
-      const _curFlights = {...currentFlights};
+      const _curFlights = {...futureFlightRef.current};
       for(const evSim of evSimArr){
-        if(evSim.tipo === "VUELO_DESPEGA" || evSim.tipo==="VUELO_ATERRIZA"){
+        if(evSim.tipo === "VUELO_DESPEGA"){
           const evVuelo = evSim as EventoVuelo;
-          if(evVuelo.tipo === "VUELO_DESPEGA"){
-            _curFlights[evVuelo.codigoVuelo] = evVuelo
-          }
-          else if(evVuelo.tipo === "VUELO_ATERRIZA"){
-            delete _curFlights[evVuelo.codigoVuelo]
-          }
+          _curFlights[evVuelo.codigoVuelo] = evVuelo
         }
       }
       setCurrentFlights(_curFlights)
+      for(const evSim of evSimArr){
+        if(evSim.tipo==="VUELO_ATERRIZA"){
+          const evVuelo = evSim as EventoVuelo;
+          delete _curFlights[evVuelo.codigoVuelo]
+        }
+      }
+      futureFlightRef.current = _curFlights
       setInitTime(_event.horaActual)
   },[])
   useEffect(()=>{
