@@ -69,7 +69,7 @@ interface AvionesSimulacionProps{
 }
 
 function AvionesSimulacion({aeropuertos,vuelos,_tiempoActual}:AvionesSimulacionProps){
-  const SIM_SECONDS_TO_REAL_SECONDS = 600; //Hardcodeado por el momento, deberia de pasarse como un valor al back
+  const SIM_SECONDS_TO_REAL_SECONDS = 6000; //Hardcodeado por el momento, deberia de pasarse como un valor al back
   //const [initTime,setInitTime] = useState(new Date());
   const [actualMs,setActualMs] = useState(0);
   const [tiempoActual,setTiempoActual] = useState(new Date(_tiempoActual));
