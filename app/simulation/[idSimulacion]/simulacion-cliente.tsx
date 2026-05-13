@@ -5,6 +5,7 @@ import { SimulacionService } from '@/app/services/simulation.service';
 import { simulacionWS } from '@/app/services/config/webSocket';
 import { Aeropuerto } from '@/app/shared/types/Aeropuerto';
 import { MapaSimulacion } from './components/mapa-simulacion';
+import {Evento, EventoAeropuerto, EventoVuelo, SimulationEvent} from "@/app/shared/types/Evento";
 
 interface Props {
   id: string;
@@ -43,25 +44,31 @@ export function SimulacionCliente({ id, topic, aeropuertosIniciales }: Props) {
             return;
           }
 
-          lote.eventos.forEach((evento: any, index: number) => {
-            console.log(`\nEvento ${index + 1} del lote`);
-            console.log("Tipo:", evento.tipo);
+          lote.eventos.forEach((evento: Evento, index: number) => {
+            //console.log(`\nEvento ${index + 1} del lote`);
+            //console.log("Tipo:", evento.tipo);
 
             if (evento.tipo === "AEROPUERTO_ACTUALIZADO") {
-              console.log("Aeropuerto:", evento.codigoAeropuerto);
-              console.log("Maletas:", `${evento.maletasActuales}/${evento.capacidadAlmacen}`);
-              console.log("Estado:", evento.estado);
-              console.log("Ocupación:", evento.porcentajeOcupacion);
+                const _evento = evento as EventoAeropuerto;
+              //console.log("Aeropuerto:", _evento.codigoAeropuerto);
+              //console.log("Maletas:", `${_evento.maletasActuales}/${_evento.capacidadAlmacen}`);
+              //console.log("Estado:", _evento.estado);
+              //console.log("Ocupación:", _evento.porcentajeOcupacion);
             } else if (evento.tipo === "VUELO_DESPEGA" || evento.tipo === "VUELO_ATERRIZA") {
-              console.log("Vuelo:", evento.codigoVuelo);
-              console.log("Ruta:", `${evento.origenIata} → ${evento.destinoIata}`);
-              console.log("Maletas:", evento.cantidadMaletas);
-              console.log("Hora salida local:", evento.horaSalidaLocal || evento.horaSalida);
-              console.log("Hora llegada local:", evento.horaLlegadaLocal || evento.horaLlegada);
+                const _evento = evento as EventoVuelo;
+                if(evento.tipo==="VUELO_DESPEGA")console.log(`Despega ${_evento.codigoVuelo}`)
+              //console.log("Vuelo:", _evento.codigoVuelo);
+              //console.log("Ruta:", `${_evento.origenIata} → ${_evento.destinoIata}`);
+              //console.log("Maletas:", _evento.cantidadMaletas);
+              console.log("Hora salida local:", _evento.horaSalidaLocal || _evento.horaSalida);
+              console.log("Hora llegada local:", _evento.horaLlegadaLocal || _evento.horaLlegada);
             } else {
               console.log(evento);
             }
+            //Activar evento
+
           });
+            document.dispatchEvent(new SimulationEvent(lote.eventos));
         }, 
         async () => {
           if (!arrancadoRef.current) {
