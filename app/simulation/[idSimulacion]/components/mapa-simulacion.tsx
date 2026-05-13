@@ -69,7 +69,7 @@ interface AvionesSimulacionProps{
 }
 
 function AvionesSimulacion({aeropuertos,vuelos,_tiempoActual}:AvionesSimulacionProps){
-  const SIM_SECONDS_TO_REAL_SECONDS = 6000; //Hardcodeado por el momento, deberia de pasarse como un valor al back
+  const SIM_SECONDS_TO_REAL_SECONDS = 1000; //Hardcodeado por el momento, deberia de pasarse como un valor al back
   //const [initTime,setInitTime] = useState(new Date());
   const [actualMs,setActualMs] = useState(0);
   const [tiempoActual,setTiempoActual] = useState(new Date(_tiempoActual));
@@ -80,7 +80,6 @@ function AvionesSimulacion({aeropuertos,vuelos,_tiempoActual}:AvionesSimulacionP
     let _now = Date.now();
     //const _actual = new Date(_tiempoActual)
     //let abort = false;
-    console.log(Date.now() - _now)
     //const diff = Date.now() - _now
     _now = Date.now();
     let timeout : NodeJS.Timeout | null = null;
@@ -123,14 +122,9 @@ function AvionesSimulacion({aeropuertos,vuelos,_tiempoActual}:AvionesSimulacionP
         + actualMs*SIM_SECONDS_TO_REAL_SECONDS //Ajustar por tiempo elapsado interno
         + 5*60*60*1000 //Ajustar por GMT
     )
-    console.log(`Tiempo actual real: ${tiempoActualReal}`)
-    console.log(`Hora inicio: ${horaInicio}`)
-    console.log(`Dividendo: ${tiempoActualReal.getTime() - horaInicio.getTime()}`)
-    console.log(`Divisor: ${horaFin.getTime() - horaInicio.getTime()}`)
     const percTraveled =
         clamp((tiempoActualReal.getTime() - horaInicio.getTime())
             /(horaFin.getTime() - horaInicio.getTime()),0,1)
-    console.log(`Porcentaje viajado: ${percTraveled}`)
     return percTraveled
   },[actualMs, tiempoActual])
 
@@ -146,8 +140,6 @@ function AvionesSimulacion({aeropuertos,vuelos,_tiempoActual}:AvionesSimulacionP
           origCoords[0] + (destCoords[0]-origCoords[0])*(percTraveled??0),
           origCoords[1] + (destCoords[1]-origCoords[1])*(percTraveled??0)
         ]
-        console.log(`Porcentaje viajado: ${percTraveled}`)
-        console.log(`Coordenadas actuales: ${res}`)
         return res
       }
       ,[aeropuertos, getPercTraveled])
