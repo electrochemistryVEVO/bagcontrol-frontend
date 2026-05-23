@@ -11,7 +11,6 @@ export default async function SimulacionPage({
     const resolvedParams = await params;
     const resolvedSearchParams = await searchParams;
     const aeropuertosIniciales = (await AeropuertoService.listarAeropuertos()).data;
-
   return (
     <SimulacionCliente 
       id={resolvedParams.idSimulacion}

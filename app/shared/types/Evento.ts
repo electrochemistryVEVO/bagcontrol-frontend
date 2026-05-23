@@ -1,4 +1,4 @@
-
+//Batch que se recibe del back
 export class EventoBatch {
     public numeroLote !: string;
     public ventanaInicio !: Date;
@@ -8,6 +8,16 @@ export class EventoBatch {
 
     constructor(obj : Partial<EventoBatch>){
         Object.assign(this,obj);
+    }
+}
+
+//Batch que se recibe mediante un evento en la simulacion
+export class EventoBatchSimulation{
+    tiempoActual !: Date;
+    eventos : Evento[] = [];
+    constructor(tiempoActual : Date,eventos: Evento[]){
+        this.tiempoActual = tiempoActual;
+        this.eventos = eventos;
     }
 }
 
@@ -38,20 +48,21 @@ export class EventoVuelo extends Evento{
     public horaLlegadaLocal?: Date;
     public horaSalida?: Date;
     public horaLlegada?: Date;
-
+    public horaSalidaUtc !: Date;
+    public horaLlegadaUtc !: Date;
     constructor(obj : Partial<EventoVuelo>){
         super()
         Object.assign(this,obj);
     }
 }
 
-export class SimulationEvent extends CustomEvent<EventoBatch>{
+export class SimulationEvent extends CustomEvent<EventoBatchSimulation>{
     public event!:Evento[];
     public horaActual!:Date;
-    constructor(obj:EventoBatch) {
+    constructor(obj:EventoBatchSimulation) {
         super("eventoSimulacion",{detail:obj});
         this.event = obj.eventos;
-        this.horaActual = obj.ventanaFin;
+        this.horaActual = obj.tiempoActual;
     }
     static subscribe(cb:(eventoSim:Event)=>void){
         document.addEventListener("eventoSimulacion", cb);

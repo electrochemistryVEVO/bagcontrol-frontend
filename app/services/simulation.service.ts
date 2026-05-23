@@ -1,4 +1,4 @@
-import { RespuestaInicioSimulacionDTO } from '../shared/types/Simulacion';
+import {RespuestaEstadoSimulacionDTO, RespuestaInicioSimulacionDTO} from '../shared/types/Simulacion';
 import axiosApi from './config/axios';
 
 export type ParametrosSimulacion = {
@@ -11,7 +11,8 @@ export type ParametrosSimulacion = {
 
 export const SimulacionService = {
     prepararInicio : (params: ParametrosSimulacion) => axiosApi.post<RespuestaInicioSimulacionDTO>('/simulacion/preparar', null, {params}),
-    iniciar: (idSimulacion: string) => axiosApi.post(`/simulacion/iniciar/${idSimulacion}/arrancar`)
+    iniciar: (idSimulacion: string) => axiosApi.post(`/simulacion/iniciar/${idSimulacion}/arrancar`),
+    obtenerEstado : (idSimulacion:string) : Promise<any> => axiosApi.get(`/simulacion/${idSimulacion}/estado`)
 }
 
 

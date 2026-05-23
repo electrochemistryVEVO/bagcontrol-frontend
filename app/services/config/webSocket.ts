@@ -6,14 +6,13 @@ class SimulacionWebSocket {
 
   conectar(topic: string, onMessage: (lote: any) => void, onSuccess: () => void) {
     const socket = new SockJS('http://localhost:8080/ws/simulacion'); //harcodeado
-
     this.client = new Client({
       webSocketFactory: () => socket,
       reconnectDelay: 5000,
-      
+
       onConnect: () => {
         console.log('2. Conectado al WebSocket correctamente.');
-        
+
         this.client?.subscribe(topic, (message) => {
           if (message.body) {
             const lote = JSON.parse(message.body);

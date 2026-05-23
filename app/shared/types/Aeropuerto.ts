@@ -4,8 +4,12 @@ export type Aeropuerto= {
   codigoIata: string;
   latitud: number;
   longitud: number;
+  gmt : number;
   cantidadAlmacen: number;
   capacidadAlmacen: number;
+  ciudad : string;
+  pais : string;
+  continente : string;
 };
 
 //Usado en la simulación del mapa
