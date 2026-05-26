@@ -100,14 +100,16 @@ function AvionesSimulacion({aeropuertos,vuelos,getPercTraveled,initTime}:Aviones
     type: 'FeatureCollection',
     features: vuelos.reduce((acum,vuelo) => {
       if((getPercTraveled(vuelo)??1.0)>=1.0)return acum;
+      const bearing = Math.atan2(
+          (aeropuertos.find((e)=>e.codigoIata===vuelo.destinoIata)?.longitud ?? 0)
+          - (aeropuertos.find((e)=>e.codigoIata===vuelo.origenIata)?.longitud ?? 0),
+          (aeropuertos.find((e)=>e.codigoIata===vuelo.destinoIata)?.latitud ?? 0)
+          - (aeropuertos.find((e)=>e.codigoIata===vuelo.origenIata)?.latitud ?? 0)
+      ) * 180 / Math.PI;
+      console.log(`Bearing: ${bearing}`)
       return [...acum,({
         type: 'Feature',
-        properties: { ...vuelo,bearing:Math.atan2(
-              (aeropuertos.find((e)=>e.codigoIata===vuelo.destinoIata)?.latitud ?? 0)
-              - (aeropuertos.find((e)=>e.codigoIata===vuelo.destinoIata)?.latitud ?? 0),
-              (aeropuertos.find((e)=>e.codigoIata===vuelo.destinoIata)?.longitud ?? 0)
-              - (aeropuertos.find((e)=>e.codigoIata===vuelo.destinoIata)?.longitud ?? 0)
-          ) },
+        properties: { ...vuelo,bearing},
         geometry: {
           type: 'Point',
           coordinates: planeCoords(vuelo) ?? [0,0],
@@ -259,7 +261,7 @@ export function MapaSimulacion({ aeropuertosIniciales }: Props) {
     type: 'FeatureCollection',
     features: aeropuertos.map((airport) => ({
       type: 'Feature',
-      properties: { ...airport },
+      properties: { ...airport,isAirport:true },
       geometry: {
         type: 'Point',
         coordinates: [airport.longitud, airport.latitud],
@@ -272,19 +274,11 @@ export function MapaSimulacion({ aeropuertosIniciales }: Props) {
     setShowPopup(true);
     popupRef.current?.trackPointer();
   };
-  /*const mapRef = useRef<MapRef>(null);
-  const setMapRef = useCallback((node:MapRef)=>{
-    if(node){
-      console.log("Sprite agregado")
-      node.addSprite("airplane","https://w7.pngwing.com/pngs/303/986/png-transparent-plane-illustration-airplane-computer-icons-avion-angle-monochrome-vehicle-thumbnail.png")
-    }
-    mapRef.current = node;
-  },[])*/
 
   return (
     <Map
       initialViewState={{ longitude: 0, latitude: 0, zoom: 3.5 }}
-      mapStyle="https://demotiles.maplibre.org/style.json"
+      mapStyle="https://tiles.openfreemap.org/styles/bright"
       onMouseEnter={handleMouseEnter}
       onLoad={async (e:MapLibreEvent)=>{
         //const img: HTMLImageElement = createElement("img",{src:AirplaneImage})
@@ -294,7 +288,7 @@ export function MapaSimulacion({ aeropuertosIniciales }: Props) {
         e.target.addImage("airplane",img.data)
       }}
       onMouseLeave={() => setShowPopup(false)}
-      interactiveLayerIds={['point']}
+      interactiveLayerIds={['point','plane']}
     >
       <Source id="aeropuertos-data" type="geojson" data={geojson}>
         <Layer {...layerStyle} />
@@ -309,11 +303,22 @@ export function MapaSimulacion({ aeropuertosIniciales }: Props) {
           ref={popupRef}
           closeButton={false}
         >
-          <b>{selAirport.properties?.codigoIata}</b>
-          <p>
-            {selAirport.properties?.cantidadAlmacen}/
-            {selAirport.properties?.capacidadAlmacen} maletas
-          </p>
+          {selAirport.properties?.isAirport ? (<>
+            <b>{selAirport.properties?.codigoIata}</b>
+            <p>
+              {selAirport.properties?.cantidadAlmacen}/
+              {selAirport.properties?.capacidadAlmacen} maletas
+            </p>
+          </>) : (<>
+            <b>Vuelo {selAirport.properties?.codigoVuelo}</b>
+            <p>
+              {selAirport.properties?.origenIata} {'\u2192'}
+              {selAirport.properties?.destinoIata}
+            </p>
+            <p>
+              {selAirport.properties?.cantidadMaletas} maletas
+            </p>
+          </>)}
         </Popup>
       )}
     </Map>
