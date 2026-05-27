@@ -15,3 +15,7 @@ export function binarySearch<T,V>(arr : T[], target : V,cmp:(a:T,b:V)=>number, s
         return binarySearch<T,V>(arr, target,cmp, start, mid - 1);
     }
 }
+
+export function DateFormat(d : Date) : string{
+    return `${d.getFullYear()}-${d.getMonth().toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`
+}

@@ -236,7 +236,7 @@ export function SimulacionCliente({ id, topic, aeropuertosIniciales }: Props) {
         .then(({data})=> {
             console.log(data)
             console.log(`Tiempo actual: ${data.fechaInicio}`)
-            console.log(`Escala de tiempo: 1000:${data.saMs}`)
+            console.log(`Escala de tiempo: 1:${data.k}`)
             if(!data.detenida && !data.pausada) {
                 let _date = new Date(data.fechaInicio);
                 let i=1;
@@ -259,7 +259,7 @@ export function SimulacionCliente({ id, topic, aeropuertosIniciales }: Props) {
                 console.log("NUmero inicial de batches:")
                 console.log(_batches_ref)
                 batchesRef.current = _batches_ref;
-                iniciar(new Date(data.fechaInicio), data.saMs)
+                iniciar(new Date(data.fechaInicio), data.k*1000)
             }
         });
     //iniciar();

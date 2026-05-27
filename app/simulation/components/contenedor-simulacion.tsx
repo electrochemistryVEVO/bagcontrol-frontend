@@ -11,6 +11,7 @@ import {Select} from "@mui/material";
 import {useEffect, useState} from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import {DateFormat} from "@/app/shared/Utils";
 
 enum SimulationType{
     TIEMPO_REAL,
@@ -43,10 +44,13 @@ export function ContenedorSimulacion() {
       const _endDate =
           (   simulationType===SimulationType.VENTANA_TIEMPO ? endDate :
               simulationType===SimulationType.TIEMPO_REAL ? new Date(_startDate.getTime() + 1000*60*60*24) : null)
-      localStorage.setItem("fechaInicio",'2026-02-10')
+      const _k = simulationType===SimulationType.TIEMPO_REAL ? 1 : timeScale;
+      localStorage.setItem("fechaInicio",DateFormat(_startDate))
       console.log(_startDate);
       console.log(_endDate);
-    const params : ParametrosSimulacion = { fechaInicio: _startDate.toDateString(),fechaFin: _endDate?.toDateString() , k: 300};
+    const params : ParametrosSimulacion = { fechaInicio: DateFormat(_startDate),
+        fechaFin: _endDate ? DateFormat(_endDate) : undefined ,
+        k: _k};
     const { data } = await SimulacionService.prepararInicio(params); 
     router.push(`/simulation/${data.simulacionId}?topic=${encodeURIComponent(data.websocketTopic)}`);
   };
@@ -98,9 +102,9 @@ export function ContenedorSimulacion() {
               )}
               {(simulationType === SimulationType.VENTANA_TIEMPO || simulationType === SimulationType.COLAPSO_OPERATIVO) && (
                   <>
-                      <InputLabel id="select_time_scale_label">Numero de segundos simulados por segundo real</InputLabel>
+                      <InputLabel id="select_time_scale_label">Numero de minutos simulados cada 10 segundos</InputLabel>
                       <Slider aria-labelledby="select_time_scale_label"
-                      defaultValue={10} min={1} max={99.9999} step={0.1}
+                      defaultValue={15} min={1} max={120}
                       onChange = {(_,update)=>{setTimeScale(update);}}
                       valueLabelDisplay="auto"
                       />
