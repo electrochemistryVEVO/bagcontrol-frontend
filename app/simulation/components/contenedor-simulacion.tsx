@@ -6,7 +6,7 @@ import {
   Map,
 } from '@vis.gl/react-maplibre';
 import styles from '../../stylesheets/contenedor.module.css';
-import {FormControl, InputLabel, MenuItem, Slider} from "@mui/material";
+import {FormControl, InputLabel, MenuItem, Slider, Typography} from "@mui/material";
 import {Select} from "@mui/material";
 import {useEffect, useState} from "react";
 import DatePicker from "react-datepicker";
@@ -50,7 +50,7 @@ export function ContenedorSimulacion() {
       console.log(_endDate);
     const params : ParametrosSimulacion = { fechaInicio: DateFormat(_startDate),
         fechaFin: _endDate ? DateFormat(_endDate) : undefined ,
-        k: _k};
+        k: _k*10}; //saMs de back es constante y es 10 segundos
     const { data } = await SimulacionService.prepararInicio(params); 
     router.push(`/simulation/${data.simulacionId}?topic=${encodeURIComponent(data.websocketTopic)}`);
   };
@@ -82,7 +82,7 @@ export function ContenedorSimulacion() {
                   <MenuItem value={SimulationType.COLAPSO_OPERATIVO}>Hasta el colapso operativo</MenuItem>
               </Select>
               {simulationType === SimulationType.VENTANA_TIEMPO && (<>
-                <InputLabel id="select_date_range_label">Seleccionar rango de fechas de simulacion</InputLabel>
+                <Typography id="select_date_range_label">Seleccionar rango de fechas de simulacion</Typography>
                 <DatePicker aria-labelledby="select_date_range_label" showMonthYearDropdown={true} selectsRange={true}
                     startDate={startDate} endDate={endDate}
                     selectedDates={[new Date('2026-02-10'),new Date('2026-02-15')]}
@@ -92,7 +92,7 @@ export function ContenedorSimulacion() {
               </>)}
               {(simulationType === SimulationType.TIEMPO_REAL || simulationType === SimulationType.COLAPSO_OPERATIVO) && (
                   <>
-                      <InputLabel id="select_date_start_label">Seleccionar fecha inicio</InputLabel>
+                      <Typography id="select_date_start_label">Seleccionar fecha inicio</Typography>
                       <DatePicker aria-labelledby="select_date_start_label" showMonthYearDropdown={true}
                                   onChange={(update:Date|null)=> {setStartDate(update);}}
                                   selected={startDate}
@@ -102,21 +102,25 @@ export function ContenedorSimulacion() {
               )}
               {(simulationType === SimulationType.VENTANA_TIEMPO || simulationType === SimulationType.COLAPSO_OPERATIVO) && (
                   <>
-                      <InputLabel id="select_time_scale_label">Numero de minutos simulados cada 10 segundos</InputLabel>
-                      <Slider aria-labelledby="select_time_scale_label"
-                      defaultValue={15} min={1} max={120}
+                      <Typography id="select_time_scale_label">
+                          Numero de segundos simulados por segundo real
+                      </Typography>
+                      <Slider className={styles.simulacionContainerForm}
+                      aria-labelledby="select_time_scale_label" id="select_time_scale"
+                      defaultValue={30} min={1} max={300}
                       onChange = {(_,update)=>{setTimeScale(update);}}
                       valueLabelDisplay="auto"
+                      marks = {[{value:1,label:'1'},{value:300,label:'300'}]}
                       />
                   </>
               )}
+              <button
+                  onClick={handlePreparar}
+                  className={styles.simulacionButton}
+              >
+                  Preparar e Iniciar
+              </button>
           </FormControl>
-        <button 
-            onClick={handlePreparar} 
-            className={styles.simulacionButton}
-        >
-            Preparar e Iniciar
-        </button>
         </div>
     </div>
   );

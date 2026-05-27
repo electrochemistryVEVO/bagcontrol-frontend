@@ -54,6 +54,10 @@
     background-color: #2563eb;
 }
 
+.simulacionContainerForm {
+    color: white;
+}
+
 .simulacionButton:active {
     transform: scale(0.98);
 }
