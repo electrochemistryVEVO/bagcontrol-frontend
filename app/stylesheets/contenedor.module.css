@@ -1,0 +1,59 @@
+.mapContainer{
+    position: relative;
+    height: 100vh;
+    width: 100%;
+}
+
+.simulacionModal {
+    position: absolute;
+    top: 15%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+
+    background-color: rgba(30, 41, 59, 0.95);
+    color: #f8fafc;
+
+    padding: 30px;
+    border-radius: 12px;
+
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+
+    text-align: center;
+    min-width: 300px;
+}
+
+.simulacionTitle {
+    margin-top: 0;
+    margin-bottom: 20px;
+}
+
+.simulacionText {
+    margin-bottom: 20px;
+}
+
+.simulacionButton {
+    padding: 12px 24px;
+    cursor: pointer;
+
+    background-color: #3b82f6;
+    color: white;
+
+    border: none;
+    border-radius: 8px;
+
+    font-size: 1rem;
+    font-weight: bold;
+
+    box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.5);
+
+    transition: background-color 0.2s ease;
+}
+
+.simulacionButton:hover {
+    background-color: #2563eb;
+}
+
+.simulacionButton:active {
+    transform: scale(0.98);
+}
