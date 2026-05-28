@@ -4,11 +4,9 @@ import { ContenedorSimulacion } from './components/contenedor-simulacion';
 export default async function SimulacionPage() {
 
   return (
-    <div style={{ height: '80vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <h1>Panel de Simulación</h1>
-      
-      {/* Delegamos la lógica del botón y el WebSocket al cliente */}
-      <ContenedorSimulacion />
+        <ContenedorSimulacion />
     </div>
   );
 }
