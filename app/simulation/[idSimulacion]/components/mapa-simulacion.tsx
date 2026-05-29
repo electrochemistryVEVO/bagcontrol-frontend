@@ -1,326 +1,271 @@
 'use client';
 
 import {
-  Map,
+  Map as MapLibre,
   MapGeoJSONFeature,
   MapLayerMouseEvent,
   Popup,
   PopupInstance,
   Source,
   Layer,
-  CircleLayerSpecification, LineLayerSpecification, MapRef,
+  CircleLayerSpecification,
+  LineLayerSpecification,
+  MapRef,
+  SymbolLayerSpecification,
 } from '@vis.gl/react-maplibre';
-import {createElement, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
-import {Feature, FeatureCollection} from 'geojson';
+import { useMemo, useRef, useState, useEffect, RefObject } from 'react';
+import { FeatureCollection, Feature } from 'geojson';
+import { MapLibreEvent } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { Aeropuerto, AeropuertoSimulacion } from '@/app/shared/types/Aeropuerto';
-import { useSimulacion } from '../hooks/useSimulacion';
-import {Evento, EventoVuelo, SimulationEvent} from "@/app/shared/types/Evento";
-import {SymbolStyleLayer} from "maplibre-gl/src/style/style_layer/symbol_style_layer";
-import {MapLibreEvent, SymbolLayerSpecification} from "maplibre-gl";
-import {clamp} from "@mui/utils";
-//import AirplaneImage from '@/assets/png/airplane.png';
-import {Air} from "@mui/icons-material";
-import * as fs from "node:fs";
 
+import { AeropuertoSimulacion, Aeropuerto } from '@/app/shared/types/Aeropuerto';
+import { EventoVuelo } from "@/app/shared/types/Evento";
+import { AeropuertoPopupContent } from './pop-up-aeropuerto';
+import { RelojSimulacionOverlay } from './reloj-simulacion';
 
-const layerStyle: CircleLayerSpecification = {
+// ============================================================================
+// 1. ESTILOS DE CAPAS (Layers)
+// ============================================================================
+const layerStyleAeropuertos: CircleLayerSpecification = {
   id: 'point',
   type: 'circle',
   source: 'aeropuertos-data',
   paint: {
-    'circle-radius': 10,
-    'circle-color': '#007cbf',
+    'circle-radius': 8,
+    // Sincronizado con el DTO del backend usando 'estadoCapacidad'
+    'circle-color': [
+      'match',
+      ['get', 'estadoCapacidad'],
+      'ROJO', '#ef4444',
+      'AMARILLO', '#eab308',
+      'VERDE', '#22c55e',
+      '#007cbf' // Fallback
+    ],
+    'circle-stroke-width': 1,
+    'circle-stroke-color': '#ffffff'
   },
 };
 
-const layerStyleLine : LineLayerSpecification = {
+const layerStyleLine: LineLayerSpecification = {
   id: 'routes',
   type: 'line',
-  source : 'vuelos-data',
-  paint: {"line-color": "#198EC8"}
-}
+  source: 'rutas-data',
+  paint: { 
+    "line-color": "#198EC8",
+    "line-width": 2,
+    "line-opacity": 0.6,
+    "line-dasharray": [2, 2]
+  }
+};
 
-const layerStyleAirplane : SymbolLayerSpecification = {
+const layerStyleAirplane: SymbolLayerSpecification = {
   id: 'plane',
   type: 'symbol',
   source: 'aviones-data',
+  paint: {
+    'icon-opacity': 1,
+    'icon-opacity-transition': { duration: 0 } // Eliminamos el delay de 300ms de MapLibre
+  },
   layout: {
     'icon-image': 'airplane',
     'icon-rotate': ['get', 'bearing'],
     'icon-rotation-alignment': 'map',
-    'icon-overlap': 'always',
-    'icon-ignore-placement': true
+    'icon-allow-overlap': true,
+    'icon-ignore-placement': true,
+    'icon-size': 0.05
   }
+};
+
+// ============================================================================
+// 2. FUNCIONES MATEMÁTICAS (Helpers)
+// ============================================================================
+function interpolar(inicio: number[], fin: number[], progreso: number) {
+  return [
+    inicio[0] + (fin[0] - inicio[0]) * progreso,
+    inicio[1] + (fin[1] - inicio[1]) * progreso
+  ];
 }
 
+function calcularBearing(inicio: number[], fin: number[]) {
+  const dy = fin[1] - inicio[1];
+  const dx = fin[0] - inicio[0];
+  const theta = Math.atan2(dy, dx) * (180 / Math.PI);
+  
+  // Ajuste matemático de 180 grados para corregir la inversión de dirección de iconos que miran al norte
+  return 90 - theta
+}
+
+// ============================================================================
+// 3. COMPONENTE PRINCIPAL
+// ============================================================================
 interface Props {
-    aeropuertosIniciales: Aeropuerto[]
+  aeropuertosIniciales: Aeropuerto[];
+  aeropuertosRef: RefObject<Record<string, AeropuertoSimulacion>>; // Recibe la referencia en memoria RAM
+  vuelosActivosRef: RefObject<Map<string, EventoVuelo>>;
+  tiempoSimulacionRef: RefObject<number>;
 }
 
-interface RutasSimulacionProps{
-    aeropuertos: Aeropuerto[]
-    currentFlights: Record<string,EventoVuelo>
-    initTime: Date
-    actualMs: number
-}
-
-interface SimulacionTiempoRealProps{
-    aeropuertos: Aeropuerto[]
-}
-
-interface AvionesSimulacionProps{
-    aeropuertos: Aeropuerto[]
-    vuelos: EventoVuelo[]
-    getPercTraveled : (flight:EventoVuelo)=>number|null
-    initTime: Date
-}
-
-function AvionesSimulacion({aeropuertos,vuelos,getPercTraveled,initTime}:AvionesSimulacionProps){
-  const SIM_SECONDS_TO_REAL_SECONDS = 20000; //Hardcodeado por el momento, deberia de pasarse como un valor al back
-  //const [initTime,setInitTime] = useState(new Date());
-
-  const planeCoords = useCallback(
-      (flight:EventoVuelo) => {
-        const aeropuertoOrigen = aeropuertos.find((e)=>e.codigoIata===flight.origenIata)
-        const aeropuertoDestino = aeropuertos.find((e)=>e.codigoIata===flight.destinoIata)
-        const origCoords = [aeropuertoOrigen?.longitud ?? 0,aeropuertoOrigen?.latitud ?? 0]
-        const destCoords = [aeropuertoDestino?.longitud ?? 0,aeropuertoDestino?.latitud ?? 0]
-        const percTraveled = getPercTraveled(flight)
-        const res = [
-          origCoords[0] + (destCoords[0]-origCoords[0])*(percTraveled??0),
-          origCoords[1] + (destCoords[1]-origCoords[1])*(percTraveled??0)
-        ]
-        return res
-      }
-      ,[aeropuertos, getPercTraveled])
-
-  const initFeatures : Feature[] = [];
-  const geojson: FeatureCollection = useMemo(() => ({
-    type: 'FeatureCollection',
-    features: vuelos.reduce((acum,vuelo) => {
-      if((getPercTraveled(vuelo)??1.0)>=1.0)return acum;
-      const bearing = Math.atan2(
-          (aeropuertos.find((e)=>e.codigoIata===vuelo.destinoIata)?.longitud ?? 0)
-          - (aeropuertos.find((e)=>e.codigoIata===vuelo.origenIata)?.longitud ?? 0),
-          (aeropuertos.find((e)=>e.codigoIata===vuelo.destinoIata)?.latitud ?? 0)
-          - (aeropuertos.find((e)=>e.codigoIata===vuelo.origenIata)?.latitud ?? 0)
-      ) * 180 / Math.PI;
-      console.log(`Bearing: ${bearing}`)
-      return [...acum,({
-        type: 'Feature',
-        properties: { ...vuelo,bearing},
-        geometry: {
-          type: 'Point',
-          coordinates: planeCoords(vuelo) ?? [0,0],
-        },
-      })]
-    },initFeatures),
-  }), [vuelos,getPercTraveled]);
-  return (
-      <Source id="aviones-data" type="geojson" data={geojson}>
-        <Layer {...layerStyleAirplane} />
-      </Source>
-  )
-}
-
-function RutasSimulacion({aeropuertos,currentFlights,initTime}:RutasSimulacionProps){
-  //state of current flights
-  //const [currentFlights,setCurrentFlights] = useState<Record<string, EventoVuelo>>(JSON.parse(localStorage.getItem("currentFlights") ?? "{}"))
-  //const futureFlightRef = useRef(currentFlights);
-  //const [initTime,setInitTime] = useState(new Date(localStorage.getItem("fechaInicio") ?? 0));
-  console.log("Vuelos actuales")
-  console.log(currentFlights)
-  const arrFlights = Array.from(Object.values(currentFlights))
-  const geojson: FeatureCollection = useMemo(() => ({
-    type: 'FeatureCollection',
-    features: arrFlights.map((flight:EventoVuelo) => ({
-      type: 'Feature',
-      properties: { ...flight },
-      geometry: {
-        type: 'LineString',
-        coordinates: [[aeropuertos.find((e)=>e.codigoIata===flight.origenIata)?.longitud ?? 0,
-          aeropuertos.find((e)=>e.codigoIata===flight.origenIata)?.latitud ?? 0],
-          [aeropuertos.find((e)=>e.codigoIata===flight.destinoIata)?.longitud ?? 0,
-            aeropuertos.find((e)=>e.codigoIata===flight.destinoIata)?.latitud ?? 0]],
-      },
-    })),
-  }), [arrFlights, aeropuertos]);
-
-  return (
-      <>
-        <Source id="vuelos-data" type="geojson" data={geojson}>
-          <Layer {...layerStyleLine} />
-        </Source>
-      </>
-  )
-}
-
-function SimulacionTiempoReal({aeropuertos}:SimulacionTiempoRealProps){
-  const SIM_SECONDS_TO_REAL_SECONDS = 10000; //Hardcodeado por el momento, deberia de pasarse como un valor al back
-  const [currentFlights,setCurrentFlights] = useState<Record<string, EventoVuelo>>({});
-  const [initTime,setInitTime] = useState(new Date());
-  const [actualMs,setActualMs] = useState(0);
- // const [tiempoActual,setTiempoActual] = useState(new Date(initTime));
-  const futureFlightRef = useRef(currentFlights);
-
-  const cbEvent = useCallback((_event:Event)=>{
-    if(!(_event instanceof SimulationEvent))return;
-    const eventoSim = _event as SimulationEvent;
-    const evSimArr = eventoSim.event
-    const _curFlights = futureFlightRef.current;
-    //const _curFlights = {...currentFlights};
-    console.log("Lista de evSim:")
-    for(const evSim of evSimArr){
-      if(evSim.tipo === "VUELO_DESPEGA"){
-        const evVuelo = evSim as EventoVuelo;
-        console.log("Vuelo agregado")
-        _curFlights[evVuelo.codigoVuelo] = evVuelo
-      }
-    }
-    console.log(_curFlights)
-    setCurrentFlights(_curFlights)
-    for(const evSim of evSimArr){
-      if(evSim.tipo==="VUELO_ATERRIZA"){
-        const evVuelo = evSim as EventoVuelo;
-        delete _curFlights[evVuelo.codigoVuelo]
-      }
-    }
-    futureFlightRef.current = _curFlights
-    setInitTime(_event.horaActual)
-  },[])
-  useEffect(()=>{
-    console.log("event was subscribed to")
-    SimulationEvent.subscribe(cbEvent)
-    //Cleanup callback
-    return ()=>{
-      SimulationEvent.unsubscribe(cbEvent)
-    }
-  },[])
-
-  /*
-  useEffect(() => {
-    let _now = Date.now();
-    _now = Date.now();
-    let timeout : NodeJS.Timeout | null = null;
-    const timer = new Promise(r => {
-      timeout = setTimeout(r,500)
-      return timeout
-    });
-    timer.then(()=>{
-      const diff = Date.now() - _now
-      setActualMs(actualMs + diff)
-    })
-    //cleanup
-    return () => {
-      if((new Date(initTime)).toDateString()!==initTime.toDateString()){
-        console.log("Siguiente batch");
-        if(timeout)clearTimeout(timeout)
-        setActualMs(0)
-        //setTiempoActual(new Date(initTime))
-      }
-    }
-  }, [actualMs,initTime]);
-  */
-  const getPercTraveled = useCallback((flight:EventoVuelo)=>{
-    let horaInicio = flight.horaSalidaUtc
-    let horaFin = flight.horaLlegadaUtc
-    if(!horaInicio || !horaFin){return null}
-    horaInicio = new Date(horaInicio)
-    horaFin = new Date(horaFin)
-    console.log(`tiempoActualReal: ${initTime}`)
-    console.log(`Tiempo de vuelo: ${horaInicio}`)
-    const percTraveled =
-        clamp((initTime.getTime() - horaInicio.getTime())
-            /(horaFin.getTime() - horaInicio.getTime()),0,1)
-    return percTraveled
-  },[
-      //actualMs,
-    initTime])
-  const filteredFlights = Array.from(Object.values(currentFlights)).reduce((acum,val) : Record<string, EventoVuelo>=>{
-    const perc = getPercTraveled(val) ?? 0
-    if(perc>0 && perc<1)acum[val.codigoVuelo]=val;return acum;},{}
-  )
-  const arrFlights = Array.from(Object.values(filteredFlights))
-  return (<>
-      <RutasSimulacion aeropuertos={aeropuertos} currentFlights={filteredFlights} initTime={initTime} actualMs={actualMs}/>
-      <AvionesSimulacion aeropuertos={aeropuertos} vuelos={arrFlights} initTime={initTime} getPercTraveled={getPercTraveled} />
-  </>)
-}
-
-
-export function MapaSimulacion({ aeropuertosIniciales }: Props) {
-
-  const { aeropuertos } = useSimulacion(aeropuertosIniciales);
-
-  const [showPopup, setShowPopup] = useState(false);
-  const [selAirport, setSelAirport] = useState<MapGeoJSONFeature | null>(null);
+export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosActivosRef, tiempoSimulacionRef }: Props) {
+  const mapRef = useRef<MapRef>(null);
   const popupRef = useRef<PopupInstance | null>(null);
+  
+  const [showPopup, setShowPopup] = useState(false);
+  const [selFeature, setSelFeature] = useState<MapGeoJSONFeature | null>(null);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
-  const geojson: FeatureCollection = useMemo(() => ({
-    type: 'FeatureCollection',
-    features: aeropuertos.map((airport) => ({
-      type: 'Feature',
-      properties: { ...airport,isAirport:true },
-      geometry: {
-        type: 'Point',
-        coordinates: [airport.longitud, airport.latitud],
-      },
-    })),
-  }), [aeropuertos]);
+  // Diccionario ultra-rápido para coordenadas estáticas
+  const coordsAeropuertos = useMemo(() => {
+    const dict: Record<string, number[]> = {};
+    aeropuertosIniciales.forEach(a => {
+      dict[a.codigoIata] = [a.longitud, a.latitud];
+    });
+    return dict;
+  }, [aeropuertosIniciales]);
 
+  // ============================================================================
+  // 4. EL MOTOR GRÁFICO (WebGL Loop)
+  // ============================================================================
+  useEffect(() => {
+    let animationFrameId: number;
+
+    const animar = () => {
+      const map = mapRef.current?.getMap();
+      if (!map || !map.isStyleLoaded()) {
+        animationFrameId = requestAnimationFrame(animar);
+        return;
+      }
+
+      const tiempoActual = tiempoSimulacionRef.current;
+      const featuresAviones: Feature[] = [];
+      const featuresRutas: Feature[] = [];
+
+      // 1. Procesar y animar vuelos activos
+      vuelosActivosRef.current.forEach((vuelo) => {
+        const coordsOrigen = coordsAeropuertos[vuelo.origenIata];
+        const coordsDestino = coordsAeropuertos[vuelo.destinoIata];
+
+        if (!coordsOrigen || !coordsDestino) return;
+
+        const inicioMs = new Date(vuelo.horaSalidaUtc).getTime();
+        const finMs = new Date(vuelo.horaLlegadaUtc).getTime();
+        
+        const duracion = finMs - inicioMs;
+        let progreso = duracion > 0 ? (tiempoActual - inicioMs) / duracion : 1;
+        progreso = Math.max(0, Math.min(1, progreso)); 
+        
+        const posicionActual = interpolar(coordsOrigen, coordsDestino, progreso);
+        const bearing = calcularBearing(coordsOrigen, coordsDestino);
+
+        // Feature del Avión
+        featuresAviones.push({
+          type: 'Feature',
+          properties: { ...vuelo, bearing, isAirplane: true },
+          geometry: { type: 'Point', coordinates: posicionActual }
+        });
+
+        // Feature de la Ruta Dinámica progresiva (crece junto al avión)
+        if (progreso > 0.001) {
+          featuresRutas.push({
+            type: 'Feature',
+            properties: {},
+            geometry: { type: 'LineString', coordinates: [coordsOrigen, posicionActual] }
+          });
+        }
+      });
+
+      // 2. Extraer y construir la data de Aeropuertos en caliente desde la referencia RAM
+      const featuresAeropuertos: Feature[] = Object.values(aeropuertosRef.current || {}).map((airport) => ({
+        type: 'Feature',
+        properties: { ...airport, isAirport: true },
+        geometry: { type: 'Point', coordinates: [airport.longitud, airport.latitud] },
+      }));
+
+      // 3. Inyección síncrona simultánea a las fuentes WebGL
+      const sourceAviones = map.getSource('aviones-data') as maplibregl.GeoJSONSource;
+      const sourceRutas = map.getSource('rutas-data') as maplibregl.GeoJSONSource;
+      const sourceAeropuertos = map.getSource('aeropuertos-data') as maplibregl.GeoJSONSource;
+
+      if (sourceAviones) sourceAviones.setData({ type: 'FeatureCollection', features: featuresAviones });
+      if (sourceRutas) sourceRutas.setData({ type: 'FeatureCollection', features: featuresRutas });
+      if (sourceAeropuertos) sourceAeropuertos.setData({ type: 'FeatureCollection', features: featuresAeropuertos });
+
+      animationFrameId = requestAnimationFrame(animar);
+    };
+
+    animar();
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [coordsAeropuertos, vuelosActivosRef, tiempoSimulacionRef, aeropuertosRef]);
+
+  // ============================================================================
+  // 5. EVENTOS DE INTERACCIÓN (Hover y Popups)
+  // ============================================================================
   const handleMouseEnter = (event: MapLayerMouseEvent) => {
-    setSelAirport(event.features?.[0] ?? null);
+    setSelFeature(event.features?.[0] ?? null);
     setShowPopup(true);
     popupRef.current?.trackPointer();
   };
 
   return (
-    <Map
-      initialViewState={{ longitude: 0, latitude: 0, zoom: 3.5 }}
-      mapStyle="https://tiles.openfreemap.org/styles/bright"
-      onMouseEnter={handleMouseEnter}
-      onLoad={async (e:MapLibreEvent)=>{
-        //const img: HTMLImageElement = createElement("img",{src:AirplaneImage})
-        //const img = fs.readFileSync("../assets/png/airplane.png")
-        const img = await e.target.loadImage('http://localhost:3000/airplane.png')
-        console.log("real")
-        e.target.addImage("airplane",img.data)
-      }}
-      onMouseLeave={() => setShowPopup(false)}
-      interactiveLayerIds={['point','plane']}
-    >
-      <Source id="aeropuertos-data" type="geojson" data={geojson}>
-        <Layer {...layerStyle} />
-      </Source>
-      <SimulacionTiempoReal aeropuertos={aeropuertosIniciales}/>
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      
+      <MapLibre
+        ref={mapRef}
+        initialViewState={{ longitude: -75, latitude: -10, zoom: 4 }} 
+        mapStyle="https://tiles.openfreemap.org/styles/bright"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={() => setShowPopup(false)}
+        interactiveLayerIds={['point', 'plane']}
+        onLoad={async (e: MapLibreEvent) => {
+          const map = e.target;
+          if (!map.hasImage('airplane')) {
+            const img = await map.loadImage('/avion.png');     
+            map.addImage('airplane', img.data)
+            setImageLoaded(true);
+          }
+        }}
+      >
+        {/* CAPA DE RUTAS (Fondo) */}
+        <Source id="rutas-data" type="geojson" data={{ type: 'FeatureCollection', features: [] }}>
+          <Layer {...layerStyleLine} />
+        </Source>
 
-      {showPopup && selAirport && (
-        <Popup
-          longitude={selAirport.geometry.type === 'Point' ? (selAirport.geometry.coordinates[0] as number) : 0}
-          latitude={selAirport.geometry.type === 'Point' ? (selAirport.geometry.coordinates[1] as number) : 0}
-          anchor="bottom"
-          ref={popupRef}
-          closeButton={false}
-        >
-          {selAirport.properties?.isAirport ? (<>
-            <b>{selAirport.properties?.codigoIata}</b>
-            <p>
-              {selAirport.properties?.cantidadAlmacen}/
-              {selAirport.properties?.capacidadAlmacen} maletas
-            </p>
-          </>) : (<>
-            <b>Vuelo {selAirport.properties?.codigoVuelo}</b>
-            <p>
-              {selAirport.properties?.origenIata} {'\u2192'}
-              {selAirport.properties?.destinoIata}
-            </p>
-            <p>
-              {selAirport.properties?.cantidadMaletas} maletas
-            </p>
-          </>)}
-        </Popup>
-      )}
-    </Map>
+        {/* CAPA DE AEROPUERTOS (Medio) - Ahora inicializada vacía para controlarla por WebGL */}
+        <Source id="aeropuertos-data" type="geojson" data={{ type: 'FeatureCollection', features: [] }}>
+          <Layer {...layerStyleAeropuertos} />
+        </Source>
+
+        {imageLoaded && (
+          <Source id="aviones-data" type="geojson" data={{ type: 'FeatureCollection', features: [] }}>
+            <Layer {...layerStyleAirplane} />
+          </Source>
+        )}
+
+        {/* POPUP DINÁMICO */}
+        {showPopup && selFeature && (
+          <Popup
+            longitude={selFeature.geometry.type === 'Point' ? (selFeature.geometry.coordinates[0] as number) : 0}
+            latitude={selFeature.geometry.type === 'Point' ? (selFeature.geometry.coordinates[1] as number) : 0}
+            anchor="bottom"
+            ref={popupRef}
+            closeButton={false}
+            offset={15}
+          >
+            {selFeature.properties?.isAirport ? (                        
+              <AeropuertoPopupContent 
+                codigoIata={selFeature.properties.codigoIata} 
+                aeropuertosRef={aeropuertosRef} 
+              />
+            ) : (
+              <div style={{ color: 'black' }}>
+                <b>Vuelo {selFeature.properties?.codigoVuelo}</b>
+                <p>{selFeature.properties?.origenIata} {'\u2192'} {selFeature.properties?.destinoIata}</p>
+                <p>{selFeature.properties?.cantidadMaletas} maletas</p>
+              </div>
+            )}
+          </Popup>
+        )}
+      </MapLibre>
+      <RelojSimulacionOverlay tiempoRef={tiempoSimulacionRef} />
+    </div>
   );
 }

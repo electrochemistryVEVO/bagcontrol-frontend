@@ -1,11 +1,12 @@
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
+import { INIT_WEB_SOCKET_URL } from './constants';
 
 class SimulacionWebSocket {
   private client: Client | null = null;
 
   conectar(topic: string, onMessage: (lote: any) => void, onSuccess: () => void) {
-    const socket = new SockJS('http://localhost:8080/ws/simulacion'); //harcodeado
+    const socket = new SockJS(INIT_WEB_SOCKET_URL);
     this.client = new Client({
       webSocketFactory: () => socket,
       reconnectDelay: 5000,

@@ -1,61 +1,109 @@
-.mapContainer{
+.mapContainer {
     position: relative;
     height: 100vh;
-    width: 100%;
+    width: 100%;    
+    overflow: hidden;
 }
 
+/* Modal flotante estilizado como tarjeta translúcida moderna (Glassmorphism) */
 .simulacionModal {
     position: absolute;
-    top: 15%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    top: 50%;
+    left: 50%;    
+    transform: translate(-50%, -60%);
     z-index: 10;
 
-    background-color: rgba(30, 41, 59, 0.95);
+    background-color: rgba(15, 23, 42, 0.9); /* Slate 900 con opacidad */
+    backdrop-filter: blur(8px);
     color: #f8fafc;
 
-    padding: 30px;
-    border-radius: 12px;
-
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
-
-    text-align: center;
-    min-width: 300px;
+    padding: 28px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    
+    width: 360px;
+    display: flex;
+    flex-direction: column;
 }
 
 .simulacionTitle {
-    margin-top: 0;
-    margin-bottom: 20px;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 0 8px 0;
+    color: #ffffff;
+    text-align: left;
 }
 
-.simulacionText {
-    margin-bottom: 20px;
+.simulacionSubtitle {
+    font-size: 0.875rem;
+    color: #94a3b8; /* Slate 400 */
+    margin-bottom: 24px;
+    text-align: left;
 }
 
+/* Contenedor del formulario con layout vertical ordenado */
+.formContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 20px; /* Controla el espaciado interno entre campos uniformemente */
+}
+
+/* Estilo para los textos descriptivos arriba de selectores o sliders */
+.fieldLabel {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #cbd5e1; /* Slate 300 */
+    margin-bottom: 8px;
+    display: block;
+    text-align: left;
+}
+
+/* Contenedor personalizado para encapsular los DatePickers */
+.datePickerWrapper {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+}
+
+.datePickerWrapper :global(.react-datepicker-wrapper) {
+    width: 100%;
+}
+
+.datePickerWrapper :global(.react-datepicker__input-container input) {
+    width: 100%;
+    padding: 10px 12px;
+    background-color: rgba(30, 41, 59, 0.7); /* Slate 800 */
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    color: #ffffff;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.datePickerWrapper :global(.react-datepicker__input-container input:focus) {
+    border-color: #3b82f6; /* Blue 500 */
+}
+
+/* Botón de envío principal */
 .simulacionButton {
-    padding: 12px 24px;
+    margin-top: 12px;
+    padding: 14px 24px;
     cursor: pointer;
-
     background-color: #3b82f6;
-    color: white;
-
+    color: #ffffff;
     border: none;
     border-radius: 8px;
-
     font-size: 1rem;
-    font-weight: bold;
-
-    box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.5);
-
-    transition: background-color 0.2s ease;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    transition: all 0.2s ease;
 }
 
 .simulacionButton:hover {
     background-color: #2563eb;
-}
-
-.simulacionContainerForm {
-    color: white;
+    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
 }
 
 .simulacionButton:active {
