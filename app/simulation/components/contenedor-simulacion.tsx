@@ -111,6 +111,7 @@ export function ContenedorSimulacion() {
                             startDate={startDate} 
                             endDate={endDate}
                             onChange={(update) => { setStartDate(update[0]); setEndDate(update[1]); }}
+                            dateFormat="dd/MM/yyyy"
                         />
                     </div>
                 )}
@@ -123,6 +124,7 @@ export function ContenedorSimulacion() {
                             showMonthYearDropdown
                             onChange={(date: Date | null) => { setStartDate(date); }}
                             selected={startDate}
+                            dateFormat="dd/MM/yyyy"
                         />
                     </div>
                 )}
