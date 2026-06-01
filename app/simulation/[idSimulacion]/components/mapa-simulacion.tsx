@@ -220,6 +220,7 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
           if (!map.hasImage('airplane')) {
             const img = await map.loadImage('/avion.png');     
             map.addImage('airplane', img.data)
+            console.log("image is loaded")
             setImageLoaded(true);
           }
         }}

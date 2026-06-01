@@ -57,9 +57,9 @@ export function useSimulacion(
     const eventosFiltrados = lote.eventos.filter(
       (e: any) => !TIPOS_IGNORADOS.includes(e.tipo)
     );
-    colaEventos.current.push(...eventosFiltrados);
+    colaEventos.current.push(...(eventosFiltrados));
     if (eventosFiltrados.length > 0) {
-      colaEventos.current.push(...eventosFiltrados);
+      colaEventos.current.push(...(eventosFiltrados));
       if (onNuevoLote) onNuevoLote();
     }
   }, []);
@@ -124,7 +124,9 @@ export function useSimulacion(
         if (horaEvento > tiempoActual) break;
 
         // Sacar de la cola
-        const ev = colaEventos.current.shift()!;
+        // pop() usa menos recursos que shift()
+        const ev = colaEventos.current.shift();
+        if(!ev)break;
 
         if (ev.tipo === "VUELO_DESPEGA") {
           const evVuelo = ev as EventoVuelo;
