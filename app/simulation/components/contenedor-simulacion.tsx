@@ -79,35 +79,34 @@ export function ContenedorSimulacion() {
                 <h2 className={styles.simulacionTitle}>Configurar Simulación</h2>
                 <p className={styles.simulacionSubtitle}>Establece los parámetros del motor operativo</p>
                 
-                <div className={styles.formContainer}>
-                    {/* Campo Tipo de simulación */}
-                    <div>
-                        <label className={styles.fieldLabel} htmlFor="simulation_type">Tipo de simulación</label>
-                        <Select
-                            id="simulation_type"
-                            value={simulationType}
-                            onChange={(e) => {
-                                if (typeof e.target.value === "string") return;
-                                setSimulationType(e.target.value);
-                            }}
-                            fullWidth
-                            sx={{
-                                color: '#ffffff',
-                                backgroundColor: 'rgba(30, 41, 59, 0.7)',
-                                '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.15)' },
-                                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
-                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#3b82f6' },
-                                '.MuiSvgIcon-root': { color: '#94a3b8' }
-                            }}
-                        >
-                            <MenuItem value={SimulationType.TIEMPO_REAL}>Ejecución en tiempo real</MenuItem>
-                            <MenuItem value={SimulationType.VENTANA_TIEMPO}>Ventana de 3 a 5 días</MenuItem>
-                            <MenuItem value={SimulationType.COLAPSO_OPERATIVO}>Hasta el colapso operativo</MenuItem>
-                        </Select>
-                    </div>
+                <div className={styles.formContainer}>            
 
-                    {/* Renderizado Condicional de Fechas */}
-                    {simulationType === SimulationType.VENTANA_TIEMPO && (
+                <div>
+                    <label className={styles.fieldLabel} htmlFor="simulation_type">Tipo de simulación</label>
+                    <Select
+                        id="simulation_type"
+                        value={simulationType}
+                        onChange={(e) => {
+                            if (typeof e.target.value === "string") return;
+                            setSimulationType(e.target.value);
+                        }}
+                        fullWidth
+                        sx={{
+                            color: '#ffffff',
+                            backgroundColor: 'rgba(30, 41, 59, 0.7)',
+                            '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.15)' },
+                            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
+                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#3b82f6' },
+                            '.MuiSvgIcon-root': { color: '#94a3b8' }
+                        }}
+                    >
+                        <MenuItem value={SimulationType.TIEMPO_REAL}>Ejecución en tiempo real</MenuItem>
+                        <MenuItem value={SimulationType.VENTANA_TIEMPO}>Ventana de 3 a 5 días</MenuItem>
+                        <MenuItem value={SimulationType.COLAPSO_OPERATIVO}>Hasta el colapso operativo</MenuItem>
+                    </Select>
+                </div>                
+
+                    { (simulationType === SimulationType.VENTANA_TIEMPO) && (
                         <div className={styles.datePickerWrapper}>
                             <span id="select_date_range_label" className={styles.fieldLabel}>Rango de fechas y horas</span>
                             <DatePicker 
