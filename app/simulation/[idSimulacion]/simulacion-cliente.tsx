@@ -107,6 +107,26 @@ export function SimulacionCliente({ id, topic, k, aeropuertosIniciales }: Props)
     error:         '#ef4444',
   };
 
+  const handlePausar = async () => {
+    await SimulacionService.pausar(id);
+    setEstadoSim('pausada');
+  };
+  const handleReanudar = async () => {
+    await SimulacionService.reanudar(id);
+    setEstadoSim('en_vivo');
+  };
+  const handleDetener = async () => {
+    await SimulacionService.detener(id);
+    setEstadoSim('detenida');
+  };
+
+  const btnBase: React.CSSProperties = {
+    display: 'inline-flex', alignItems: 'center', gap: '6px',
+    padding: '6px 16px', borderRadius: '6px', fontWeight: 600,
+    fontSize: '14px', cursor: 'pointer', border: '2px solid',
+    background: 'transparent', color: 'white', transition: 'opacity .15s',
+  };
+
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <header style={{ padding: '0.6rem 1rem', background: '#1e293b', color: 'white', display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
