@@ -6,7 +6,7 @@ export default async function SimulacionPage({
   searchParams 
 }: { 
   params: Promise<{ idSimulacion: string }>;
-  searchParams: Promise<{ topic: string }>; 
+  searchParams: Promise<{ topic: string, k: number }>; 
 }) {
     const resolvedParams = await params;
     const resolvedSearchParams = await searchParams;
@@ -14,7 +14,8 @@ export default async function SimulacionPage({
   return (
     <SimulacionCliente 
       id={resolvedParams.idSimulacion}
-      topic={resolvedSearchParams.topic} 
+      topic={resolvedSearchParams.topic}
+      k = {resolvedSearchParams.k}
       aeropuertosIniciales={aeropuertosIniciales} 
     />
   );

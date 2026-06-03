@@ -1,75 +1,67 @@
-//Batch que se recibe del back
-export class EventoBatch {
-    public numeroLote !: string;
-    public ventanaInicio !: Date;
-    public ventanaFin !: Date;
-    public cantidadEventos !: number;
-    public eventos : Evento[] = [];
+export type TipoEvento = 
+    | "SIMULACION_INICIADA"
+    | "AEROPUERTO_ACTUALIZADO"
+    | "ALERTA_AEROPUERTO_SATURADO"
+    | "VUELO_DESPEGA"
+    | "VUELO_ATERRIZA"
+    | "VUELO_CANCELADO"
+    | "PLAN_GENERADO"
+    | "SIMULACION_PAUSADA"
+    | "SIMULACION_EN_PAUSA"
+    | "SIMULACION_REANUDADA"
+    | "VELOCIDAD_CAMBIADA"
+    | "CICLO_COLAPSO_EVALUADO"
+    | "COLAPSO_DETECTADO"
+    | "SIMULACION_DETENIDA"
+    | "SIMULACION_FINALIZADA"
+    | "ERROR";
 
-    constructor(obj : Partial<EventoBatch>){
-        Object.assign(this,obj);
-    }
+export type EstadoCapacidad = "ROJO" | "AMARILLO" | "VERDE";
+
+// ==========================================
+// DTOs BASE Y EVENTOS
+// ==========================================
+export interface EventoBase {
+    tipo: TipoEvento;
+    fechaHoraEvento: string;
 }
 
-//Batch que se recibe mediante un evento en la simulacion
-export class EventoBatchSimulation{
-    tiempoActual !: Date;
-    eventos : Evento[] = [];
-    constructor(tiempoActual : Date,eventos: Evento[]){
-        this.tiempoActual = tiempoActual;
-        this.eventos = eventos;
-    }
+export interface EventoAeropuerto extends EventoBase {
+    codigoAeropuerto: string;
+    estadoCapacidad: EstadoCapacidad;
+    porcentajeOcupacion: number;
+    maletasActuales: number;
+    capacidadAlmacen: number;
 }
 
-export class Evento{
-    public tipo!: string;
+export interface EventoVuelo extends EventoBase {
+    codigoVuelo: number; 
+    origenIata: string;
+    destinoIata: string;
+    estado: EstadoCapacidad;
+    cantidadMaletas: number;
+    horaSalidaLocal: string;
+    horaLlegadaLocal: string;
+    horaSalidaUtc: string;
+    horaLlegadaUtc: string;
 }
 
-export class EventoAeropuerto extends Evento{
-    public codigoAeropuerto!: string;
-    public capacidadAlmacen!: number;
-    public maletasActuales!: number;
-    public estado!: string;
-    public porcentajeOcupacion!: number;
+// Discriminador automático para Typescript (Opcional pero muy útil)
+export type Evento = EventoAeropuerto | EventoVuelo | EventoBase;
 
-    constructor(obj : Partial<EventoAeropuerto>){
-        super()
-        Object.assign(this,obj);
-    }
-}
-export class EventoVuelo extends Evento{
-    public codigoVuelo!: string;
-    public origenIata!: string;
-    public destinoIata!: string;
-    public cantidadMaletas!: number;
-    public capacidadAlmacen!: number;
-    public maletasActuales!: number;
-    public horaSalidaLocal?: Date;
-    public horaLlegadaLocal?: Date;
-    public horaSalida?: Date;
-    public horaLlegada?: Date;
-    public horaSalidaUtc !: Date;
-    public horaLlegadaUtc !: Date;
-    constructor(obj : Partial<EventoVuelo>){
-        super()
-        Object.assign(this,obj);
-    }
+// ==========================================
+// DTOs DE LOTE (BATCH)
+// ==========================================
+export interface EventoBatch {
+    simulacionId: string;
+    numeroLote: number;
+    ventanaInicio: string | null;
+    ventanaFin: string | null;
+    cantidadEventos: number;
+    eventos: Evento[]; 
 }
 
-export class SimulationEvent extends CustomEvent<EventoBatchSimulation>{
-    public event!:Evento[];
-    public horaActual!:Date;
-    constructor(obj:EventoBatchSimulation) {
-        super("eventoSimulacion",{detail:obj});
-        this.event = obj.eventos;
-        this.horaActual = obj.tiempoActual;
-    }
-    static subscribe(cb:(eventoSim:Event)=>void){
-        document.addEventListener("eventoSimulacion", cb);
-        console.log("event listener added")
-    }
-    static unsubscribe(cb:(eventoSim:Event)=>void){
-        document.removeEventListener("eventoSimulacion", cb);
-        console.log("event listener removed")
-    }
+export interface EventoBatchSimulation {
+    tiempoActual: Date;
+    eventos: Evento[];
 }
