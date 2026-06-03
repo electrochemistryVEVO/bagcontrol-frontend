@@ -4,6 +4,7 @@ import { useSimulacion } from './hooks/useSimulacion';
 import { Aeropuerto } from '@/app/shared/types/Aeropuerto';
 import { MapaSimulacion } from './components/mapa-simulacion';
 import { useToast } from '@/app/shared/hooks/useToast';
+import { SimulacionService } from '@/app/services/simulation.service';
 
 interface Props {
   id: string;
@@ -15,6 +16,7 @@ interface Props {
 export function SimulacionCliente({ id, topic, k, aeropuertosIniciales }: Props) {
   const SaS_SEGUNDOS = 30;
   const { showToast, ToastComponent } = useToast();
+
   // 1. Extraemos la fecha que el formulario dejó guardada en el localStorage
   const fechaGuardada = typeof window !== 'undefined' ? localStorage.getItem("fechaInicio") : null;
   
@@ -23,9 +25,11 @@ export function SimulacionCliente({ id, topic, k, aeropuertosIniciales }: Props)
       ? new Date(`${fechaGuardada}T00:00:00Z`).toISOString() 
       : new Date('2026-02-10T00:00:00Z').toISOString(); 
   
-  // Extraemos 'aeropuertosRef' en lugar del estado reactivo para evitar congelar la UI
+  // El estado del ciclo de vida vive en el hook — lo recibimos directamente.
   const { 
-    conectado, 
+    conectado,
+    estadoSim,
+    setEstadoSim,
     aeropuertosRef, 
     vuelosActivosRef, 
     tiempoSimulacionRef 
@@ -41,26 +45,140 @@ export function SimulacionCliente({ id, topic, k, aeropuertosIniciales }: Props)
     }
   );
 
+  const handlePausar = async () => {
+    try {
+      await SimulacionService.pausar(id);
+      // El estado se actualizará cuando llegue el evento SIMULACION_PAUSADA por WS.
+      // Anticipamos el cambio en la UI para respuesta inmediata:
+      setEstadoSim('pausada');
+      showToast('Simulación pausada', 'info');
+    } catch {
+      showToast('Error al pausar la simulación', 'error');
+    }
+  };
+
+  const handleReanudar = async () => {
+    try {
+      await SimulacionService.reanudar(id);
+      setEstadoSim('en_vivo');
+      showToast('Simulación reanudada', 'success');
+    } catch {
+      showToast('Error al reanudar la simulación', 'error');
+    }
+  };
+
+  const handleDetener = async () => {
+    try {
+      await SimulacionService.detener(id);
+      setEstadoSim('detenida');
+      showToast('Simulación detenida', 'info');
+    } catch {
+      showToast('Error al detener la simulación', 'error');
+    }
+  };
+
+  const btnBase: React.CSSProperties = {
+    display: 'inline-flex', alignItems: 'center', gap: '6px',
+    padding: '6px 16px', borderRadius: '6px', fontWeight: 600,
+    fontSize: '14px', cursor: 'pointer', border: '2px solid',
+    background: 'transparent', color: 'white', transition: 'opacity .2s',
+  };
+
+  const estaActiva  = estadoSim === 'en_vivo';
+  const estaPausada = estadoSim === 'pausada';
+  const terminada   = estadoSim === 'finalizada' || estadoSim === 'detenida' || estadoSim === 'error';
+
+  // Texto de estado visible en la barra
+  const etiquetaEstado: Record<typeof estadoSim, string> = {
+    sincronizando: 'Sincronizando...',
+    en_vivo:       'En vivo',
+    pausada:       'Pausada',
+    detenida:      'Detenida',
+    finalizada:    'Finalizada',
+    error:         'Error',
+  };
+
+  const colorEstado: Record<typeof estadoSim, string> = {
+    sincronizando: '#f87171',
+    en_vivo:       '#4ade80',
+    pausada:       '#fbbf24',
+    detenida:      '#f87171',
+    finalizada:    '#94a3b8',
+    error:         '#ef4444',
+  };
+
+  const handlePausar = async () => {
+    await SimulacionService.pausar(id);
+    setEstadoSim('pausada');
+  };
+  const handleReanudar = async () => {
+    await SimulacionService.reanudar(id);
+    setEstadoSim('en_vivo');
+  };
+  const handleDetener = async () => {
+    await SimulacionService.detener(id);
+    setEstadoSim('detenida');
+  };
+
+  const btnBase: React.CSSProperties = {
+    display: 'inline-flex', alignItems: 'center', gap: '6px',
+    padding: '6px 16px', borderRadius: '6px', fontWeight: 600,
+    fontSize: '14px', cursor: 'pointer', border: '2px solid',
+    background: 'transparent', color: 'white', transition: 'opacity .15s',
+  };
+
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <header style={{ padding: '1rem', background: '#1e293b', color: 'white', display: 'flex', justifyContent: 'space-between' }}>
-        <div>
-            <span>ID Simulación: {id}</span>
-            <span style={{ marginLeft: '20px', color: conectado ? '#4ade80' : '#f87171' }}>
-            ● {conectado ? 'En vivo' : 'Sincronizando...'}
-            </span>
+      <header style={{ padding: '0.6rem 1rem', background: '#1e293b', color: 'white', display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+        {/* ID y estado */}
+        <span style={{ fontSize: '13px', opacity: 0.8 }}>ID Simulación: {id}</span>
+        <span style={{ color: colorEstado[estadoSim], fontWeight: 600 }}>
+          ● {etiquetaEstado[estadoSim]}
+        </span>
+
+        {/* Botones de control */}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            style={{ ...btnBase, borderColor: '#22d3ee', color: '#22d3ee',
+              opacity: estaActiva ? 1 : 0.35,
+              cursor: estaActiva ? 'pointer' : 'not-allowed' }}
+            onClick={handlePausar}
+            disabled={!estaActiva}
+          >
+            ⏸ Pausar
+          </button>
+          <button
+            style={{ ...btnBase, borderColor: '#e2e8f0', color: '#e2e8f0',
+              opacity: estaPausada ? 1 : 0.35,
+              cursor: estaPausada ? 'pointer' : 'not-allowed' }}
+            onClick={handleReanudar}
+            disabled={!estaPausada}
+          >
+            ▶ Reanudar
+          </button>
+          <button
+            style={{ ...btnBase, borderColor: '#f87171', color: '#f87171',
+              opacity: (estaActiva || estaPausada) ? 1 : 0.35,
+              cursor: (estaActiva || estaPausada) ? 'pointer' : 'not-allowed' }}
+            onClick={handleDetener}
+            disabled={terminada || estadoSim === 'sincronizando'}
+          >
+            ⏹ Detener
+          </button>
         </div>
-        <div>
-            <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-                Velocidad: {k} min simulados / {SaS_SEGUNDOS}s reales
-            </span>
+
+        {/* Velocidad - empujado a la derecha */}
+        <div style={{ marginLeft: 'auto' }}>
+          <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+            Velocidad: {k} min simulados / {SaS_SEGUNDOS}s reales
+          </span>
         </div>
       </header>
       
       <div style={{ flex: 1 }}>
         <MapaSimulacion            
             aeropuertosIniciales={aeropuertosIniciales}
-            aeropuertosRef={aeropuertosRef} // Pasamos la referencia mutable directa
+            aeropuertosRef={aeropuertosRef}
             vuelosActivosRef={vuelosActivosRef}
             tiempoSimulacionRef={tiempoSimulacionRef}
         />
