@@ -13,15 +13,27 @@ interface Props {
 }
 
 export function SimulacionCliente({ id, topic, k, aeropuertosIniciales }: Props) {
-  const SaS_SEGUNDOS = 30;
+  const SaS_SEGUNDOS = 25;
   const { showToast, ToastComponent } = useToast();
-  // 1. Extraemos la fecha que el formulario dejó guardada en el localStorage
+  
+  // 1. Extraemos la fecha con hora que el formulario dejó guardada en el localStorage
   const fechaGuardada = typeof window !== 'undefined' ? localStorage.getItem("fechaInicio") : null;
   
-  // 2. Construimos la fecha de arranque forzando UTC para evitar desajustes de zona horaria.
-  const fechaInicioReal = fechaGuardada 
-      ? new Date(`${fechaGuardada}T00:00:00Z`).toISOString() 
-      : new Date('2026-02-10T00:00:00Z').toISOString(); 
+  // 2. Construimos la fecha de arranque de forma segura
+  const obtenerFechaInicioISO = (): string => {
+    if (fechaGuardada) {
+      // Como 'fechaGuardada' ya viene con formato 'YYYY-MM-DDTHH:mm' (hora local elegida),
+      // la parseamos directamente como hora local y la convertimos a ISO.
+      const fechaLocal = new Date(fechaGuardada);
+      if (!isNaN(fechaLocal.getTime())) {
+        return fechaLocal.toISOString();
+      }
+    }
+    // Fallback por defecto si no hay nada guardado o es inválido
+    return new Date('2026-02-10T00:00:00Z').toISOString();
+  };
+
+  const fechaInicioReal = obtenerFechaInicioISO();
   
   // Extraemos 'aeropuertosRef' en lugar del estado reactivo para evitar congelar la UI
   const { 
