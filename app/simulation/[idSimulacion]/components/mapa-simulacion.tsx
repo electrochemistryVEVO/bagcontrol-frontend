@@ -22,6 +22,7 @@ import { AeropuertoSimulacion, Aeropuerto } from '@/app/shared/types/Aeropuerto'
 import { EventoVuelo } from "@/app/shared/types/Evento";
 import { AeropuertoPopupContent } from './pop-up-aeropuerto';
 import { RelojSimulacionOverlay } from './reloj-simulacion';
+import AvionSidePanel, {useOpenPanel} from "@/app/simulation/components/avion-sidepanel";
 
 // ============================================================================
 // 1. ESTILOS DE CAPAS (Layers)
@@ -112,6 +113,7 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
   const [showPopup, setShowPopup] = useState(false);
   const [selFeature, setSelFeature] = useState<MapGeoJSONFeature | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const openPanel = useOpenPanel();
 
   // Diccionario ultra-rápido para coordenadas estáticas
   const coordsAeropuertos = useMemo(() => {
@@ -207,13 +209,14 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      
+      <AvionSidePanel {...openPanel}/>
       <MapLibre
         ref={mapRef}
         initialViewState={{ longitude: -75, latitude: -10, zoom: 4 }} 
         mapStyle="https://tiles.openfreemap.org/styles/bright"
         onMouseEnter={handleMouseEnter}
         onMouseLeave={() => setShowPopup(false)}
+        onMouseDown={openPanel.onClick}
         interactiveLayerIds={['point', 'plane']}
         onLoad={async (e: MapLibreEvent) => {
           const map = e.target;
