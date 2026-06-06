@@ -23,6 +23,7 @@ import { EventoVuelo } from "@/app/shared/types/Evento";
 import { AeropuertoPopupContent } from './pop-up-aeropuerto';
 import { RelojSimulacionOverlay } from './reloj-simulacion';
 import AvionSidePanel, {useOpenPanel} from "@/app/simulation/components/avion-sidepanel";
+import {Drawer} from "@mui/material";
 
 // ============================================================================
 // 1. ESTILOS DE CAPAS (Layers)
@@ -104,16 +105,21 @@ interface Props {
   aeropuertosRef: RefObject<Record<string, AeropuertoSimulacion>>; // Recibe la referencia en memoria RAM
   vuelosActivosRef: RefObject<Map<string, EventoVuelo>>;
   tiempoSimulacionRef: RefObject<number>;
+  idSimulacion: string;
 }
 
-export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosActivosRef, tiempoSimulacionRef }: Props) {
+export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosActivosRef, tiempoSimulacionRef,idSimulacion }: Props) {
   const mapRef = useRef<MapRef>(null);
   const popupRef = useRef<PopupInstance | null>(null);
   
   const [showPopup, setShowPopup] = useState(false);
   const [selFeature, setSelFeature] = useState<MapGeoJSONFeature | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
-  const openPanel = useOpenPanel();
+
+  // Logica de panel para los aviones
+  //const openPanel = useOpenPanel();
+  const [panelOpen,setPanelOpen] = useState(false);
+  const [selFlight,setSelFlight] = useState<MapGeoJSONFeature|null>(null);
 
   // Diccionario ultra-rápido para coordenadas estáticas
   const coordsAeropuertos = useMemo(() => {
@@ -209,14 +215,21 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      <AvionSidePanel {...openPanel}/>
+      <Drawer open={panelOpen} onClose={()=>{setPanelOpen(false)}}>
+        <AvionSidePanel openPanel={panelOpen} selFlight={selFlight} idSimulacion={idSimulacion} aeropuertos={aeropuertosIniciales}/>
+      </Drawer>
       <MapLibre
         ref={mapRef}
         initialViewState={{ longitude: -75, latitude: -10, zoom: 4 }} 
         mapStyle="https://tiles.openfreemap.org/styles/bright"
         onMouseEnter={handleMouseEnter}
         onMouseLeave={() => setShowPopup(false)}
-        onMouseDown={openPanel.onClick}
+        onMouseDown={(e:MapLayerMouseEvent)=> {
+          const properties = e.features?.[0]?.properties;
+          if (!(properties?.isAirplane)) return;
+          setSelFlight(e.features?.[0] ?? null);
+          setPanelOpen(true)
+        }}
         interactiveLayerIds={['point', 'plane']}
         onLoad={async (e: MapLibreEvent) => {
           const map = e.target;
@@ -228,12 +241,10 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
           }
         }}
       >
-        {/* CAPA DE RUTAS (Fondo) */}
         <Source id="rutas-data" type="geojson" data={{ type: 'FeatureCollection', features: [] }}>
           <Layer {...layerStyleLine} />
         </Source>
 
-        {/* CAPA DE AEROPUERTOS (Medio) - Ahora inicializada vacía para controlarla por WebGL */}
         <Source id="aeropuertos-data" type="geojson" data={{ type: 'FeatureCollection', features: [] }}>
           <Layer {...layerStyleAeropuertos} />
         </Source>
@@ -244,7 +255,6 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
           </Source>
         )}
 
-        {/* POPUP DINÁMICO */}
         {showPopup && selFeature && (
           <Popup
             longitude={selFeature.geometry.type === 'Point' ? (selFeature.geometry.coordinates[0] as number) : 0}

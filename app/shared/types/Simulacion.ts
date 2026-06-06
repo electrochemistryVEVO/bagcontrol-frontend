@@ -10,7 +10,7 @@ export type RespuestaEstadoSimulacionDTO = {
     pausada : boolean;
     detenida : boolean;
     saMs : number;
-    ultimoLoteEmitido : number;
+    ultimoLoteEmitido : bigint;
     algoritmo:string;
     k : number;
     fechaInicio : string;

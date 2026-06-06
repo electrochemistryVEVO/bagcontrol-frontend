@@ -3,7 +3,7 @@
 .panel {
     background: #f5f5f5;
     font-family: "Inter", sans-serif;
-    display: flex;
+    /*display: flex;*/
     justify-content: center;
     width: 280px;
     min-height: 600px;
@@ -159,4 +159,94 @@
     height: 18px;
     color: #111;
     flex-shrink: 0;
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.card-header .section-title {
+    margin-bottom: 0;
+}
+
+.collapse-btn {
+    border: none;
+    background: transparent;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    color: #222;
+}
+
+.collapse-btn svg {
+    width: 100%;
+    height: 100%;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.flight-info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.flight-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.flight-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    color: #222;
+}
+
+.flight-location {
+    text-align: right;
+    font-size: 14px;
+    line-height: 1.8;
+    color: #222;
+}
+
+.plane-icon {
+    width: 28px;
+    height: 28px;
+    color: #000;
+}
+
+.takeoff {
+    transform: rotate(-12deg);
+}
+
+.landing {
+    transform: rotate(22deg);
+}
+
+.flight-arrow {
+    text-align: center;
+    font-size: 34px;
+    font-weight: 700;
+    color: #222;
+    line-height: 1;
+    margin: 4px 0;
+}
+
+.progress-yellow {
+    background: #d5d5d5;
+}
+
+.progress-fill-yellow {
+    width: 65%;
+    background: #e9d968;
+    color: #111;
 }

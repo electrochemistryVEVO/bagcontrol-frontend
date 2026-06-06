@@ -1,4 +1,6 @@
-export type TipoEvento = 
+import {Aeropuerto} from "@/app/shared/types/Aeropuerto";
+
+export type TipoEvento =
     | "SIMULACION_INICIADA"
     | "AEROPUERTO_ACTUALIZADO"
     | "VUELO_DESPEGA"
@@ -34,9 +36,11 @@ export interface EventoAeropuerto extends EventoBase {
 }
 
 export interface EventoVuelo extends EventoBase {
-    codigoVuelo: number; 
+    codigoVuelo: bigint;
     origenIata: string;
     destinoIata: string;
+    origenAeropuerto?: Aeropuerto;
+    destinoAeropuerto?: Aeropuerto;
     estado: EstadoCapacidad;
     cantidadMaletas: number;
     horaSalidaLocal: string;

@@ -63,6 +63,7 @@ export function SimulacionCliente({ id, topic, k, aeropuertosIniciales }: Props)
             aeropuertosRef={aeropuertosRef} // Pasamos la referencia mutable directa
             vuelosActivosRef={vuelosActivosRef}
             tiempoSimulacionRef={tiempoSimulacionRef}
+            idSimulacion={id}
         />
         {ToastComponent}
       </div>
