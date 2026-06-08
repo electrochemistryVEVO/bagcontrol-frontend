@@ -203,7 +203,7 @@ export function useOpenPanel(): OpenSimulationPanel {
 export default memo(function AvionSidePanel(props: AvionSidePanelProps) {
     //Borrar logica tomada del mapa
     const {selFlight} = props;
-    let flight = selFlight?.properties ? {...selFlight.properties} : null;
+    const flight = selFlight?.properties ? {...selFlight.properties} : null;
     if(!flight)return null;
     delete flight.bearing;
     delete flight.isAirplane;
