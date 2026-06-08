@@ -30,6 +30,5 @@ export const SimulacionService = {
     detener: (idSimulacion: string) =>
         axiosApi.post(`/simulacion/${idSimulacion}/detener`),
 }
-}
 
 

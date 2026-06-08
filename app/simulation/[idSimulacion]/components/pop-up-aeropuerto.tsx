@@ -27,10 +27,12 @@ export function AeropuertoPopupContent({
   if (!data) return null;
 
   return (
-    <div style={{ color: 'black' }}>
-      <b>{data.codigoIata} - {data.nombre}</b>
-      <p>{data.maletasActuales} / {data.capacidadAlmacen} maletas</p>
-      <p>Estado: {data.estadoCapacidad}</p>
+    <div style={{ color: 'black', maxWidth: '250px' }}>
+      <b style={{ fontSize: '1.1rem' }}>{data.codigoIata} - {data.nombre}</b>
+      <div style={{ margin: '8px 0', borderBottom: '1px solid #ccc' }}>
+        <p style={{ margin: '2px 0' }}>Maletas: {data.maletasActuales} / {data.capacidadAlmacen}</p>
+        <p style={{ margin: '2px 0' }}>Estado: <b>{data.estadoCapacidad}</b></p>
+      </div>
     </div>
   );
 }

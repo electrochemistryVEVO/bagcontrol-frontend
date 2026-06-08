@@ -26,25 +26,18 @@ export function useSimulacion(
   const colaEventos = useRef<Evento[]>([]);
   const tiempoSimulacion = useRef<number>(new Date(fechaInicio).getTime());
 
-  // Guardamos onNuevoLote en un ref para que encolarEventos nunca se recree
-  // aunque el padre pase una nueva arrow function en cada render.
+  // Búfer de acoplamiento para el desfase controlado de 1 lote
+  const lotesRecibidosRef = useRef<number>(0);
+  const [bufferListo, setBufferListo] = useState(false);
+
   const onNuevoLoteRef = useRef(onNuevoLote);
   useEffect(() => { onNuevoLoteRef.current = onNuevoLote; }, [onNuevoLote]);
 
-  const [aeropuertosUI, setAeropuertosUI] = useState<Record<string, AeropuertoSimulacion>>(() =>
+  const aeropuertosSimulacion = useRef<Record<string, AeropuertoSimulacion>>(
     Object.fromEntries(
       aeropuertosIniciales.map(a => [
         a.codigoIata,
-        { ...a, maletasActuales: 0, porcentajeOcupacion: 0, estadoCapacidad: 'VERDE' }
-      ])
-    )
-  );
-
-  const aeropuertosLogica = useRef<Record<string, AeropuertoSimulacion>>(
-    Object.fromEntries(
-      aeropuertosIniciales.map(a => [
-        a.codigoIata,
-        { ...a, maletasActuales: 0, porcentajeOcupacion: 0, estadoCapacidad: 'VERDE' }
+        { ...a, maletasActuales: 0, porcentajeOcupacion: 0, estadoCapacidad: 'VERDE', enviosProximosAVencer: [] }
       ])
     )
   );
@@ -52,8 +45,7 @@ export function useSimulacion(
   const [estadoSim, setEstadoSim] = useState<EstadoSimulacion>('sincronizando');
 
   // ============================================================================
-  // 2. Callback para encolar eventos nuevos que llegan por WebSocket
-  //    Dependencia vacía [] — nunca se recrea, usa onNuevoLoteRef para el callback
+  // Callback para encolar eventos y gestionar el búfer de inercia
   // ============================================================================
   const encolarEventos = useCallback((lote: EventoBatch) => {
     if (!lote.eventos || !Array.isArray(lote.eventos)) return;
@@ -62,14 +54,13 @@ export function useSimulacion(
       switch ((e as any).tipo) {
         case 'SIMULACION_INICIADA':
           setConectado(true);
-          setEstadoSim('en_vivo');
           break;
         case 'SIMULACION_PAUSADA':
         case 'SIMULACION_EN_PAUSA':
           setEstadoSim('pausada');
           break;
         case 'SIMULACION_REANUDADA':
-          setEstadoSim('en_vivo');
+          if (lotesRecibidosRef.current >= 1) setEstadoSim('en_vivo');
           break;
         case 'SIMULACION_FINALIZADA':
         case 'COLAPSO_DETECTADO':
@@ -96,12 +87,20 @@ export function useSimulacion(
 
     if (eventosFiltrados.length > 0) {
       colaEventos.current.push(...eventosFiltrados);
+      lotesRecibidosRef.current += 1;
+
+      // El mapa arranca a moverse SOLO cuando el primer batch de datos está a salvo en la memoria RAM
+      if (lotesRecibidosRef.current >= 1 && !bufferListo) {
+        setBufferListo(true);
+        setEstadoSim('en_vivo');
+      }
+
       onNuevoLoteRef.current?.();
     }
-  }, []); // [] estable — no depende de onNuevoLote directamente
+  }, [bufferListo]);
 
   // ======================
-  // 3. CONEXIÓN WEBSOCKET
+  // CONEXIÓN WEBSOCKET
   // ======================
   useEffect(() => {
     if (!topic || !id) return;
@@ -122,7 +121,6 @@ export function useSimulacion(
             }
           }
           setConectado(true);
-          setEstadoSim('en_vivo');
         }
       }
     );
@@ -130,32 +128,26 @@ export function useSimulacion(
     return () => {
       simulacionWS.desconectar();
       colaEventos.current = [];
+      lotesRecibidosRef.current = 0;
       arrancadoRef.current = false;
     };
   }, [id, topic, encolarEventos]);
 
   // =================================================
-  // 4. MOTOR LÓGICO Y CONTROL DEL TIEMPO
-  //    El reloj solo avanza cuando hay eventos en la cola
-  //    (evita que K=300 "queme" los vuelos antes de verlos)
+  // MOTOR LÓGICO Y CONTROL DEL TIEMPO
   // =================================================
   useEffect(() => {
     const msSimuladosPorLote = K * 60 * 1000;
     const msRealesPorLote = SaS * 1000;
     const factorAceleracion = msSimuladosPorLote / msRealesPorLote;
-
     const TICK_RATE = 100;
 
     const timer = setInterval(() => {
-      // Solo avanzar el reloj simulado si hay eventos pendientes por procesar.
-      // Sin esto, con K=300 el tiempo corre tan rápido que los vuelos "aterrizan"
-      // antes de que el mapa tenga oportunidad de renderizarlos.
-      if (colaEventos.current.length > 0) {
-        tiempoSimulacion.current += TICK_RATE * factorAceleracion;
-      }
+      // Bloquear el avance del reloj si la simulación no está activa o si vaciamos la cola
+      if (estadoSim !== 'en_vivo' || colaEventos.current.length === 0) return;
 
+      tiempoSimulacion.current += TICK_RATE * factorAceleracion;
       const tiempoActual = tiempoSimulacion.current;
-      let huboCambiosAeropuertos = false;
 
       while (colaEventos.current.length > 0) {
         const evento = colaEventos.current[0];
@@ -175,28 +167,26 @@ export function useSimulacion(
         } else if (ev.tipo === 'AEROPUERTO_ACTUALIZADO') {
           const evAero = ev as EventoAeropuerto;
           const codigo = evAero.codigoAeropuerto;
-          if (aeropuertosLogica.current[codigo]) {
-            aeropuertosLogica.current[codigo].maletasActuales = evAero.maletasActuales;
-            aeropuertosLogica.current[codigo].porcentajeOcupacion = evAero.porcentajeOcupacion;
-            aeropuertosLogica.current[codigo].estadoCapacidad = evAero.estadoCapacidad;
-            huboCambiosAeropuertos = true;
+          
+          if (aeropuertosSimulacion.current[codigo]) {
+            aeropuertosSimulacion.current[codigo].maletasActuales = evAero.maletasActuales;
+            aeropuertosSimulacion.current[codigo].porcentajeOcupacion = evAero.porcentajeOcupacion;
+            aeropuertosSimulacion.current[codigo].estadoCapacidad = evAero.estadoCapacidad;
+            // Inyección limpia del top crítico mapeado desde el backend
+            aeropuertosSimulacion.current[codigo].enviosProximosAVencer = evAero.enviosProximosAVencer || [];
           }
         }
-      }
-
-      if (huboCambiosAeropuertos) {
-        setAeropuertosUI({ ...aeropuertosLogica.current });
       }
     }, TICK_RATE);
 
     return () => clearInterval(timer);
-  }, [K, SaS]);
+  }, [K, SaS, estadoSim]);
 
   return {
     conectado,
     estadoSim,
     setEstadoSim,
-    aeropuertosRef: aeropuertosLogica,
+    aeropuertosRef: aeropuertosSimulacion,
     vuelosActivosRef: vuelosActivos,
     tiempoSimulacionRef: tiempoSimulacion,
   };

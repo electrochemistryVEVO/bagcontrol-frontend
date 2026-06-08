@@ -14,7 +14,7 @@ import {
   SymbolLayerSpecification,
 } from '@vis.gl/react-maplibre';
 import { useMemo, useRef, useState, useEffect, RefObject } from 'react';
-import { FeatureCollection, Feature } from 'geojson';
+import { Feature } from 'geojson';
 import { MapLibreEvent } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
@@ -22,12 +22,12 @@ import { AeropuertoSimulacion, Aeropuerto } from '@/app/shared/types/Aeropuerto'
 import { EventoVuelo } from "@/app/shared/types/Evento";
 import { AeropuertoPopupContent } from './pop-up-aeropuerto';
 import { RelojSimulacionOverlay } from './reloj-simulacion';
-import AvionSidePanel, {useOpenPanel} from "@/app/simulation/components/avion-sidepanel";
-import {Drawer} from "@mui/material";
-import globals from '../../../globals.css';
+import AvionSidePanel from "@/app/simulation/components/avion-sidepanel";
+import AeropuertoSidePanel from "@/app/simulation/components/aeropuerto-sidepanel";
+import { Drawer } from "@mui/material";
 
 // ============================================================================
-// 1. ESTILOS DE CAPAS (Layers)
+// STILOS DE CAPAS (Layers)
 // ============================================================================
 const layerStyleAeropuertos: CircleLayerSpecification = {
   id: 'point',
@@ -35,14 +35,13 @@ const layerStyleAeropuertos: CircleLayerSpecification = {
   source: 'aeropuertos-data',
   paint: {
     'circle-radius': 8,
-    // Sincronizado con el DTO del backend usando 'estadoCapacidad'
     'circle-color': [
       'match',
       ['get', 'estadoCapacidad'],
       'ROJO', '#ef4444',
       'AMARILLO', '#eab308',
       'VERDE', '#22c55e',
-      '#007cbf' // Fallback
+      '#007cbf'
     ],
     'circle-stroke-width': 1,
     'circle-stroke-color': '#ffffff'
@@ -54,13 +53,13 @@ const layerStyleLine: LineLayerSpecification = {
   type: 'line',
   source: 'rutas-data',
   paint: { 
-    "line-color":[
+    "line-color": [
       'match',
       ['get', 'estado'],
       'ROJO', '#ef4444',
       'AMARILLO', '#eab308',
       'VERDE', '#22c55e',
-      '#007cbf' // Fallback
+      '#007cbf'
     ],
     "line-width": 2,
     "line-opacity": 0.6,
@@ -74,15 +73,14 @@ const layerStyleAirplane: SymbolLayerSpecification = {
   source: 'aviones-data',
   paint: {
     'icon-opacity': 1,
-    'icon-color':[
+    'icon-color': [
       'match',
       ['get', 'estado'],
       'ROJO', '#ef4444',
       'AMARILLO', '#eab308',
       'VERDE', '#22c55e',
-      '#007cbf' // Fallback
-    ],
-    'icon-opacity-transition': { duration: 0 } // Eliminamos el delay de 300ms de MapLibre
+      '#ffffff'
+    ]
   },
   layout: {
     'icon-image': 'airplane',
@@ -94,9 +92,6 @@ const layerStyleAirplane: SymbolLayerSpecification = {
   }
 };
 
-// ============================================================================
-// 2. FUNCIONES MATEMÁTICAS (Helpers)
-// ============================================================================
 function interpolar(inicio: number[], fin: number[], progreso: number) {
   return [
     inicio[0] + (fin[0] - inicio[0]) * progreso,
@@ -108,23 +103,18 @@ function calcularBearing(inicio: number[], fin: number[]) {
   const dy = fin[1] - inicio[1];
   const dx = fin[0] - inicio[0];
   const theta = Math.atan2(dy, dx) * (180 / Math.PI);
-  
-  // Ajuste matemático de 180 grados para corregir la inversión de dirección de iconos que miran al norte
-  return 90 - theta
+  return 90 - theta;
 }
 
-// ============================================================================
-// 3. COMPONENTE PRINCIPAL
-// ============================================================================
 interface Props {
   aeropuertosIniciales: Aeropuerto[];
-  aeropuertosRef: RefObject<Record<string, AeropuertoSimulacion>>; // Recibe la referencia en memoria RAM
+  aeropuertosRef: RefObject<Record<string, AeropuertoSimulacion>>;
   vuelosActivosRef: RefObject<Map<string, EventoVuelo>>;
   tiempoSimulacionRef: RefObject<number>;
   idSimulacion: string;
 }
 
-export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosActivosRef, tiempoSimulacionRef,idSimulacion }: Props) {
+export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosActivosRef, tiempoSimulacionRef, idSimulacion }: Props) {
   const mapRef = useRef<MapRef>(null);
   const popupRef = useRef<PopupInstance | null>(null);
   
@@ -132,12 +122,13 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
   const [selFeature, setSelFeature] = useState<MapGeoJSONFeature | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  // Logica de panel para los aviones
-  //const openPanel = useOpenPanel();
-  const [panelOpen,setPanelOpen] = useState(false);
-  const [selFlight,setSelFlight] = useState<MapGeoJSONFeature|null>(null);
+  // Controladores de estado para los Drawers laterales
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [selFlight, setSelFlight] = useState<MapGeoJSONFeature | null>(null);
 
-  // Diccionario ultra-rápido para coordenadas estáticas
+  const [airportPanelOpen, setAirportPanelOpen] = useState(false);
+  const [selAirport, setSelAirport] = useState<MapGeoJSONFeature | null>(null);
+
   const coordsAeropuertos = useMemo(() => {
     const dict: Record<string, number[]> = {};
     aeropuertosIniciales.forEach(a => {
@@ -147,12 +138,7 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
   }, [aeropuertosIniciales]);
 
   // ============================================================================
-  // 4. EL MOTOR GRÁFICO (WebGL Loop)
-  // FIX: Se agregó `imageLoaded` a las dependencias para que el loop de animación
-  // se reinicie una vez que la Source 'aviones-data' exista en el mapa.
-  // Sin esto, el loop arrancaba antes de que la Source fuera montada (porque
-  // dependía del condicional `{imageLoaded && <Source ...>}`), y
-  // map.getSource('aviones-data') devolvía undefined en cada frame.
+  // EL MOTOR GRÁFICO (WebGL Render Loop)
   // ============================================================================
   useEffect(() => {
     let animationFrameId: number;
@@ -168,7 +154,6 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
       const featuresAviones: Feature[] = [];
       const featuresRutas: Feature[] = [];
 
-      // 1. Procesar y animar vuelos activos
       vuelosActivosRef.current.forEach((vuelo) => {
         const coordsOrigen = coordsAeropuertos[vuelo.origenIata];
         const coordsDestino = coordsAeropuertos[vuelo.destinoIata];
@@ -184,31 +169,28 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
         
         const posicionActual = interpolar(coordsOrigen, coordsDestino, progreso);
         const bearing = calcularBearing(coordsOrigen, coordsDestino);
-        // Feature del Avión
+
         featuresAviones.push({
           type: 'Feature',
           properties: { ...vuelo, bearing, isAirplane: true },
           geometry: { type: 'Point', coordinates: posicionActual }
         });
 
-        // Feature de la Ruta Dinámica progresiva (crece junto al avión)
         if (progreso > 0.001) {
           featuresRutas.push({
             type: 'Feature',
-            properties: {},
+            properties: { estado: vuelo.estado },
             geometry: { type: 'LineString', coordinates: [coordsOrigen, posicionActual] }
           });
         }
       });
 
-      // 2. Extraer y construir la data de Aeropuertos en caliente desde la referencia RAM
       const featuresAeropuertos: Feature[] = Object.values(aeropuertosRef.current || {}).map((airport) => ({
         type: 'Feature',
         properties: { ...airport, isAirport: true },
         geometry: { type: 'Point', coordinates: [airport.longitud, airport.latitud] },
       }));
 
-      // 3. Inyección síncrona simultánea a las fuentes WebGL
       const sourceAviones = map.getSource('aviones-data') as maplibregl.GeoJSONSource;
       const sourceRutas = map.getSource('rutas-data') as maplibregl.GeoJSONSource;
       const sourceAeropuertos = map.getSource('aeropuertos-data') as maplibregl.GeoJSONSource;
@@ -222,11 +204,8 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
 
     animar();
     return () => cancelAnimationFrame(animationFrameId);
-  }, [coordsAeropuertos, vuelosActivosRef, tiempoSimulacionRef, aeropuertosRef, imageLoaded]); // <-- FIX: imageLoaded agregado
+  }, [coordsAeropuertos, vuelosActivosRef, tiempoSimulacionRef, aeropuertosRef, imageLoaded]);
 
-  // ============================================================================
-  // 5. EVENTOS DE INTERACCIÓN (Hover y Popups)
-  // ============================================================================
   const handleMouseEnter = (event: MapLayerMouseEvent) => {
     setSelFeature(event.features?.[0] ?? null);
     setShowPopup(true);
@@ -235,28 +214,47 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      <Drawer open={panelOpen} onClose={()=>{setPanelOpen(false)}}>
-        <AvionSidePanel openPanel={panelOpen} selFlight={selFlight} idSimulacion={idSimulacion} aeropuertos={aeropuertosIniciales}/>
+      {/* DRAWER PARA AVIONES */}
+      <Drawer open={panelOpen} onClose={() => setPanelOpen(false)}>
+        <AvionSidePanel openPanel={panelOpen} selFlight={selFlight} idSimulacion={idSimulacion} aeropuertos={aeropuertosIniciales} />
       </Drawer>
+
+      {/* DRAWER PARA AEROPUERTOS */}
+      <Drawer open={airportPanelOpen} onClose={() => setAirportPanelOpen(false)}>
+        <AeropuertoSidePanel openPanel={airportPanelOpen} selAirport={selAirport} aeropuertosRef={aeropuertosRef} />
+      </Drawer>
+      
       <MapLibre
         ref={mapRef}
         initialViewState={{ longitude: -75, latitude: -10, zoom: 4 }} 
         mapStyle="https://tiles.openfreemap.org/styles/bright"
         onMouseEnter={handleMouseEnter}
         onMouseLeave={() => setShowPopup(false)}
-        onMouseDown={(e:MapLayerMouseEvent)=> {
-          const properties = e.features?.[0]?.properties;
-          if (!(properties?.isAirplane)) return;
-          setSelFlight(e.features?.[0] ?? null);
-          setPanelOpen(true)
+        onMouseDown={(e: MapLayerMouseEvent) => {
+          const feature = e.features?.[0];
+          const properties = feature?.properties;
+          if (!properties) return;
+
+          // Se discrimina qué tipo de capa interactiva recibió el click
+          if (properties.isAirplane) {
+            setSelFlight(feature ?? null);
+            setPanelOpen(true);
+          } else if (properties.isAirport) {
+            setSelAirport(feature ?? null);
+            setAirportPanelOpen(true);
+          }
         }}
         interactiveLayerIds={['point', 'plane']}
         onLoad={async (e: MapLibreEvent) => {
           const map = e.target;
-          if (!map.hasImage('airplane')) {
-            const img = await map.loadImage('/avion.png');     
-            map.addImage('airplane', img.data,{sdf:true})
-            console.log("image is loaded")
+          try {
+            if (!map.hasImage('airplane')) {
+              const img = await map.loadImage('/avion.png');     
+              map.addImage('airplane', img.data, { sdf: true });
+              setImageLoaded(true);
+            }
+          } catch (err) {
+            console.error("Error al inyectar recurso gráfico:", err);
             setImageLoaded(true);
           }
         }}

@@ -1,6 +1,8 @@
-import {Aeropuerto} from "@/app/shared/types/Aeropuerto";
 
-export type TipoEvento =
+import {Aeropuerto} from "@/app/shared/types/Aeropuerto";
+import { Envio } from './Envio'; 
+
+export type TipoEvento = 
     | "SIMULACION_INICIADA"
     | "AEROPUERTO_ACTUALIZADO"
     | "ALERTA_AEROPUERTO_SATURADO"
@@ -34,6 +36,7 @@ export interface EventoAeropuerto extends EventoBase {
     porcentajeOcupacion: number;
     maletasActuales: number;
     capacidadAlmacen: number;
+    enviosProximosAVencer?: Envio[];
 }
 
 export interface EventoVuelo extends EventoBase {

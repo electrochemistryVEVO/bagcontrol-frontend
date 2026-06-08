@@ -23,15 +23,15 @@ export function SimulacionCliente({ id, topic, k, aeropuertosIniciales }: Props)
   // 2. Construimos la fecha de arranque de forma segura
   const obtenerFechaInicioISO = (): string => {
     if (fechaGuardada) {
-      // Como 'fechaGuardada' ya viene con formato 'YYYY-MM-DDTHH:mm' (hora local elegida),
-      // la parseamos directamente como hora local y la convertimos a ISO.
-      const fechaLocal = new Date(fechaGuardada);
-      if (!isNaN(fechaLocal.getTime())) {
-        return fechaLocal.toISOString();
-      }
+      // Para evitar el desfase, no uses 'new Date()' directamente si quieres mantener tu hora
+      // Mejor manipula el string manualmente para forzar UTC si es lo que tu backend espera:
+      const d = new Date(fechaGuardada);
+      
+      // Si tu backend espera UTC, asegúrate de que el ISO resultante sea '...Z'
+      // Esta línea elimina el desfase local y lo deja en el UTC original del string:
+      return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString();
     }
-    // Fallback por defecto si no hay nada guardado o es inválido
-    return new Date('2026-02-10T00:00:00Z').toISOString();
+    return '2026-02-10T00:00:00.000Z';
   };
 
   const fechaInicioReal = obtenerFechaInicioISO();
