@@ -3,6 +3,7 @@ import {Aeropuerto} from "@/app/shared/types/Aeropuerto";
 export type TipoEvento =
     | "SIMULACION_INICIADA"
     | "AEROPUERTO_ACTUALIZADO"
+    | "ALERTA_AEROPUERTO_SATURADO"
     | "VUELO_DESPEGA"
     | "VUELO_ATERRIZA"
     | "VUELO_CANCELADO"

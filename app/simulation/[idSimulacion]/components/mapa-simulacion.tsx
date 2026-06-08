@@ -148,6 +148,11 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
 
   // ============================================================================
   // 4. EL MOTOR GRÁFICO (WebGL Loop)
+  // FIX: Se agregó `imageLoaded` a las dependencias para que el loop de animación
+  // se reinicie una vez que la Source 'aviones-data' exista en el mapa.
+  // Sin esto, el loop arrancaba antes de que la Source fuera montada (porque
+  // dependía del condicional `{imageLoaded && <Source ...>}`), y
+  // map.getSource('aviones-data') devolvía undefined en cada frame.
   // ============================================================================
   useEffect(() => {
     let animationFrameId: number;
@@ -217,7 +222,7 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
 
     animar();
     return () => cancelAnimationFrame(animationFrameId);
-  }, [coordsAeropuertos, vuelosActivosRef, tiempoSimulacionRef, aeropuertosRef]);
+  }, [coordsAeropuertos, vuelosActivosRef, tiempoSimulacionRef, aeropuertosRef, imageLoaded]); // <-- FIX: imageLoaded agregado
 
   // ============================================================================
   // 5. EVENTOS DE INTERACCIÓN (Hover y Popups)
