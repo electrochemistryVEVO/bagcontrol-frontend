@@ -14,7 +14,7 @@ interface Props {
 }
 
 export function SimulacionCliente({ id, topic, k, aeropuertosIniciales }: Props) {
-  const SaS_SEGUNDOS = 60;
+  const SaS_SEGUNDOS = 90;
   const { showToast, ToastComponent } = useToast();
 
   // 1. Extraemos la fecha que el formulario dejó guardada en el localStorage
@@ -23,13 +23,8 @@ export function SimulacionCliente({ id, topic, k, aeropuertosIniciales }: Props)
   // 2. Construimos la fecha de arranque de forma segura
   const obtenerFechaInicioISO = (): string => {
     if (fechaGuardada) {
-      // Para evitar el desfase, no uses 'new Date()' directamente si quieres mantener tu hora
-      // Mejor manipula el string manualmente para forzar UTC si es lo que tu backend espera:
-      const d = new Date(fechaGuardada);
-      
-      // Si tu backend espera UTC, asegúrate de que el ISO resultante sea '...Z'
-      // Esta línea elimina el desfase local y lo deja en el UTC original del string:
-      return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString();
+      // Devuelve "2026-02-10T23:45:00.000Z" directamente al hook
+      return fechaGuardada;
     }
     return '2026-02-10T00:00:00.000Z';
   };

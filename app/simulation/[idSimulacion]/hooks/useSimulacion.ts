@@ -2,11 +2,11 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { simulacionWS } from '@/app/services/config/webSocket';
 import { SimulacionService } from '@/app/services/simulation.service';
 import { Aeropuerto, AeropuertoSimulacion } from '@/app/shared/types/Aeropuerto';
-import { 
-  Evento, 
-  EventoVuelo, 
-  EventoAeropuerto, 
-  EventoBatch, 
+import {
+  Evento,
+  EventoVuelo,
+  EventoAeropuerto,
+  EventoBatch,
 } from "@/app/shared/types/Evento";
 
 export type EstadoSimulacion = 'sincronizando' | 'en_vivo' | 'pausada' | 'detenida' | 'finalizada' | 'error';
@@ -25,10 +25,7 @@ export function useSimulacion(
   const vuelosActivos = useRef<Map<string, EventoVuelo>>(new Map());
   const colaEventos = useRef<Evento[]>([]);
   const tiempoSimulacion = useRef<number>(new Date(fechaInicio).getTime());
-
-  // Búfer de acoplamiento para el desfase controlado de 1 lote
   const lotesRecibidosRef = useRef<number>(0);
-  const [bufferListo, setBufferListo] = useState(false);
 
   const onNuevoLoteRef = useRef(onNuevoLote);
   useEffect(() => { onNuevoLoteRef.current = onNuevoLote; }, [onNuevoLote]);
@@ -42,16 +39,25 @@ export function useSimulacion(
     )
   );
 
-  const [estadoSim, setEstadoSim] = useState<EstadoSimulacion>('sincronizando');
+  // ─── Estado dual: ref para el motor (sin closure stale), state para la UI ───
+  const estadoSimRef = useRef<EstadoSimulacion>('sincronizando');
+  const [estadoSim, setEstadoSimInterno] = useState<EstadoSimulacion>('sincronizando');
+
+  const setEstadoSim = useCallback((nuevoEstado: EstadoSimulacion) => {
+    estadoSimRef.current = nuevoEstado;
+    setEstadoSimInterno(nuevoEstado);
+  }, []);
 
   // ============================================================================
-  // Callback para encolar eventos y gestionar el búfer de inercia
+  // Encolar eventos entrantes y gestionar el arranque con búfer de 2 lotes
   // ============================================================================
   const encolarEventos = useCallback((lote: EventoBatch) => {
     if (!lote.eventos || !Array.isArray(lote.eventos)) return;
 
+    // 1. Procesar eventos de control (ciclo de vida)
     for (const e of lote.eventos) {
-      switch ((e as any).tipo) {
+      const tipo = (e as any).tipo;
+      switch (tipo) {
         case 'SIMULACION_INICIADA':
           setConectado(true);
           break;
@@ -60,7 +66,7 @@ export function useSimulacion(
           setEstadoSim('pausada');
           break;
         case 'SIMULACION_REANUDADA':
-          if (lotesRecibidosRef.current >= 1) setEstadoSim('en_vivo');
+          setEstadoSim('en_vivo');
           break;
         case 'SIMULACION_FINALIZADA':
         case 'COLAPSO_DETECTADO':
@@ -75,33 +81,46 @@ export function useSimulacion(
       }
     }
 
+    // 2. Filtrar eventos de física (vuelos, aeropuertos)
     const TIPOS_IGNORADOS = [
       'SIMULACION_INICIADA', 'SIMULACION_PAUSADA', 'SIMULACION_EN_PAUSA',
       'SIMULACION_REANUDADA', 'SIMULACION_FINALIZADA', 'COLAPSO_DETECTADO',
       'SIMULACION_DETENIDA', 'ERROR',
     ];
 
-    const eventosFiltrados = lote.eventos.filter(
-      (e: any) => !TIPOS_IGNORADOS.includes(e.tipo)
-    );
+    const eventosFiltrados = lote.eventos.filter((e: any) => {
+      const tipo = e.tipo || e.tipoEvento;
+      return !TIPOS_IGNORADOS.includes(tipo);
+    });
 
-    if (eventosFiltrados.length > 0) {
-      colaEventos.current.push(...eventosFiltrados);
-      lotesRecibidosRef.current += 1;
+    if (eventosFiltrados.length === 0) return;
 
-      // El mapa arranca a moverse SOLO cuando el primer batch de datos está a salvo en la memoria RAM
-      if (lotesRecibidosRef.current >= 1 && !bufferListo) {
-        setBufferListo(true);
-        setEstadoSim('en_vivo');
-      }
+    // 3. Acumular en la cola
+    colaEventos.current.push(...eventosFiltrados);
+    lotesRecibidosRef.current += 1;
 
-      onNuevoLoteRef.current?.();
+    console.log('[LOTE RECIBIDO]', {
+      numero: lotesRecibidosRef.current,
+      eventosEnLote: eventosFiltrados.length,
+      totalEnCola: colaEventos.current.length,
+      primerEvento: eventosFiltrados[0]?.fechaHoraEvento,
+      ultimoEvento: eventosFiltrados[eventosFiltrados.length - 1]?.fechaHoraEvento,
+    });
+
+    // 4. Arrancar el motor solo cuando tenemos ≥2 lotes (colchón de seguridad)
+    if (lotesRecibidosRef.current >= 2 && estadoSimRef.current === 'sincronizando') {
+      // Sincronizar el reloj simulado al primer evento real de la cola
+      tiempoSimulacion.current = new Date(colaEventos.current[0].fechaHoraEvento).getTime();
+      console.log('[MOTOR ARRANCA] reloj sincronizado a:', colaEventos.current[0].fechaHoraEvento);
+      setEstadoSim('en_vivo');
     }
-  }, [bufferListo]);
 
-  // ======================
-  // CONEXIÓN WEBSOCKET
-  // ======================
+    onNuevoLoteRef.current?.();
+  }, [setEstadoSim]);
+
+  // ============================================================================
+  // Conexión WebSocket
+  // ============================================================================
   useEffect(() => {
     if (!topic || !id) return;
 
@@ -115,10 +134,11 @@ export function useSimulacion(
             await SimulacionService.iniciar(id);
           } catch (error: any) {
             if (error?.response?.status !== 409) {
-              console.error("Error al iniciar la simulación:", error);
+              console.error('[WS] Error al iniciar la simulación:', error);
               arrancadoRef.current = false;
               return;
             }
+            // 409 = ya estaba corriendo, ignorar
           }
           setConectado(true);
         }
@@ -133,46 +153,57 @@ export function useSimulacion(
     };
   }, [id, topic, encolarEventos]);
 
-  // =================================================
-  // MOTOR LÓGICO Y CONTROL DEL TIEMPO
-  // =================================================
+  // ============================================================================
+  // Motor lógico — intervalo estable, lee estadoSimRef para evitar closure stale
+  // ============================================================================
   useEffect(() => {
-    const msSimuladosPorLote = K * 60 * 1000;
-    const msRealesPorLote = SaS * 1000;
-    const factorAceleracion = msSimuladosPorLote / msRealesPorLote;
-    const TICK_RATE = 100;
+    const msSimuladosPorLote = K * 60 * 1000;   // ej: 90min → 5_400_000 ms
+    const msRealesPorLote    = SaS * 1000;       // ej: 90s  →    90_000 ms
+    const factorAceleracion  = msSimuladosPorLote / msRealesPorLote; // = 60
+    const TICK_RATE = 100; // ms reales por tick
 
     const timer = setInterval(() => {
-      // Bloquear el avance del reloj si la simulación no está activa o si vaciamos la cola
-      if (estadoSim !== 'en_vivo' || colaEventos.current.length === 0) return;
+      // ← ref, nunca queda stale aunque el estado cambie
+      if (estadoSimRef.current !== 'en_vivo') return;
+      if (colaEventos.current.length === 0) return;
 
+      // ── Diagnóstico (quitar en producción) ──
+      console.log('[MOTOR-TICK]', {
+        cola: colaEventos.current.length,
+        tiempoSim: new Date(tiempoSimulacion.current).toISOString(),
+        primerEventoPendiente: colaEventos.current[0]?.fechaHoraEvento,
+      });
+
+      // Avanzar el reloj simulado
       tiempoSimulacion.current += TICK_RATE * factorAceleracion;
       const tiempoActual = tiempoSimulacion.current;
 
+      // Procesar todos los eventos cuyo timestamp ya fue alcanzado
       while (colaEventos.current.length > 0) {
         const evento = colaEventos.current[0];
         const horaEvento = new Date(evento.fechaHoraEvento).getTime();
         if (horaEvento > tiempoActual) break;
 
         const ev = colaEventos.current.shift()!;
+        const tipo = (ev as any).tipo || (ev as any).tipoEvento;
 
-        if (ev.tipo === 'VUELO_DESPEGA') {
+        if (tipo === 'VUELO_DESPEGA') {
           const evVuelo = ev as EventoVuelo;
           vuelosActivos.current.set(evVuelo.codigoVuelo.toString(), evVuelo);
+          console.log('[VUELO DESPEGA]', evVuelo.codigoVuelo, evVuelo.origenIata, '→', evVuelo.destinoIata);
 
-        } else if (ev.tipo === 'VUELO_ATERRIZA') {
+        } else if (tipo === 'VUELO_ATERRIZA') {
           const evVuelo = ev as EventoVuelo;
           vuelosActivos.current.delete(evVuelo.codigoVuelo.toString());
+          console.log('[VUELO ATERRIZA]', evVuelo.codigoVuelo, '→', evVuelo.destinoIata);
 
-        } else if (ev.tipo === 'AEROPUERTO_ACTUALIZADO') {
+        } else if (tipo === 'AEROPUERTO_ACTUALIZADO') {
           const evAero = ev as EventoAeropuerto;
           const codigo = evAero.codigoAeropuerto;
-          
           if (aeropuertosSimulacion.current[codigo]) {
-            aeropuertosSimulacion.current[codigo].maletasActuales = evAero.maletasActuales;
+            aeropuertosSimulacion.current[codigo].maletasActuales     = evAero.maletasActuales;
             aeropuertosSimulacion.current[codigo].porcentajeOcupacion = evAero.porcentajeOcupacion;
-            aeropuertosSimulacion.current[codigo].estadoCapacidad = evAero.estadoCapacidad;
-            // Inyección limpia del top crítico mapeado desde el backend
+            aeropuertosSimulacion.current[codigo].estadoCapacidad     = evAero.estadoCapacidad;
             aeropuertosSimulacion.current[codigo].enviosProximosAVencer = evAero.enviosProximosAVencer || [];
           }
         }
@@ -180,7 +211,7 @@ export function useSimulacion(
     }, TICK_RATE);
 
     return () => clearInterval(timer);
-  }, [K, SaS, estadoSim]);
+  }, [K, SaS]); // ← estadoSim FUERA de deps; se accede via ref
 
   return {
     conectado,
