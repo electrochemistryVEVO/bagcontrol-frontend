@@ -29,6 +29,17 @@ export default function PageTabs(){
             value={currentTab}
             aria-label="nav tabs example"
             role="navigation"
+            sx={{
+                '& .MuiTab-root': {
+                    color: '#ffffff',
+                },
+                '& .MuiTab-root.Mui-selected': {
+                    color: '#ffffff',
+                },
+                '& .MuiTabs-indicator': {
+                    backgroundColor: '#ffffff',
+                },
+            }}
         >
             <LinkTab label="SIMULACIÓN" href="/simulation" />
             <LinkTab label="DASHBOARD" href="/dashboard" />

@@ -1,6 +1,2 @@
-import { Aeropuerto } from '../shared/types/Aeropuerto'
-import axiosApi from './config/axios'
-
-export const AeropuertoService = {
-    listarAeropuertos : () => axiosApi.get<Aeropuerto[]>('/aeropuertos')
-}
+// Re-export desde el nuevo servicio para mantener compatibilidad con imports existentes
+export { AeropuertoService } from './aeropuerto.service'
