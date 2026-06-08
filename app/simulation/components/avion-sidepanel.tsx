@@ -24,7 +24,8 @@ function SidePanelContents({flight,isOpen,idSimulacion,aeropuertos} : {flight:Ev
         if(flight){
             //Llamada a API
             SimulacionService.obtenerEnviosPorVuelo(idSimulacion,flight.codigoVuelo)
-                .then(({data}:{data:Envio[]})=>{console.log(data);setEnviosAsignados(data)})
+                .then(({data}:{data:Envio[]})=>{
+                    setEnviosAsignados(data)})
                 .catch((err)=>{console.error(err)})
         }
     }, [isOpen]);
@@ -40,6 +41,7 @@ function SidePanelContents({flight,isOpen,idSimulacion,aeropuertos} : {flight:Ev
             return acum
         },new Map<string,Aeropuerto>())
     },[flight]);
+
 
     const aeropuertoOrigen = _aeropuertos.get(flight.origenIata);
     const aeropuertoDestino = _aeropuertos.get(flight.destinoIata);
@@ -117,12 +119,12 @@ function SidePanelContents({flight,isOpen,idSimulacion,aeropuertos} : {flight:Ev
 
             <div className={styles["capacity"]}>
                 <span>Carga actual:</span>
-                <span>{flight.cantidadMaletas}/200</span>
+                <span>{flight.cantidadMaletas}/{flight.capacidadMax}</span>
             </div>
 
             <div className={styles["progress progress-yellow"]}>
                 <div className={styles["progress-fill progress-fill-yellow"]}>
-                    {(flight.cantidadMaletas/2).toFixed(2)}%
+                    {(flight.cantidadMaletas/flight.capacidadMax*100).toFixed(2)}%
                 </div>
             </div>
 

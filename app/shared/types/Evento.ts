@@ -43,6 +43,7 @@ export interface EventoVuelo extends EventoBase {
     destinoAeropuerto?: Aeropuerto;
     estado: EstadoCapacidad;
     cantidadMaletas: number;
+    capacidadMax: number;
     horaSalidaLocal: string;
     horaLlegadaLocal: string;
     horaSalidaUtc: string;

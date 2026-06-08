@@ -24,6 +24,7 @@ import { AeropuertoPopupContent } from './pop-up-aeropuerto';
 import { RelojSimulacionOverlay } from './reloj-simulacion';
 import AvionSidePanel, {useOpenPanel} from "@/app/simulation/components/avion-sidepanel";
 import {Drawer} from "@mui/material";
+import globals from '../../../globals.css';
 
 // ============================================================================
 // 1. ESTILOS DE CAPAS (Layers)
@@ -53,7 +54,14 @@ const layerStyleLine: LineLayerSpecification = {
   type: 'line',
   source: 'rutas-data',
   paint: { 
-    "line-color": "#198EC8",
+    "line-color":[
+      'match',
+      ['get', 'estado'],
+      'ROJO', '#ef4444',
+      'AMARILLO', '#eab308',
+      'VERDE', '#22c55e',
+      '#007cbf' // Fallback
+    ],
     "line-width": 2,
     "line-opacity": 0.6,
     "line-dasharray": [2, 2]
@@ -66,6 +74,14 @@ const layerStyleAirplane: SymbolLayerSpecification = {
   source: 'aviones-data',
   paint: {
     'icon-opacity': 1,
+    'icon-color':[
+      'match',
+      ['get', 'estado'],
+      'ROJO', '#ef4444',
+      'AMARILLO', '#eab308',
+      'VERDE', '#22c55e',
+      '#007cbf' // Fallback
+    ],
     'icon-opacity-transition': { duration: 0 } // Eliminamos el delay de 300ms de MapLibre
   },
   layout: {
@@ -163,7 +179,6 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
         
         const posicionActual = interpolar(coordsOrigen, coordsDestino, progreso);
         const bearing = calcularBearing(coordsOrigen, coordsDestino);
-
         // Feature del Avión
         featuresAviones.push({
           type: 'Feature',
@@ -235,7 +250,7 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
           const map = e.target;
           if (!map.hasImage('airplane')) {
             const img = await map.loadImage('/avion.png');     
-            map.addImage('airplane', img.data)
+            map.addImage('airplane', img.data,{sdf:true})
             console.log("image is loaded")
             setImageLoaded(true);
           }
