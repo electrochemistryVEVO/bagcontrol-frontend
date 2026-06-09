@@ -83,13 +83,6 @@ export function SimulacionCliente({ id, topic, k, aeropuertosIniciales }: Props)
     }
   };
 
-  const btnBase: React.CSSProperties = {
-    display: 'inline-flex', alignItems: 'center', gap: '6px',
-    padding: '6px 16px', borderRadius: '6px', fontWeight: 600,
-    fontSize: '14px', cursor: 'pointer', border: '2px solid',
-    background: 'transparent', color: 'white', transition: 'opacity .2s',
-  };
-
   const estaActiva  = estadoSim === 'en_vivo';
   const estaPausada = estadoSim === 'pausada';
   const terminada   = estadoSim === 'finalizada' || estadoSim === 'detenida' || estadoSim === 'error';
@@ -111,6 +104,14 @@ export function SimulacionCliente({ id, topic, k, aeropuertosIniciales }: Props)
     detenida:      '#f87171',
     finalizada:    '#94a3b8',
     error:         '#ef4444',
+  };
+
+
+  const btnBase: React.CSSProperties = {
+    display: 'inline-flex', alignItems: 'center', gap: '6px',
+    padding: '6px 16px', borderRadius: '6px', fontWeight: 600,
+    fontSize: '14px', cursor: 'pointer', border: '2px solid',
+    background: 'transparent', color: 'white', transition: 'opacity .15s',
   };
 
   return (
