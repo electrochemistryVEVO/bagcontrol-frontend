@@ -1,5 +1,5 @@
-import {Box, Button, Drawer, Table, TableBody, TableCell, TablePagination, TableRow} from "@mui/material";
-import {memo, useCallback, useEffect, useMemo, useState} from "react";
+import {Box, Table, TableBody, TableCell, TablePagination, TableRow} from "@mui/material";
+import {memo, useEffect, useMemo, useState} from "react";
 import styles from "../../stylesheets/sidepanel.module.css";
 import {EventoVuelo} from "@/app/shared/types/Evento";
 import {MapGeoJSONFeature, MapLayerMouseEvent} from "@vis.gl/react-maplibre";
@@ -9,7 +9,21 @@ import {Aeropuerto} from "@/app/shared/types/Aeropuerto";
 import {HourFormat} from "@/app/shared/Utils";
 
 
-function SidePanelContents({flight,isOpen,idSimulacion,aeropuertos} : {flight:EventoVuelo,isOpen:boolean,idSimulacion:string,aeropuertos:Aeropuerto[]}){
+function SidePanelContents({
+    flight,
+    isOpen,
+    idSimulacion,
+    aeropuertos,
+    onMostrarRutaEnvio,
+    onEnfocarVuelo,
+} : {
+    flight: EventoVuelo,
+    isOpen: boolean,
+    idSimulacion: string,
+    aeropuertos: Aeropuerto[],
+    onMostrarRutaEnvio: (idPedido: string) => void,
+    onEnfocarVuelo: () => void,
+}){
     //Envios
     const [enviosAsignados,setEnviosAsignados] = useState<Envio[]>([]);
 
@@ -20,7 +34,6 @@ function SidePanelContents({flight,isOpen,idSimulacion,aeropuertos} : {flight:Ev
     //Tomar los envios asignados al vuelo
 
     useEffect(() => {
-        console.log(flight)
         if(flight){
             //Llamada a API
             SimulacionService.obtenerEnviosPorVuelo(idSimulacion,flight.codigoVuelo)
@@ -28,19 +41,14 @@ function SidePanelContents({flight,isOpen,idSimulacion,aeropuertos} : {flight:Ev
                     setEnviosAsignados(data)})
                 .catch((err)=>{console.error(err)})
         }
-    }, [isOpen]);
-    console.log(enviosAsignados)
-
-
-
-    console.log(enviosAsignados)
+    }, [flight, idSimulacion, isOpen]);
     //Memo de aeropuertos para no perder el hilo
     const _aeropuertos = useMemo(()=>{
         return aeropuertos.reduce((acum:Map<string,Aeropuerto>,val:Aeropuerto)=>{
             acum.set(val.codigoIata,val)
             return acum
         },new Map<string,Aeropuerto>())
-    },[flight]);
+    },[aeropuertos]);
 
 
     const aeropuertoOrigen = _aeropuertos.get(flight.origenIata);
@@ -58,10 +66,8 @@ function SidePanelContents({flight,isOpen,idSimulacion,aeropuertos} : {flight:Ev
             <div className={styles["card-header"]}>
                 <h2 className={styles["section-title"]}>Información del vuelo</h2>
 
-                <button className={styles["collapse-btn"]}>
-                    <svg viewBox="0 0 24 24">
-                        <path d="M6 15L12 9L18 15"/>
-                    </svg>
+                <button type="button" style={miniButtonStyle} onClick={onEnfocarVuelo}>
+                    Enfocar
                 </button>
             </div>
 
@@ -129,8 +135,8 @@ function SidePanelContents({flight,isOpen,idSimulacion,aeropuertos} : {flight:Ev
             </div>
 
             <div className={styles["packages-header"]}>
-                <span>Paquetes:</span>
-                <a href="#" className={styles["view-all"]}>ver todos</a>
+                <span>Envios asignados a esta UT:</span>
+                <span className={styles["view-all"]}>{enviosAsignados.length} registros</span>
             </div>
 
             <div className={styles["subtitle"]}>
@@ -145,13 +151,17 @@ function SidePanelContents({flight,isOpen,idSimulacion,aeropuertos} : {flight:Ev
                             .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                             .map((envio:Envio)=>(<TableRow key={envio.idPedido} className={styles["package-item"]}>
                                 <TableCell className={styles["package-code"]}>{envio.idPedido}</TableCell>
-                                <TableCell className={styles["package-time red"]}>hasta {HourFormat(new Date(envio.fechaHora))}</TableCell>
+                                <TableCell>{envio.origenIata} - {envio.destinoIata}</TableCell>
+                                <TableCell>{envio.cantidadMaletas} maletas</TableCell>
+                                <TableCell className={styles["package-time red"]}>{HourFormat(new Date(envio.fechaHora))}</TableCell>
                                 <TableCell>
-                                    <svg className={styles["external"]} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <path d="M14 3h7v7"/>
-                                        <path d="M10 14L21 3"/>
-                                        <rect x="3" y="7" width="14" height="14" rx="2"/>
-                                    </svg>
+                                    <button
+                                        type="button"
+                                        onClick={() => onMostrarRutaEnvio(envio.idPedido)}
+                                        style={miniButtonStyle}
+                                    >
+                                        Ruta
+                                    </button>
                                 </TableCell>
                             </TableRow>))
                     }
@@ -180,6 +190,8 @@ type AvionSidePanelProps = {
     selFlight: MapGeoJSONFeature | null,
     idSimulacion: string,
     aeropuertos: Aeropuerto[],
+    onMostrarRutaEnvio: (idPedido: string) => void,
+    onEnfocarVuelo: () => void,
 }
 
 export function useOpenPanel(): OpenSimulationPanel {
@@ -210,6 +222,24 @@ export default memo(function AvionSidePanel(props: AvionSidePanelProps) {
     const _flight = flight as EventoVuelo;
     return (
         <div>
-            <SidePanelContents flight={_flight} isOpen={props.openPanel} idSimulacion={props.idSimulacion} aeropuertos={props.aeropuertos}/>
+            <SidePanelContents
+                flight={_flight}
+                isOpen={props.openPanel}
+                idSimulacion={props.idSimulacion}
+                aeropuertos={props.aeropuertos}
+                onMostrarRutaEnvio={props.onMostrarRutaEnvio}
+                onEnfocarVuelo={props.onEnfocarVuelo}
+            />
         </div>
     )})
+
+const miniButtonStyle: React.CSSProperties = {
+    border: 'none',
+    borderRadius: 6,
+    padding: '5px 9px',
+    background: '#2563eb',
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: 'pointer',
+};

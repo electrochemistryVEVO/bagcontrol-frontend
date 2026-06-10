@@ -11,9 +11,10 @@ interface Props {
   topic: string;
   k: number;
   aeropuertosIniciales: Aeropuerto[];
+  errorInicial?: string | null;
 }
 
-export function SimulacionCliente({ id, topic, k, aeropuertosIniciales }: Props) {
+export function SimulacionCliente({ id, topic, k, aeropuertosIniciales, errorInicial }: Props) {
   const SaS_SEGUNDOS = 90;
   const { showToast, ToastComponent } = useToast();
 
@@ -33,7 +34,6 @@ export function SimulacionCliente({ id, topic, k, aeropuertosIniciales }: Props)
   
   // El estado del ciclo de vida vive en el hook — lo recibimos directamente.
   const { 
-    conectado,
     estadoSim,
     setEstadoSim,
     aeropuertosRef, 
@@ -161,6 +161,11 @@ export function SimulacionCliente({ id, topic, k, aeropuertosIniciales }: Props)
           </span>
         </div>
       </header>
+      {errorInicial && (
+        <div style={{ padding: '8px 16px', background: '#fef2f2', color: '#b91c1c', fontSize: 13 }}>
+          {errorInicial}
+        </div>
+      )}
       
       <div style={{ flex: 1 }}>
         <MapaSimulacion            

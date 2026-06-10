@@ -57,8 +57,16 @@ export function GestionAeropuertos() {
         await AeropuertoService.crearAeropuerto(form)
         flash('Aeropuerto creado exitosamente')
       } else if (modo === 'editar' && editandoIata) {
-        const { codigoIata, ...datos } = form
-        await AeropuertoService.actualizarAeropuerto(editandoIata, datos as ActualizarAeropuertoDTO)
+        const datos: ActualizarAeropuertoDTO = {
+          ciudad: form.ciudad,
+          pais: form.pais,
+          continente: form.continente,
+          gmt: form.gmt,
+          capacidadAlmacen: form.capacidadAlmacen,
+          latitud: form.latitud,
+          longitud: form.longitud,
+        }
+        await AeropuertoService.actualizarAeropuerto(editandoIata, datos)
         flash('Aeropuerto actualizado exitosamente')
       }
       cerrar()

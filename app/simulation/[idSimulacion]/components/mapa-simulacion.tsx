@@ -13,13 +13,16 @@ import {
   MapRef,
   SymbolLayerSpecification,
 } from '@vis.gl/react-maplibre';
-import { useMemo, useRef, useState, useEffect, RefObject } from 'react';
+import { useMemo, useRef, useState, useEffect, RefObject, useCallback } from 'react';
 import { Feature } from 'geojson';
 import { MapLibreEvent } from 'maplibre-gl';
+import type { GeoJSONSource } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import { AeropuertoSimulacion, Aeropuerto } from '@/app/shared/types/Aeropuerto';
 import { EventoVuelo } from "@/app/shared/types/Evento";
+import { EnvioRuta } from '@/app/shared/types/Envio';
+import { SimulacionService } from '@/app/services/simulation.service';
 import { AeropuertoPopupContent } from './pop-up-aeropuerto';
 import { RelojSimulacionOverlay } from './reloj-simulacion';
 import AvionSidePanel from "@/app/simulation/components/avion-sidepanel";
@@ -67,6 +70,17 @@ const layerStyleLine: LineLayerSpecification = {
   }
 };
 
+const layerStyleRutaEnvio: LineLayerSpecification = {
+  id: 'envio-ruta',
+  type: 'line',
+  source: 'envio-ruta-data',
+  paint: {
+    'line-color': '#2563eb',
+    'line-width': 4,
+    'line-opacity': 0.9,
+  }
+};
+
 const layerStyleAirplane: SymbolLayerSpecification = {
   id: 'plane',
   type: 'symbol',
@@ -106,6 +120,12 @@ function calcularBearing(inicio: number[], fin: number[]) {
   return 90 - theta;
 }
 
+function obtenerCoordenadasFeature(feature: MapGeoJSONFeature | null): [number, number] | null {
+  if (!feature || feature.geometry.type !== 'Point') return null;
+  const [lng, lat] = feature.geometry.coordinates;
+  return [lng as number, lat as number];
+}
+
 interface Props {
   aeropuertosIniciales: Aeropuerto[];
   aeropuertosRef: RefObject<Record<string, AeropuertoSimulacion>>;
@@ -128,6 +148,9 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
 
   const [airportPanelOpen, setAirportPanelOpen] = useState(false);
   const [selAirport, setSelAirport] = useState<MapGeoJSONFeature | null>(null);
+  const [idEnvioBusqueda, setIdEnvioBusqueda] = useState('');
+  const [rutaEnvio, setRutaEnvio] = useState<EnvioRuta | null>(null);
+  const [rutaError, setRutaError] = useState<string | null>(null);
 
   const coordsAeropuertos = useMemo(() => {
     const dict: Record<string, number[]> = {};
@@ -136,6 +159,97 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
     });
     return dict;
   }, [aeropuertosIniciales]);
+
+  const enfocarCoordenadas = useCallback((coords: [number, number], zoom = 6) => {
+    mapRef.current?.getMap().flyTo({
+      center: coords,
+      zoom,
+      duration: 700,
+      essential: true,
+    });
+  }, []);
+
+  const enfocarAeropuerto = useCallback((codigoIata: string) => {
+    const coords = coordsAeropuertos[codigoIata];
+    if (coords) {
+      enfocarCoordenadas([coords[0], coords[1]], 6.5);
+    }
+  }, [coordsAeropuertos, enfocarCoordenadas]);
+
+  const enfocarVueloSeleccionado = useCallback(() => {
+    const coords = obtenerCoordenadasFeature(selFlight);
+    if (coords) {
+      enfocarCoordenadas(coords, 6.5);
+    }
+  }, [enfocarCoordenadas, selFlight]);
+
+  const mostrarRutaEnvio = useCallback(async (idPedido: string) => {
+    const idNormalizado = idPedido.trim();
+    if (!idNormalizado) return;
+
+    try {
+      setRutaError(null);
+      const { data } = await SimulacionService.obtenerRutaEnvio(idSimulacion, idNormalizado);
+      setRutaEnvio(data);
+      setIdEnvioBusqueda(idNormalizado);
+    } catch {
+      setRutaEnvio(null);
+      setRutaError(`No se encontro ruta para el envio ${idNormalizado}`);
+    }
+  }, [idSimulacion]);
+
+  const featuresRutaEnvio = useMemo<Feature[]>(() => {
+    if (!rutaEnvio) return [];
+    return rutaEnvio.escalas
+      .map((escala, index): Feature | null => {
+        const origen = coordsAeropuertos[escala.origenIata];
+        const destino = coordsAeropuertos[escala.destinoIata];
+        if (!origen || !destino) return null;
+        return {
+          type: 'Feature' as const,
+          properties: {
+            index: index + 1,
+            codigoVuelo: String(escala.codigoVuelo),
+            origenIata: escala.origenIata,
+            destinoIata: escala.destinoIata,
+          },
+          geometry: { type: 'LineString' as const, coordinates: [origen, destino] },
+        };
+      })
+      .filter((feature): feature is Feature => feature !== null);
+  }, [coordsAeropuertos, rutaEnvio]);
+
+  const enfocarRutaEnvio = useCallback(() => {
+    const coords = featuresRutaEnvio.flatMap((feature) => {
+      if (feature.geometry.type !== 'LineString') return [];
+      return feature.geometry.coordinates as [number, number][];
+    });
+
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+
+    if (coords.length === 0 && rutaEnvio?.aeropuertoActual) {
+      enfocarAeropuerto(rutaEnvio.aeropuertoActual);
+      return;
+    }
+    if (coords.length === 0) return;
+
+    const lngs = coords.map(([lng]) => lng);
+    const lats = coords.map(([, lat]) => lat);
+    map.fitBounds(
+      [
+        [Math.min(...lngs), Math.min(...lats)],
+        [Math.max(...lngs), Math.max(...lats)],
+      ],
+      { padding: 90, duration: 700, maxZoom: 6.5 }
+    );
+  }, [enfocarAeropuerto, featuresRutaEnvio, rutaEnvio]);
+
+  useEffect(() => {
+    if (rutaEnvio) {
+      enfocarRutaEnvio();
+    }
+  }, [enfocarRutaEnvio, rutaEnvio]);
 
   // ============================================================================
   // EL MOTOR GRÁFICO (WebGL Render Loop)
@@ -172,7 +286,7 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
 
         featuresAviones.push({
           type: 'Feature',
-          properties: { ...vuelo, bearing, isAirplane: true },
+          properties: { ...vuelo, codigoVuelo: String(vuelo.codigoVuelo), bearing, isAirplane: true },
           geometry: { type: 'Point', coordinates: posicionActual }
         });
 
@@ -191,20 +305,22 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
         geometry: { type: 'Point', coordinates: [airport.longitud, airport.latitud] },
       }));
 
-      const sourceAviones = map.getSource('aviones-data') as maplibregl.GeoJSONSource;
-      const sourceRutas = map.getSource('rutas-data') as maplibregl.GeoJSONSource;
-      const sourceAeropuertos = map.getSource('aeropuertos-data') as maplibregl.GeoJSONSource;
+      const sourceAviones = map.getSource('aviones-data') as GeoJSONSource;
+      const sourceRutas = map.getSource('rutas-data') as GeoJSONSource;
+      const sourceAeropuertos = map.getSource('aeropuertos-data') as GeoJSONSource;
+      const sourceRutaEnvio = map.getSource('envio-ruta-data') as GeoJSONSource;
 
       if (sourceAviones) sourceAviones.setData({ type: 'FeatureCollection', features: featuresAviones });
       if (sourceRutas) sourceRutas.setData({ type: 'FeatureCollection', features: featuresRutas });
       if (sourceAeropuertos) sourceAeropuertos.setData({ type: 'FeatureCollection', features: featuresAeropuertos });
+      if (sourceRutaEnvio) sourceRutaEnvio.setData({ type: 'FeatureCollection', features: featuresRutaEnvio });
 
       animationFrameId = requestAnimationFrame(animar);
     };
 
     animar();
     return () => cancelAnimationFrame(animationFrameId);
-  }, [coordsAeropuertos, vuelosActivosRef, tiempoSimulacionRef, aeropuertosRef, imageLoaded]);
+  }, [coordsAeropuertos, vuelosActivosRef, tiempoSimulacionRef, aeropuertosRef, imageLoaded, featuresRutaEnvio]);
 
   const handleMouseEnter = (event: MapLayerMouseEvent) => {
     setSelFeature(event.features?.[0] ?? null);
@@ -216,13 +332,87 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       {/* DRAWER PARA AVIONES */}
       <Drawer open={panelOpen} onClose={() => setPanelOpen(false)}>
-        <AvionSidePanel openPanel={panelOpen} selFlight={selFlight} idSimulacion={idSimulacion} aeropuertos={aeropuertosIniciales} />
+        <AvionSidePanel
+          openPanel={panelOpen}
+          selFlight={selFlight}
+          idSimulacion={idSimulacion}
+          aeropuertos={aeropuertosIniciales}
+          onMostrarRutaEnvio={mostrarRutaEnvio}
+          onEnfocarVuelo={enfocarVueloSeleccionado}
+        />
       </Drawer>
 
       {/* DRAWER PARA AEROPUERTOS */}
       <Drawer open={airportPanelOpen} onClose={() => setAirportPanelOpen(false)}>
-        <AeropuertoSidePanel openPanel={airportPanelOpen} selAirport={selAirport} aeropuertosRef={aeropuertosRef} />
+        <AeropuertoSidePanel
+          openPanel={airportPanelOpen}
+          selAirport={selAirport}
+          aeropuertosRef={aeropuertosRef}
+          idSimulacion={idSimulacion}
+          onMostrarRutaEnvio={mostrarRutaEnvio}
+          onEnfocarAeropuerto={enfocarAeropuerto}
+        />
       </Drawer>
+      <div style={{
+        position: 'absolute',
+        top: 16,
+        left: 16,
+        zIndex: 10,
+        background: 'rgba(15, 23, 42, 0.92)',
+        color: '#fff',
+        padding: 12,
+        borderRadius: 8,
+        width: 320,
+        boxShadow: '0 8px 20px rgba(0,0,0,0.25)'
+      }}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            mostrarRutaEnvio(idEnvioBusqueda);
+          }}
+          style={{ display: 'flex', gap: 8 }}
+        >
+          <input
+            value={idEnvioBusqueda}
+            onChange={(e) => setIdEnvioBusqueda(e.target.value)}
+            placeholder="ID de envio"
+            style={{
+              flex: 1,
+              borderRadius: 6,
+              border: '1px solid #64748b',
+              padding: '7px 9px',
+              color: '#fff',
+              background: '#1e293b',
+              outline: 'none'
+            }}
+          />
+          <button type="submit" style={{ border: 'none', borderRadius: 6, padding: '7px 10px', background: '#38bdf8', color: '#0f172a', fontWeight: 700 }}>
+            Ruta
+          </button>
+        </form>
+        {rutaError && <div style={{ marginTop: 8, fontSize: 12, color: '#fecaca' }}>{rutaError}</div>}
+        {rutaEnvio && (
+          <div style={{ marginTop: 10, fontSize: 12, lineHeight: 1.45 }}>
+            <div style={{ fontWeight: 700 }}>Envio {rutaEnvio.envio.idPedido}</div>
+            <div>{rutaEnvio.envio.origenIata} - {rutaEnvio.envio.destinoIata} · {rutaEnvio.envio.cantidadMaletas} maletas</div>
+            <div>Estado: {rutaEnvio.estado} · Actual: {rutaEnvio.aeropuertoActual ?? 'N/A'}</div>
+            <div style={{ marginTop: 6, maxHeight: 120, overflowY: 'auto' }}>
+              {rutaEnvio.escalas.length === 0 ? (
+                <div>Sin itinerario asignado.</div>
+              ) : rutaEnvio.escalas.map((escala, index) => (
+                <div key={`${escala.codigoVuelo}-${index}`}>
+                  {index + 1}. Vuelo {escala.codigoVuelo}: {escala.origenIata} - {escala.destinoIata}
+                </div>
+              ))}
+            </div>
+            {rutaEnvio.escalas.length > 0 && featuresRutaEnvio.length === 0 && (
+              <div style={{ marginTop: 6, color: '#fde68a' }}>
+                La ruta tiene escalas, pero faltan coordenadas de aeropuerto para pintarla.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
       
       <MapLibre
         ref={mapRef}
@@ -239,9 +429,14 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
           if (properties.isAirplane) {
             setSelFlight(feature ?? null);
             setPanelOpen(true);
+            const coords = obtenerCoordenadasFeature(feature ?? null);
+            if (coords) enfocarCoordenadas(coords, 6.5);
           } else if (properties.isAirport) {
             setSelAirport(feature ?? null);
             setAirportPanelOpen(true);
+            if (typeof properties.codigoIata === 'string') {
+              enfocarAeropuerto(properties.codigoIata);
+            }
           }
         }}
         interactiveLayerIds={['point', 'plane']}
@@ -261,6 +456,10 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
       >
         <Source id="rutas-data" type="geojson" data={{ type: 'FeatureCollection', features: [] }}>
           <Layer {...layerStyleLine} />
+        </Source>
+
+        <Source id="envio-ruta-data" type="geojson" data={{ type: 'FeatureCollection', features: [] }}>
+          <Layer {...layerStyleRutaEnvio} />
         </Source>
 
         <Source id="aeropuertos-data" type="geojson" data={{ type: 'FeatureCollection', features: [] }}>

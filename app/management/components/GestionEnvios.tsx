@@ -1,36 +1,27 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { RegistroEnvio } from './RegistroEnvio'
+import { EnvioService } from '@/app/services/envio.service'
+import { Envio } from '@/app/shared/types/Envio'
 
 export function GestionEnvios() {
   const [vista, setVista] = useState<'lista' | 'registro'>('lista')
-  const [envios, setEnvios] = useState<Array<{
-    idPedido: string
-    origenIata: string
-    destinoIata: string
-    fechaHora: string
-    cantidadMaletas: number
-    idCliente: string
-  }>>([])
-  const [loading, setLoading] = useState(false)
+  const [envios, setEnvios] = useState<Envio[]>([])
+  const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
   const [pagina, setPagina] = useState(1)
 
   useEffect(() => {
-    setLoading(true)
-    setErrorMsg('')
-
     const inicio = new Date()
     inicio.setDate(inicio.getDate() - 30)
     const fechaInicio = inicio.toISOString().split('T')[0]
 
-    fetch(`http://localhost:8090/api/envios/rango-dias?fechaInicio=${fechaInicio}&dias=60`)
-      .then(r => r.json())
-      .then(data => {
+    EnvioService.listarEnviosPorDias(fechaInicio, 60)
+      .then(({ data }) => {
         setEnvios(Array.isArray(data) ? data : [])
       })
       .catch(() => {
-        setErrorMsg('No se pudieron cargar los envíos. Verifica que el servidor esté activo en localhost:8090.')
+        setErrorMsg('No se pudieron cargar los envios. Verifica que el servidor este activo.')
         setEnvios([])
       })
       .finally(() => setLoading(false))
@@ -101,7 +92,7 @@ export function GestionEnvios() {
             ) : filas.length === 0 ? (
               <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center' as const, color: '#94a3b8' }}>No hay envíos registrados en este período</td></tr>
             ) : filas.map((e, i) => (
-              <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', color: '#111827' }}>
+              <tr key={e.idPedido} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa', color: '#111827' }}>
                 <td style={{ padding: '10px 14px', borderBottom: '1px solid #f1f5f9', fontWeight: 600, fontFamily: 'monospace' }}>{e.idPedido}</td>
                 <td style={{ padding: '10px 14px', borderBottom: '1px solid #f1f5f9' }}>{e.origenIata}</td>
                 <td style={{ padding: '10px 14px', borderBottom: '1px solid #f1f5f9' }}>{e.destinoIata}</td>

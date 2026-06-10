@@ -10,9 +10,14 @@ export function AeropuertoPopupContent({
   aeropuertosRef: RefObject<Record<string, AeropuertoSimulacion>> 
 }) {
   // Estado local solo para este cuadrito de texto
-  const [data, setData] = useState(() => aeropuertosRef.current?.[codigoIata]);
+  const [data, setData] = useState<AeropuertoSimulacion | undefined>();
 
   useEffect(() => {
+    const liveData = aeropuertosRef.current?.[codigoIata];
+    if (liveData) {
+      setData({ ...liveData });
+    }
+
     // Un relojito interno que corre a 10 fotogramas por segundo
     const timer = setInterval(() => {
       const liveData = aeropuertosRef.current?.[codigoIata];

@@ -4,29 +4,44 @@ import { Box, Table, TableBody, TableCell, TablePagination, TableRow } from "@mu
 import { memo, useEffect, useState, RefObject } from "react";
 import styles from "../../stylesheets/sidepanel.module.css";
 import { AeropuertoSimulacion } from "@/app/shared/types/Aeropuerto";
-import { Envio } from "@/app/shared/types/Envio"; // Tu interfaz de TypeScript mapeada antes
+import { Envio, EnvioAlmacen } from "@/app/shared/types/Envio";
 import { MapGeoJSONFeature } from "@vis.gl/react-maplibre";
 import { HourFormat } from "@/app/shared/Utils";
+import { SimulacionService } from "@/app/services/simulation.service";
 
 function AeropuertoPanelContents({
     codigoIata,
     isOpen,
-    aeropuertosRef
+    aeropuertosRef,
+    idSimulacion,
+    onMostrarRutaEnvio,
+    onEnfocarAeropuerto,
 }: {
     codigoIata: string;
     isOpen: boolean;
     aeropuertosRef: RefObject<Record<string, AeropuertoSimulacion>>;
+    idSimulacion: string;
+    onMostrarRutaEnvio: (idPedido: string) => void;
+    onEnfocarAeropuerto: (codigoIata: string) => void;
 }) {
     // 1. Inicializamos con los datos reactivos del Snapshot de simulación
-    const [data, setData] = useState<AeropuertoSimulacion | undefined>(() => aeropuertosRef.current?.[codigoIata]);
+    const [data, setData] = useState<AeropuertoSimulacion | undefined>();
     
     // Paginación local para la lista de paquetes críticos
     const [page, setPage] = useState<number>(0);
     const [rowsPerPage, setRowsPerPage] = useState<number>(5);
+    const [pageAlmacen, setPageAlmacen] = useState<number>(0);
+    const [rowsPerPageAlmacen, setRowsPerPageAlmacen] = useState<number>(5);
+    const [enviosAlmacen, setEnviosAlmacen] = useState<EnvioAlmacen[]>([]);
 
     // 2. Efecto de sincronización para mantener el Sheet "vivo" al ritmo del motor lógico
     useEffect(() => {
         if (!isOpen || !codigoIata) return;
+
+        const liveData = aeropuertosRef.current?.[codigoIata];
+        if (liveData) {
+            setData({ ...liveData });
+        }
 
         // Forzar clonación de estado en RAM cada 100ms para actualizaciones en vivo
         const timer = setInterval(() => {
@@ -38,6 +53,14 @@ function AeropuertoPanelContents({
 
         return () => clearInterval(timer);
     }, [isOpen, codigoIata, aeropuertosRef]);
+
+    useEffect(() => {
+        if (!isOpen || !codigoIata) return;
+
+        SimulacionService.obtenerEnviosPorAlmacen(idSimulacion, codigoIata)
+            .then(({ data }) => setEnviosAlmacen(data))
+            .catch(() => setEnviosAlmacen([]));
+    }, [codigoIata, idSimulacion, isOpen]);
 
     if (!data) return null;
 
@@ -73,10 +96,8 @@ function AeropuertoPanelContents({
             <div className={styles.card}>
                 <div className={styles["card-header"]}>
                     <h2 className={styles["section-title"]}>Información de aeropuerto</h2>
-                    <button className={styles["collapse-btn"]}>
-                        <svg viewBox="0 0 24 24">
-                            <path d="M6 15L12 9L18 15" />
-                        </svg>
+                    <button type="button" style={miniButtonStyle} onClick={() => onEnfocarAeropuerto(data.codigoIata)}>
+                        Enfocar
                     </button>
                 </div>
 
@@ -105,6 +126,66 @@ function AeropuertoPanelContents({
                 </div>
             </div>
 
+
+            <div className={styles.card}>
+                <div className={styles["section-title"]}>
+                    Productos en almacen
+                </div>
+
+                <div className={styles["subtitle"]}>
+                    Envios en destino final y en transito por este aeropuerto
+                </div>
+
+                <Table className={styles["package-list"]}>
+                    <TableBody>
+                        {enviosAlmacen.length === 0 ? (
+                            <TableRow>
+                                <TableCell style={{ color: '#94a3b8', textAlign: 'center' }}>
+                                    Sin productos registrados en este almacen
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            enviosAlmacen
+                                .slice(pageAlmacen * rowsPerPageAlmacen, pageAlmacen * rowsPerPageAlmacen + rowsPerPageAlmacen)
+                                .map((item: EnvioAlmacen) => (
+                                    <TableRow key={item.envio.idPedido} className={styles["package-item"]}>
+                                        <TableCell className={styles["package-code"]}>
+                                            {item.envio.idPedido}
+                                        </TableCell>
+                                        <TableCell>
+                                            {item.tipoAlmacen === 'DESTINO_FINAL' ? 'Destino final' : 'Transito'}
+                                        </TableCell>
+                                        <TableCell>
+                                            {item.envio.cantidadMaletas} maletas
+                                        </TableCell>
+                                        <TableCell>
+                                            <button
+                                                type="button"
+                                                onClick={() => onMostrarRutaEnvio(item.envio.idPedido)}
+                                                style={miniButtonStyle}
+                                            >
+                                                Ruta
+                                            </button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                        )}
+                    </TableBody>
+                </Table>
+
+                <TablePagination
+                    rowsPerPage={rowsPerPageAlmacen}
+                    component="div"
+                    rowsPerPageOptions={[5, 10, 15]}
+                    page={pageAlmacen}
+                    count={enviosAlmacen.length}
+                    onPageChange={(_, value) => setPageAlmacen(value)}
+                    onRowsPerPageChange={(e) => {
+                        setRowsPerPageAlmacen(Number(e.target.value));
+                        setPageAlmacen(0);
+                    }}
+                />
+            </div>
             {/* CARD 2: MONITOREO DE ALMACÉN EN TIEMPO REAL */}
             <div className={styles.card}>
                 <div className={styles["section-title"]}>
@@ -185,9 +266,19 @@ type AeropuertoSidePanelProps = {
     openPanel: boolean;
     selAirport: MapGeoJSONFeature | null;
     aeropuertosRef: RefObject<Record<string, AeropuertoSimulacion>>;
+    idSimulacion: string;
+    onMostrarRutaEnvio: (idPedido: string) => void;
+    onEnfocarAeropuerto: (codigoIata: string) => void;
 };
 
-export default memo(function AeropuertoSidePanel({ openPanel, selAirport, aeropuertosRef }: AeropuertoSidePanelProps) {
+export default memo(function AeropuertoSidePanel({
+    openPanel,
+    selAirport,
+    aeropuertosRef,
+    idSimulacion,
+    onMostrarRutaEnvio,
+    onEnfocarAeropuerto,
+}: AeropuertoSidePanelProps) {
     const properties = selAirport?.properties;
     if (!properties || !properties.isAirport) return null;
 
@@ -197,7 +288,21 @@ export default memo(function AeropuertoSidePanel({ openPanel, selAirport, aeropu
                 codigoIata={properties.codigoIata} 
                 isOpen={openPanel} 
                 aeropuertosRef={aeropuertosRef} 
+                idSimulacion={idSimulacion}
+                onMostrarRutaEnvio={onMostrarRutaEnvio}
+                onEnfocarAeropuerto={onEnfocarAeropuerto}
             />
         </div>
     );
 });
+
+const miniButtonStyle: React.CSSProperties = {
+    border: 'none',
+    borderRadius: 6,
+    padding: '5px 9px',
+    background: '#2563eb',
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: 'pointer',
+};

@@ -26,9 +26,12 @@ export function ContenedorSimulacion() {
 
     // Función para formatear el objeto Date a 'YYYY-MM-DDTHH:mm' respetando la hora local elegida
     const formatLocalDateTime = (date: Date): string => {
-        const tzOffset = date.getTimezoneOffset() * 60000;
-        // Convierte 23:45 local a -> "2026-02-10T23:45:00.000Z"
-        return new Date(date.getTime() - tzOffset).toISOString();
+        const pad = (value: number) => value.toString().padStart(2, '0');
+        return [
+            date.getFullYear(),
+            pad(date.getMonth() + 1),
+            pad(date.getDate()),
+        ].join('-') + `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
     };
 
     const handlePreparar = async () => {

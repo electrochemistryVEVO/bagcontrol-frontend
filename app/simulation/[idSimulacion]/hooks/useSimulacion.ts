@@ -8,8 +8,10 @@ import {
   EventoAeropuerto,
   EventoBatch,
 } from "@/app/shared/types/Evento";
+import axios from 'axios';
 
 export type EstadoSimulacion = 'sincronizando' | 'en_vivo' | 'pausada' | 'detenida' | 'finalizada' | 'error';
+type EventoConTipoAlternativo = Evento & { tipoEvento?: string };
 
 export function useSimulacion(
   id: string,
@@ -56,7 +58,7 @@ export function useSimulacion(
 
     // 1. Procesar eventos de control (ciclo de vida)
     for (const e of lote.eventos) {
-      const tipo = (e as any).tipo;
+      const tipo = e.tipo;
       switch (tipo) {
         case 'SIMULACION_INICIADA':
           setConectado(true);
@@ -88,8 +90,8 @@ export function useSimulacion(
       'SIMULACION_DETENIDA', 'ERROR',
     ];
 
-    const eventosFiltrados = lote.eventos.filter((e: any) => {
-      const tipo = e.tipo || e.tipoEvento;
+    const eventosFiltrados = lote.eventos.filter((e: Evento) => {
+      const tipo = e.tipo || (e as EventoConTipoAlternativo).tipoEvento;
       return !TIPOS_IGNORADOS.includes(tipo);
     });
 
@@ -132,8 +134,8 @@ export function useSimulacion(
           arrancadoRef.current = true;
           try {
             await SimulacionService.iniciar(id);
-          } catch (error: any) {
-            if (error?.response?.status !== 409) {
+          } catch (error: unknown) {
+            if (!axios.isAxiosError(error) || error.response?.status !== 409) {
               console.error('[WS] Error al iniciar la simulación:', error);
               arrancadoRef.current = false;
               return;
@@ -185,7 +187,7 @@ export function useSimulacion(
         if (horaEvento > tiempoActual) break;
 
         const ev = colaEventos.current.shift()!;
-        const tipo = (ev as any).tipo || (ev as any).tipoEvento;
+        const tipo = ev.tipo || (ev as EventoConTipoAlternativo).tipoEvento;
 
         if (tipo === 'VUELO_DESPEGA') {
           const evVuelo = ev as EventoVuelo;

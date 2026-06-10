@@ -1,5 +1,5 @@
-import {RespuestaEstadoSimulacionDTO, RespuestaInicioSimulacionDTO} from '../shared/types/Simulacion';
-import {Envio} from "@/app/shared/types/Envio";
+import { RespuestaInicioSimulacionDTO } from '../shared/types/Simulacion';
+import { Envio, EnvioAlmacen, EnvioRuta } from '@/app/shared/types/Envio';
 import axiosApi, { axiosSimulacion } from './config/axios';
 
 export type ParametrosSimulacion = {
@@ -18,9 +18,14 @@ export const SimulacionService = {
     iniciar: (idSimulacion: string) =>
         axiosSimulacion.post(`/simulacion/iniciar/${idSimulacion}/arrancar`),
 
-    obtenerEstado : (idSimulacion: string): Promise<any> =>
+    obtenerEstado : (idSimulacion: string) =>
         axiosApi.get(`/simulacion/${idSimulacion}/estado`),
-    obtenerEnviosPorVuelo: (idSimulacion:string,codigoVuelo:bigint) : Promise<any> => axiosApi.get(`/simulacion/${idSimulacion}/vuelos/${codigoVuelo}/envios`),
+    obtenerEnviosPorVuelo: (idSimulacion: string, codigoVuelo: string | number) =>
+        axiosApi.get<Envio[]>(`/simulacion/${idSimulacion}/vuelos/${codigoVuelo}/envios`),
+    obtenerRutaEnvio: (idSimulacion: string, idPedido: string) =>
+        axiosApi.get<EnvioRuta>(`/simulacion/${idSimulacion}/envios/${idPedido}/ruta`),
+    obtenerEnviosPorAlmacen: (idSimulacion: string, codigoIata: string) =>
+        axiosApi.get<EnvioAlmacen[]>(`/simulacion/${idSimulacion}/aeropuertos/${codigoIata}/envios`),
     pausar: (idSimulacion: string) =>
         axiosApi.post(`/simulacion/${idSimulacion}/pausar`),
 

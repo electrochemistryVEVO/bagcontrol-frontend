@@ -1,5 +1,5 @@
 export function binarySearch<T,V>(arr : T[], target : V,cmp:(a:T,b:V)=>number, start = 0, end = arr.length - 1) {
-    let mid = Math.floor((start + end) / 2);
+    const mid = Math.floor((start + end) / 2);
 
     if (start > end) {
         return -1;

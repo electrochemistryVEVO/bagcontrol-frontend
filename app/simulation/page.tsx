@@ -1,4 +1,3 @@
-import { AeropuertoService } from '@/app/services/aeropueto.service';
 import { ContenedorSimulacion } from './components/contenedor-simulacion';
 
 export default async function SimulacionPage() {

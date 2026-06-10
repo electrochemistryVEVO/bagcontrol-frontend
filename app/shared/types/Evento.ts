@@ -40,7 +40,7 @@ export interface EventoAeropuerto extends EventoBase {
 }
 
 export interface EventoVuelo extends EventoBase {
-    codigoVuelo: bigint;
+    codigoVuelo: string | number;
     origenIata: string;
     destinoIata: string;
     origenAeropuerto?: Aeropuerto;
