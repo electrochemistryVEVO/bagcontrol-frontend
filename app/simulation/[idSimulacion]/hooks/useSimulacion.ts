@@ -35,7 +35,7 @@ export function useSimulacion(
   const aeropuertosSimulacion = useRef<Record<string, AeropuertoSimulacion>>(
     Object.fromEntries(
       aeropuertosIniciales.map(a => [
-        a.codigoIata,
+        a.codigoIata?.trim().toUpperCase(),
         { ...a, maletasActuales: 0, porcentajeOcupacion: 0, estadoCapacidad: 'VERDE', enviosProximosAVencer: [] }
       ])
     )
@@ -201,12 +201,19 @@ export function useSimulacion(
 
         } else if (tipo === 'AEROPUERTO_ACTUALIZADO') {
           const evAero = ev as EventoAeropuerto;
-          const codigo = evAero.codigoAeropuerto;
+          const codigo = evAero.codigoAeropuerto?.trim().toUpperCase();
           if (aeropuertosSimulacion.current[codigo]) {
             aeropuertosSimulacion.current[codigo].maletasActuales     = evAero.maletasActuales;
             aeropuertosSimulacion.current[codigo].porcentajeOcupacion = evAero.porcentajeOcupacion;
             aeropuertosSimulacion.current[codigo].estadoCapacidad     = evAero.estadoCapacidad;
             aeropuertosSimulacion.current[codigo].enviosProximosAVencer = evAero.enviosProximosAVencer || [];
+          } else {
+            console.warn(
+              '[AERO] clave no encontrada:',
+              codigo,
+              'keys disponibles:',
+              Object.keys(aeropuertosSimulacion.current).slice(0, 5)
+            );
           }
         }
       }

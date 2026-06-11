@@ -34,6 +34,7 @@ export function SimulacionCliente({ id, topic, k, aeropuertosIniciales, errorIni
   
   // El estado del ciclo de vida vive en el hook — lo recibimos directamente.
   const { 
+    conectado,
     estadoSim,
     setEstadoSim,
     aeropuertosRef, 
@@ -174,6 +175,7 @@ export function SimulacionCliente({ id, topic, k, aeropuertosIniciales, errorIni
             vuelosActivosRef={vuelosActivosRef}
             tiempoSimulacionRef={tiempoSimulacionRef}
             idSimulacion={id}
+            conectado={conectado}
         />
         {ToastComponent}
       </div>

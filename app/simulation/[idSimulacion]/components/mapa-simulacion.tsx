@@ -25,6 +25,8 @@ import { EnvioRuta } from '@/app/shared/types/Envio';
 import { SimulacionService } from '@/app/services/simulation.service';
 import { AeropuertoPopupContent } from './pop-up-aeropuerto';
 import { RelojSimulacionOverlay } from './reloj-simulacion';
+import { PanelVuelos } from './panel-vuelos';
+import { PanelAeropuertos } from './panel-aeropuertos';
 import AvionSidePanel from "@/app/simulation/components/avion-sidepanel";
 import AeropuertoSidePanel from "@/app/simulation/components/aeropuerto-sidepanel";
 import { Drawer } from "@mui/material";
@@ -132,15 +134,18 @@ interface Props {
   vuelosActivosRef: RefObject<Map<string, EventoVuelo>>;
   tiempoSimulacionRef: RefObject<number>;
   idSimulacion: string;
+  conectado: boolean;
 }
 
-export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosActivosRef, tiempoSimulacionRef, idSimulacion }: Props) {
+export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosActivosRef, tiempoSimulacionRef, idSimulacion, conectado }: Props) {
   const mapRef = useRef<MapRef>(null);
   const popupRef = useRef<PopupInstance | null>(null);
   
   const [showPopup, setShowPopup] = useState(false);
   const [selFeature, setSelFeature] = useState<MapGeoJSONFeature | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [vuelosActivosSnapshot, setVuelosActivosSnapshot] = useState<EventoVuelo[]>([]);
+  const [aeropuertosSnapshot, setAeropuertosSnapshot] = useState<AeropuertoSimulacion[]>([]);
 
   // Controladores de estado para los Drawers laterales
   const [panelOpen, setPanelOpen] = useState(false);
@@ -251,6 +256,29 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
     }
   }, [enfocarRutaEnvio, rutaEnvio]);
 
+  useEffect(() => {
+    if (!conectado) {
+      return;
+    }
+
+    const actualizarSnapshots = () => {
+      setVuelosActivosSnapshot(Array.from(vuelosActivosRef.current.values()));
+      setAeropuertosSnapshot(Object.values(aeropuertosRef.current || {}));
+    };
+
+    const timer = setInterval(actualizarSnapshots, 500);
+    return () => clearInterval(timer);
+  }, [aeropuertosRef, conectado, vuelosActivosRef]);
+
+  const ocupacionPromedioFlota = useMemo(() => {
+    if (vuelosActivosSnapshot.length === 0) return 0;
+    const total = vuelosActivosSnapshot.reduce((acum, vuelo) => {
+      if (!vuelo.capacidadMax) return acum;
+      return acum + (vuelo.cantidadMaletas / vuelo.capacidadMax) * 100;
+    }, 0);
+    return total / vuelosActivosSnapshot.length;
+  }, [vuelosActivosSnapshot]);
+
   // ============================================================================
   // EL MOTOR GRÁFICO (WebGL Render Loop)
   // ============================================================================
@@ -353,6 +381,18 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
           onEnfocarAeropuerto={enfocarAeropuerto}
         />
       </Drawer>
+
+      <PanelVuelos
+        idSimulacion={idSimulacion}
+        vuelosActivos={vuelosActivosSnapshot}
+        visible={conectado}
+      />
+
+      <PanelAeropuertos
+        aeropuertos={aeropuertosSnapshot}
+        visible={conectado}
+      />
+
       <div style={{
         position: 'absolute',
         top: 16,
@@ -496,7 +536,7 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
           </Popup>
         )}
       </MapLibre>
-      <RelojSimulacionOverlay tiempoRef={tiempoSimulacionRef} />
+      <RelojSimulacionOverlay tiempoRef={tiempoSimulacionRef} ocupacionFlota={ocupacionPromedioFlota} />
     </div>
   );
 }
