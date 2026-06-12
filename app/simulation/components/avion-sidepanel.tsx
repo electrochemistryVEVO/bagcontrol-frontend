@@ -1,5 +1,5 @@
 import {Box, Table, TableBody, TableCell, TablePagination, TableRow} from "@mui/material";
-import {memo, useEffect, useMemo, useState} from "react";
+import {memo, useEffect, useMemo, useState, RefObject} from "react";
 import styles from "../../stylesheets/sidepanel.module.css";
 import {EventoVuelo} from "@/app/shared/types/Evento";
 import {MapGeoJSONFeature, MapLayerMouseEvent} from "@vis.gl/react-maplibre";
@@ -14,6 +14,7 @@ function SidePanelContents({
     isOpen,
     idSimulacion,
     aeropuertos,
+    tiempoSimulacionRef,
     onMostrarRutaEnvio,
     onEnfocarVuelo,
 } : {
@@ -21,6 +22,7 @@ function SidePanelContents({
     isOpen: boolean,
     idSimulacion: string,
     aeropuertos: Aeropuerto[],
+    tiempoSimulacionRef: RefObject<number>,
     onMostrarRutaEnvio: (idPedido: string) => void,
     onEnfocarVuelo: () => void,
 }){
@@ -35,13 +37,13 @@ function SidePanelContents({
 
     useEffect(() => {
         if(flight){
-            //Llamada a API
-            SimulacionService.obtenerEnviosPorVuelo(idSimulacion,flight.codigoVuelo)
-                .then(({data}:{data:Envio[]})=>{
+            const timestamp = new Date(tiempoSimulacionRef.current).toISOString();
+            SimulacionService.obtenerEnviosPorVuelo(idSimulacion, flight.codigoVuelo, timestamp)
+                .then(({data}: {data: Envio[]}) => {
                     setEnviosAsignados(data)})
-                .catch((err)=>{console.error(err)})
+                .catch((err) => {console.error(err)})
         }
-    }, [flight, idSimulacion, isOpen]);
+    }, [flight, idSimulacion, isOpen, tiempoSimulacionRef]);
     //Memo de aeropuertos para no perder el hilo
     const _aeropuertos = useMemo(()=>{
         return aeropuertos.reduce((acum:Map<string,Aeropuerto>,val:Aeropuerto)=>{
@@ -190,6 +192,7 @@ type AvionSidePanelProps = {
     selFlight: MapGeoJSONFeature | null,
     idSimulacion: string,
     aeropuertos: Aeropuerto[],
+    tiempoSimulacionRef: RefObject<number>,
     onMostrarRutaEnvio: (idPedido: string) => void,
     onEnfocarVuelo: () => void,
 }
@@ -227,6 +230,7 @@ export default memo(function AvionSidePanel(props: AvionSidePanelProps) {
                 isOpen={props.openPanel}
                 idSimulacion={props.idSimulacion}
                 aeropuertos={props.aeropuertos}
+                tiempoSimulacionRef={props.tiempoSimulacionRef}
                 onMostrarRutaEnvio={props.onMostrarRutaEnvio}
                 onEnfocarVuelo={props.onEnfocarVuelo}
             />

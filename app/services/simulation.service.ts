@@ -20,12 +20,12 @@ export const SimulacionService = {
 
     obtenerEstado : (idSimulacion: string) =>
         axiosApi.get(`/simulacion/${idSimulacion}/estado`),
-    obtenerEnviosPorVuelo: (idSimulacion: string, codigoVuelo: string | number) =>
-        axiosApi.get<Envio[]>(`/simulacion/${idSimulacion}/vuelos/${codigoVuelo}/envios`),
-    obtenerRutaEnvio: (idSimulacion: string, idPedido: string) =>
-        axiosApi.get<EnvioRuta>(`/simulacion/${idSimulacion}/envios/${idPedido}/ruta`),
-    obtenerEnviosPorAlmacen: (idSimulacion: string, codigoIata: string) =>
-        axiosApi.get<EnvioAlmacen[]>(`/simulacion/${idSimulacion}/aeropuertos/${codigoIata}/envios`),
+    obtenerEnviosPorVuelo: (idSimulacion: string, codigoVuelo: string | number, timestamp: string) =>
+        axiosApi.get<Envio[]>(`/simulacion/${idSimulacion}/vuelos/${codigoVuelo}/envios`, { params: { timestamp } }),
+    obtenerRutaEnvio: (idSimulacion: string, idPedido: string, timestamp: string) =>
+        axiosApi.get<EnvioRuta>(`/simulacion/${idSimulacion}/envios/${idPedido}/ruta`, { params: { timestamp } }),
+    obtenerEnviosPorAlmacen: (idSimulacion: string, codigoIata: string, timestamp: string) =>
+        axiosApi.get<EnvioAlmacen[]>(`/simulacion/${idSimulacion}/aeropuertos/${codigoIata}/envios`, { params: { timestamp } }),
     pausar: (idSimulacion: string) =>
         axiosApi.post(`/simulacion/${idSimulacion}/pausar`),
 

@@ -23,7 +23,7 @@ import {
   Typography,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, RefObject } from 'react';
 import { SimulacionService } from '@/app/services/simulation.service';
 import type { Envio } from '@/app/shared/types/Envio';
 import type { EstadoCapacidad, EventoVuelo } from '@/app/shared/types/Evento';
@@ -33,6 +33,7 @@ type OrdenVuelos = 'ocupacion' | 'salida' | 'llegada' | 'origen' | 'destino';
 type PanelVuelosProps = {
   idSimulacion: string;
   vuelosActivos: EventoVuelo[];
+  tiempoSimulacionRef: RefObject<number>;
   visible: boolean;
 };
 
@@ -69,7 +70,7 @@ function compararTexto(a: string, b: string) {
   return a.localeCompare(b, 'es', { sensitivity: 'base' });
 }
 
-export function PanelVuelos({ idSimulacion, vuelosActivos, visible }: PanelVuelosProps) {
+export function PanelVuelos({ idSimulacion, vuelosActivos, tiempoSimulacionRef, visible }: PanelVuelosProps) {
   const [panelAbierto, setPanelAbierto] = useState(false);
   const [busqueda, setBusqueda] = useState('');
   const [orden, setOrden] = useState<OrdenVuelos>('ocupacion');
@@ -141,7 +142,8 @@ export function PanelVuelos({ idSimulacion, vuelosActivos, visible }: PanelVuelo
     setErrorPorVuelo((actual) => ({ ...actual, [codigoVuelo]: '' }));
 
     try {
-      const { data } = await SimulacionService.obtenerEnviosPorVuelo(idSimulacion, vuelo.codigoVuelo);
+      const timestamp = new Date(tiempoSimulacionRef.current).toISOString();
+      const { data } = await SimulacionService.obtenerEnviosPorVuelo(idSimulacion, vuelo.codigoVuelo, timestamp);
       setEnviosPorVuelo((actual) => ({ ...actual, [codigoVuelo]: data }));
     } catch {
       setErrorPorVuelo((actual) => ({

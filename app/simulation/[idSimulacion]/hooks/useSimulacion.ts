@@ -26,7 +26,7 @@ export function useSimulacion(
   const arrancadoRef = useRef(false);
   const vuelosActivos = useRef<Map<string, EventoVuelo>>(new Map());
   const colaEventos = useRef<Evento[]>([]);
-  const tiempoSimulacion = useRef<number>(new Date(fechaInicio).getTime());
+  const tiempoSimulacion = useRef<number>(new Date(fechaInicio + 'Z').getTime());
   const lotesRecibidosRef = useRef<number>(0);
 
   const onNuevoLoteRef = useRef(onNuevoLote);
@@ -101,17 +101,8 @@ export function useSimulacion(
     colaEventos.current.push(...eventosFiltrados);
     lotesRecibidosRef.current += 1;
 
-    console.log('[LOTE RECIBIDO]', {
-      numero: lotesRecibidosRef.current,
-      eventosEnLote: eventosFiltrados.length,
-      totalEnCola: colaEventos.current.length,
-      primerEvento: eventosFiltrados[0]?.fechaHoraEvento,
-      ultimoEvento: eventosFiltrados[eventosFiltrados.length - 1]?.fechaHoraEvento,
-    });
-
     // 4. Arrancar el motor solo cuando tenemos ≥2 lotes (colchón de seguridad)
     if (lotesRecibidosRef.current >= 2 && estadoSimRef.current === 'sincronizando') {
-      // Sincronizar el reloj simulado al primer evento real de la cola
       tiempoSimulacion.current = new Date(colaEventos.current[0].fechaHoraEvento).getTime();
       console.log('[MOTOR ARRANCA] reloj sincronizado a:', colaEventos.current[0].fechaHoraEvento);
       setEstadoSim('en_vivo');
@@ -162,25 +153,50 @@ export function useSimulacion(
     const msSimuladosPorLote = K * 60 * 1000;   // ej: 90min → 5_400_000 ms
     const msRealesPorLote    = SaS * 1000;       // ej: 90s  →    90_000 ms
     const factorAceleracion  = msSimuladosPorLote / msRealesPorLote; // = 60
-    const TICK_RATE = 100; // ms reales por tick
+    let running = true;
+    let ultimoFrame = Date.now();
+    let tickCount = 0;
+    let colaEstabaVacia = true;
+    let loteStartTime = 0;
+    let eventosEnLote = 0;
+    let animationId: number | null = null;
 
-    const timer = setInterval(() => {
-      // ← ref, nunca queda stale aunque el estado cambie
-      if (estadoSimRef.current !== 'en_vivo') return;
-      if (colaEventos.current.length === 0) return;
+    function tick() {
+      if (!running) return;
 
-      // ── Diagnóstico (quitar en producción) ──
-      console.log('[MOTOR-TICK]', {
-        cola: colaEventos.current.length,
-        tiempoSim: new Date(tiempoSimulacion.current).toISOString(),
-        primerEventoPendiente: colaEventos.current[0]?.fechaHoraEvento,
-      });
+      // Re-agendar siempre para mantener el loop vivo a 60fps
+      animationId = requestAnimationFrame(tick);
 
-      // Avanzar el reloj simulado
-      tiempoSimulacion.current += TICK_RATE * factorAceleracion;
+      if (estadoSimRef.current !== 'en_vivo') {
+        ultimoFrame = Date.now();
+        return;
+      }
+      if (colaEventos.current.length === 0) {
+        if (!colaEstabaVacia) {
+          console.log(`[DIAG-LOTE-FIN] duracionReal=${Date.now() - loteStartTime}ms | ticksUsados=${tickCount} | tiempoSim=${new Date(tiempoSimulacion.current).toISOString()}`);
+          tickCount = 0;
+        }
+        colaEstabaVacia = true;
+        ultimoFrame = Date.now();
+        return;
+      }
+
+      if (colaEstabaVacia) {
+        loteStartTime = Date.now();
+        eventosEnLote = colaEventos.current.length;
+        console.log(`[DIAG-LOTE-INICIO] eventos=${eventosEnLote} | tiempoSim=${new Date(tiempoSimulacion.current).toISOString()}`);
+        tickCount = 0;
+      }
+      colaEstabaVacia = false;
+
+      tickCount++;
+
+      const ahora = Date.now();
+      tiempoSimulacion.current += (ahora - ultimoFrame) * factorAceleracion;
+      ultimoFrame = ahora;
       const tiempoActual = tiempoSimulacion.current;
 
-      // Procesar todos los eventos cuyo timestamp ya fue alcanzado
+      let procesados = 0;
       while (colaEventos.current.length > 0) {
         const evento = colaEventos.current[0];
         const horaEvento = new Date(evento.fechaHoraEvento).getTime();
@@ -191,14 +207,12 @@ export function useSimulacion(
 
         if (tipo === 'VUELO_DESPEGA') {
           const evVuelo = ev as EventoVuelo;
+          (evVuelo as any)._salidaEpoch = new Date(evVuelo.horaSalidaUtc).getTime();
+          (evVuelo as any)._llegadaEpoch = new Date(evVuelo.horaLlegadaUtc).getTime();
           vuelosActivos.current.set(evVuelo.codigoVuelo.toString(), evVuelo);
-          console.log('[VUELO DESPEGA]', evVuelo.codigoVuelo, evVuelo.origenIata, '→', evVuelo.destinoIata);
-
         } else if (tipo === 'VUELO_ATERRIZA') {
           const evVuelo = ev as EventoVuelo;
           vuelosActivos.current.delete(evVuelo.codigoVuelo.toString());
-          console.log('[VUELO ATERRIZA]', evVuelo.codigoVuelo, '→', evVuelo.destinoIata);
-
         } else if (tipo === 'AEROPUERTO_ACTUALIZADO') {
           const evAero = ev as EventoAeropuerto;
           const codigo = evAero.codigoAeropuerto?.trim().toUpperCase();
@@ -207,19 +221,22 @@ export function useSimulacion(
             aeropuertosSimulacion.current[codigo].porcentajeOcupacion = evAero.porcentajeOcupacion;
             aeropuertosSimulacion.current[codigo].estadoCapacidad     = evAero.estadoCapacidad;
             aeropuertosSimulacion.current[codigo].enviosProximosAVencer = evAero.enviosProximosAVencer || [];
-          } else {
-            console.warn(
-              '[AERO] clave no encontrada:',
-              codigo,
-              'keys disponibles:',
-              Object.keys(aeropuertosSimulacion.current).slice(0, 5)
-            );
           }
         }
+        procesados++;
       }
-    }, TICK_RATE);
 
-    return () => clearInterval(timer);
+      if (tickCount % 1800 === 0) {
+        console.log(`[DIAG-TICK] frame=${tickCount} | procesados=${procesados} | enCola=${colaEventos.current.length} | tiempoSim=${new Date(tiempoSimulacion.current).toISOString()}`);
+      }
+    }
+
+    animationId = requestAnimationFrame(tick);
+
+    return () => {
+      running = false;
+      if (animationId) cancelAnimationFrame(animationId);
+    };
   }, [K, SaS]); // ← estadoSim FUERA de deps; se accede via ref
 
   return {

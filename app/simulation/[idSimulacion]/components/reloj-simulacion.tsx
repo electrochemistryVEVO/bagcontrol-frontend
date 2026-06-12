@@ -18,11 +18,10 @@ export function RelojSimulacionOverlay({
   useEffect(() => {
     const timer = setInterval(() => {
       if (tiempoRef.current) {
-        // Formateamos la fecha a algo legible (ej: 09/02/2026 14:30:00)
         const d = new Date(tiempoRef.current);
         setHora(d.toLocaleString('es-PE', { timeZone: 'UTC' }));
       }
-    }, 100); // Se actualiza 10 veces por segundo
+    }, 100);
     return () => clearInterval(timer);
   }, [tiempoRef]);
 

@@ -14,6 +14,7 @@ function AeropuertoPanelContents({
     isOpen,
     aeropuertosRef,
     idSimulacion,
+    tiempoSimulacionRef,
     onMostrarRutaEnvio,
     onEnfocarAeropuerto,
 }: {
@@ -21,6 +22,7 @@ function AeropuertoPanelContents({
     isOpen: boolean;
     aeropuertosRef: RefObject<Record<string, AeropuertoSimulacion>>;
     idSimulacion: string;
+    tiempoSimulacionRef: RefObject<number>;
     onMostrarRutaEnvio: (idPedido: string) => void;
     onEnfocarAeropuerto: (codigoIata: string) => void;
 }) {
@@ -57,10 +59,11 @@ function AeropuertoPanelContents({
     useEffect(() => {
         if (!isOpen || !codigoIata) return;
 
-        SimulacionService.obtenerEnviosPorAlmacen(idSimulacion, codigoIata)
+        const timestamp = new Date(tiempoSimulacionRef.current).toISOString();
+        SimulacionService.obtenerEnviosPorAlmacen(idSimulacion, codigoIata, timestamp)
             .then(({ data }) => setEnviosAlmacen(data))
             .catch(() => setEnviosAlmacen([]));
-    }, [codigoIata, idSimulacion, isOpen]);
+    }, [codigoIata, idSimulacion, isOpen, tiempoSimulacionRef]);
 
     if (!data) return null;
 
@@ -267,6 +270,7 @@ type AeropuertoSidePanelProps = {
     selAirport: MapGeoJSONFeature | null;
     aeropuertosRef: RefObject<Record<string, AeropuertoSimulacion>>;
     idSimulacion: string;
+    tiempoSimulacionRef: RefObject<number>;
     onMostrarRutaEnvio: (idPedido: string) => void;
     onEnfocarAeropuerto: (codigoIata: string) => void;
 };
@@ -276,6 +280,7 @@ export default memo(function AeropuertoSidePanel({
     selAirport,
     aeropuertosRef,
     idSimulacion,
+    tiempoSimulacionRef,
     onMostrarRutaEnvio,
     onEnfocarAeropuerto,
 }: AeropuertoSidePanelProps) {
@@ -289,6 +294,7 @@ export default memo(function AeropuertoSidePanel({
                 isOpen={openPanel} 
                 aeropuertosRef={aeropuertosRef} 
                 idSimulacion={idSimulacion}
+                tiempoSimulacionRef={tiempoSimulacionRef}
                 onMostrarRutaEnvio={onMostrarRutaEnvio}
                 onEnfocarAeropuerto={onEnfocarAeropuerto}
             />

@@ -194,7 +194,8 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
 
     try {
       setRutaError(null);
-      const { data } = await SimulacionService.obtenerRutaEnvio(idSimulacion, idNormalizado);
+      const timestamp = new Date(tiempoSimulacionRef.current).toISOString();
+      const { data } = await SimulacionService.obtenerRutaEnvio(idSimulacion, idNormalizado, timestamp);
       setRutaEnvio(data);
       setIdEnvioBusqueda(idNormalizado);
     } catch {
@@ -284,6 +285,7 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
   // ============================================================================
   useEffect(() => {
     let animationFrameId: number;
+    let frameContador = 0;
 
     const animar = () => {
       const map = mapRef.current?.getMap();
@@ -302,8 +304,8 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
 
         if (!coordsOrigen || !coordsDestino) return;
 
-        const inicioMs = new Date(vuelo.horaSalidaUtc).getTime();
-        const finMs = new Date(vuelo.horaLlegadaUtc).getTime();
+        const inicioMs = (vuelo as any)._salidaEpoch;
+        const finMs = (vuelo as any)._llegadaEpoch;
         
         const duracion = finMs - inicioMs;
         let progreso = duracion > 0 ? (tiempoActual - inicioMs) / duracion : 1;
@@ -327,28 +329,38 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
         }
       });
 
-      const featuresAeropuertos: Feature[] = Object.values(aeropuertosRef.current || {}).map((airport) => ({
-        type: 'Feature',
-        properties: { ...airport, isAirport: true },
-        geometry: { type: 'Point', coordinates: [airport.longitud, airport.latitud] },
-      }));
-
       const sourceAviones = map.getSource('aviones-data') as GeoJSONSource;
       const sourceRutas = map.getSource('rutas-data') as GeoJSONSource;
-      const sourceAeropuertos = map.getSource('aeropuertos-data') as GeoJSONSource;
-      const sourceRutaEnvio = map.getSource('envio-ruta-data') as GeoJSONSource;
 
       if (sourceAviones) sourceAviones.setData({ type: 'FeatureCollection', features: featuresAviones });
       if (sourceRutas) sourceRutas.setData({ type: 'FeatureCollection', features: featuresRutas });
-      if (sourceAeropuertos) sourceAeropuertos.setData({ type: 'FeatureCollection', features: featuresAeropuertos });
-      if (sourceRutaEnvio) sourceRutaEnvio.setData({ type: 'FeatureCollection', features: featuresRutaEnvio });
+
+      // Aeropuertos: solo actualizar cada 30 frames (~500ms), no cambian posición ni a 60fps
+      frameContador++;
+      if (frameContador % 30 === 0) {
+        const featuresAeropuertos: Feature[] = Object.values(aeropuertosRef.current || {}).map((airport) => ({
+          type: 'Feature',
+          properties: { ...airport, isAirport: true },
+          geometry: { type: 'Point', coordinates: [airport.longitud, airport.latitud] },
+        }));
+        const sourceAeropuertos = map.getSource('aeropuertos-data') as GeoJSONSource;
+        if (sourceAeropuertos) sourceAeropuertos.setData({ type: 'FeatureCollection', features: featuresAeropuertos });
+      }
 
       animationFrameId = requestAnimationFrame(animar);
     };
 
     animar();
     return () => cancelAnimationFrame(animationFrameId);
-  }, [coordsAeropuertos, vuelosActivosRef, tiempoSimulacionRef, aeropuertosRef, imageLoaded, featuresRutaEnvio]);
+  }, [coordsAeropuertos]); // solo depende de coordenadas (estables tras mount)
+
+  // Ruta de envío: solo actualizar cuando featuresRutaEnvio cambia (búsqueda explícita)
+  useEffect(() => {
+    const map = mapRef.current?.getMap();
+    if (!map || !map.isStyleLoaded()) return;
+    const source = map.getSource('envio-ruta-data') as GeoJSONSource;
+    if (source) source.setData({ type: 'FeatureCollection', features: featuresRutaEnvio });
+  }, [featuresRutaEnvio]);
 
   const handleMouseEnter = (event: MapLayerMouseEvent) => {
     setSelFeature(event.features?.[0] ?? null);
@@ -359,32 +371,35 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       {/* DRAWER PARA AVIONES */}
-      <Drawer open={panelOpen} onClose={() => setPanelOpen(false)}>
-        <AvionSidePanel
-          openPanel={panelOpen}
-          selFlight={selFlight}
-          idSimulacion={idSimulacion}
-          aeropuertos={aeropuertosIniciales}
-          onMostrarRutaEnvio={mostrarRutaEnvio}
-          onEnfocarVuelo={enfocarVueloSeleccionado}
-        />
-      </Drawer>
+        <Drawer open={panelOpen} onClose={() => setPanelOpen(false)}>
+          <AvionSidePanel
+            openPanel={panelOpen}
+            selFlight={selFlight}
+            idSimulacion={idSimulacion}
+            aeropuertos={aeropuertosIniciales}
+            tiempoSimulacionRef={tiempoSimulacionRef}
+            onMostrarRutaEnvio={mostrarRutaEnvio}
+            onEnfocarVuelo={enfocarVueloSeleccionado}
+          />
+        </Drawer>
 
       {/* DRAWER PARA AEROPUERTOS */}
-      <Drawer open={airportPanelOpen} onClose={() => setAirportPanelOpen(false)}>
-        <AeropuertoSidePanel
-          openPanel={airportPanelOpen}
-          selAirport={selAirport}
-          aeropuertosRef={aeropuertosRef}
-          idSimulacion={idSimulacion}
-          onMostrarRutaEnvio={mostrarRutaEnvio}
-          onEnfocarAeropuerto={enfocarAeropuerto}
-        />
-      </Drawer>
+        <Drawer open={airportPanelOpen} onClose={() => setAirportPanelOpen(false)}>
+          <AeropuertoSidePanel
+            openPanel={airportPanelOpen}
+            selAirport={selAirport}
+            aeropuertosRef={aeropuertosRef}
+            idSimulacion={idSimulacion}
+            tiempoSimulacionRef={tiempoSimulacionRef}
+            onMostrarRutaEnvio={mostrarRutaEnvio}
+            onEnfocarAeropuerto={enfocarAeropuerto}
+          />
+        </Drawer>
 
       <PanelVuelos
         idSimulacion={idSimulacion}
         vuelosActivos={vuelosActivosSnapshot}
+        tiempoSimulacionRef={tiempoSimulacionRef}
         visible={conectado}
       />
 

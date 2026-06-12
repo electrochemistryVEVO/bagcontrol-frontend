@@ -1,4 +1,4 @@
-import axiosApi from './config/axios'
+import axiosApi, { axiosSimulacion } from './config/axios'
 
 export type NuevoEnvioDTO = {
   origenIata: string
@@ -6,6 +6,26 @@ export type NuevoEnvioDTO = {
   cantidadMaletas: number
   idCliente: string
   fechaHora: string // ISO string
+}
+
+export type FiltrosEnvios = {
+  origenIata?: string
+  destinoIata?: string
+  idCliente?: string
+  q?: string
+  maletasMin?: number
+  maletasMax?: number
+}
+
+export type PageResponse<T> = {
+  content: T[]
+  totalElements: number
+  totalPages: number
+  number: number
+  size: number
+  first: boolean
+  last: boolean
+  empty: boolean
 }
 
 export const EnvioService = {
@@ -16,5 +36,22 @@ export const EnvioService = {
     axiosApi.get('/envios/ventana', { params: { inicio, fin } }),
 
   listarEnviosPorDias: (fechaInicio: string, dias: number) =>
-    axiosApi.get('/envios/rango-dias', { params: { fechaInicio, dias } }),
+    axiosSimulacion.get('/envios/rango-dias', { params: { fechaInicio, dias } }),
+
+  listarEnviosPaginados: (
+    fechaInicio: string,
+    dias: number,
+    page: number,
+    size: number,
+    filtros?: FiltrosEnvios
+  ) => {
+    const params: Record<string, string | number> = { fechaInicio, dias, page, size }
+    if (filtros?.origenIata) params.origenIata = filtros.origenIata
+    if (filtros?.destinoIata) params.destinoIata = filtros.destinoIata
+    if (filtros?.idCliente) params.idCliente = filtros.idCliente
+    if (filtros?.q) params.q = filtros.q
+    if (filtros?.maletasMin != null) params.maletasMin = filtros.maletasMin
+    if (filtros?.maletasMax != null) params.maletasMax = filtros.maletasMax
+    return axiosSimulacion.get<PageResponse<any>>('/envios/paginados', { params })
+  },
 }
