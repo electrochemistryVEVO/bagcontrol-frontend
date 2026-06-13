@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { AeropuertoService, NuevoAeropuertoDTO, ActualizarAeropuertoDTO } from '@/app/services/aeropuerto.service'
+import { CargaCsvModal } from './CargaCsvModal'
 import { Aeropuerto } from '@/app/shared/types/Aeropuerto'
 import { styles as S } from './RegistroEnvio'
 
@@ -22,6 +23,7 @@ export function GestionAeropuertos() {
   const [error, setError] = useState<string | null>(null)
   const [exito, setExito] = useState<string | null>(null)
   const [pagina, setPagina] = useState(1)
+  const [csvAbierto, setCsvAbierto] = useState(false)
 
   const cargar = () =>
     AeropuertoService.listarAeropuertos()
@@ -99,7 +101,7 @@ export function GestionAeropuertos() {
       <label style={S.label}>{label}</label>
       <input
         type={type} disabled={disabled}
-        style={{ ...S.input, background: disabled ? '#f8fafc' : '#fff', color: disabled ? '#94a3b8' : '#1e293b' }}
+        style={{ ...S.input, background: disabled ? '#f8fafc' : '#fff', color: disabled ? '#374151' : '#1e293b' }}
         value={String(form[key] ?? '')}
         onChange={e => setForm(f => ({ ...f, [key]: type === 'number' ? Number(e.target.value) : e.target.value }))}
       />
@@ -117,8 +119,22 @@ export function GestionAeropuertos() {
           <h2 style={S.pageTitle}>Gestión de aeropuertos</h2>
           <p style={S.pageSubtitle}>Administra los aeropuertos registrados en el sistema</p>
         </div>
-        <button onClick={abrirCrear} style={S.btnPrimary}>Registrar Aeropuerto</button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={() => setCsvAbierto(true)} style={S.btnSecondary}>⬆ Cargar CSV</button>
+          <button onClick={abrirCrear} style={S.btnPrimary}>Registrar Aeropuerto</button>
+        </div>
       </div>
+
+      {csvAbierto && (
+        <CargaCsvModal
+          titulo="Cargar aeropuertos desde CSV"
+          formato="codigoIata,ciudad,pais,continente,gmt,capacidadAlmacen,latitud,longitud"
+          ejemplo="SPIM,Lima,Peru,America,-5,200,-12.021900,-77.114300"
+          onCargar={AeropuertoService.cargarCsv}
+          onCerrar={() => setCsvAbierto(false)}
+          onExito={() => { setCsvAbierto(false); cargar() }}
+        />
+      )}
 
       {exito && <div style={{ ...S.alertSuccess, marginBottom: 16 }}>{exito}</div>}
       {error && !modo && <div style={{ ...S.alertError, marginBottom: 16 }}>{error}</div>}
@@ -134,7 +150,7 @@ export function GestionAeropuertos() {
           </thead>
           <tbody>
             {filas.length === 0 && (
-              <tr><td colSpan={9} style={{ ...S.td, textAlign: 'center', color: '#94a3b8' }}>
+              <tr><td colSpan={9} style={{ ...S.td, textAlign: 'center', color: '#374151' }}>
                 No hay aeropuertos cargados
               </td></tr>
             )}
@@ -166,7 +182,7 @@ export function GestionAeropuertos() {
             disabled={pagina === 1}
             style={{ padding: '6px 16px', borderRadius: 8, border: '1px solid #e2e8f0', cursor: 'pointer', color: '#111827' }}
           >‹</button>
-          <span style={{ fontSize: 13, color: '#64748b' }}>Página {pagina} de {totalPaginas}</span>
+          <span style={{ fontSize: 13, color: '#111827' }}>Página {pagina} de {totalPaginas}</span>
           <button
             onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))}
             disabled={pagina === totalPaginas}
