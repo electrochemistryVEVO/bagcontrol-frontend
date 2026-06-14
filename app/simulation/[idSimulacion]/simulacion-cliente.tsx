@@ -38,7 +38,8 @@ export function SimulacionCliente({ id, topic, k, aeropuertosIniciales, errorIni
     estadoSim,
     setEstadoSim,
     aeropuertosRef, 
-    vuelosActivosRef, 
+    vuelosActivosRef,
+      enviosPlanificadosRef,
     tiempoSimulacionRef 
   } = useSimulacion(
     id, 
@@ -173,6 +174,7 @@ export function SimulacionCliente({ id, topic, k, aeropuertosIniciales, errorIni
             aeropuertosIniciales={aeropuertosIniciales}
             aeropuertosRef={aeropuertosRef}
             vuelosActivosRef={vuelosActivosRef}
+            enviosPlanificadosRef = {enviosPlanificadosRef}
             tiempoSimulacionRef={tiempoSimulacionRef}
             idSimulacion={id}
             conectado={conectado}

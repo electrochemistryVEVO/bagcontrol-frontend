@@ -21,7 +21,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 
 import { AeropuertoSimulacion, Aeropuerto } from '@/app/shared/types/Aeropuerto';
 import { EventoVuelo } from "@/app/shared/types/Evento";
-import { EnvioRuta } from '@/app/shared/types/Envio';
+import {Envio, EnvioRuta} from '@/app/shared/types/Envio';
 import { SimulacionService } from '@/app/services/simulation.service';
 import { AeropuertoPopupContent } from './pop-up-aeropuerto';
 import { RelojSimulacionOverlay } from './reloj-simulacion';
@@ -30,6 +30,7 @@ import { PanelAeropuertos } from './panel-aeropuertos';
 import AvionSidePanel from "@/app/simulation/components/avion-sidepanel";
 import AeropuertoSidePanel from "@/app/simulation/components/aeropuerto-sidepanel";
 import { Drawer } from "@mui/material";
+import {PanelEnvios} from "@/app/simulation/[idSimulacion]/components/panel-envios";
 
 // ============================================================================
 // STILOS DE CAPAS (Layers)
@@ -133,11 +134,12 @@ interface Props {
   aeropuertosRef: RefObject<Record<string, AeropuertoSimulacion>>;
   vuelosActivosRef: RefObject<Map<string, EventoVuelo>>;
   tiempoSimulacionRef: RefObject<number>;
+  enviosPlanificadosRef: RefObject<Record<string, Envio>>;
   idSimulacion: string;
   conectado: boolean;
 }
 
-export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosActivosRef, tiempoSimulacionRef, idSimulacion, conectado }: Props) {
+export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosActivosRef, enviosPlanificadosRef, tiempoSimulacionRef, idSimulacion, conectado }: Props) {
   const mapRef = useRef<MapRef>(null);
   const popupRef = useRef<PopupInstance | null>(null);
   
@@ -146,6 +148,7 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
   const [imageLoaded, setImageLoaded] = useState(false);
   const [vuelosActivosSnapshot, setVuelosActivosSnapshot] = useState<EventoVuelo[]>([]);
   const [aeropuertosSnapshot, setAeropuertosSnapshot] = useState<AeropuertoSimulacion[]>([]);
+  const [enviosSnapshot, setEnviosSnapshot] = useState<Envio[]>([]);
 
   // Controladores de estado para los Drawers laterales
   const [panelOpen, setPanelOpen] = useState(false);
@@ -265,6 +268,7 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
     const actualizarSnapshots = () => {
       setVuelosActivosSnapshot(Array.from(vuelosActivosRef.current.values()));
       setAeropuertosSnapshot(Object.values(aeropuertosRef.current || {}));
+      setEnviosSnapshot(Object.values(enviosPlanificadosRef.current || {}))
     };
 
     const timer = setInterval(actualizarSnapshots, 500);
@@ -407,6 +411,8 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
         aeropuertos={aeropuertosSnapshot}
         visible={conectado}
       />
+
+      <PanelEnvios aeropuertos={aeropuertosSnapshot} envios={enviosSnapshot} visible={conectado}/>
 
       <div style={{
         position: 'absolute',

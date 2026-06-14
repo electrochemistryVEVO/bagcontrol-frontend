@@ -52,6 +52,7 @@ export interface EventoVuelo extends EventoBase {
     horaLlegadaLocal: string;
     horaSalidaUtc: string;
     horaLlegadaUtc: string;
+    codigoEnvios: string[];
 }
 
 // Discriminador automático para Typescript (Opcional pero muy útil)
@@ -66,7 +67,8 @@ export interface EventoBatch {
     ventanaInicio: string | null;
     ventanaFin: string | null;
     cantidadEventos: number;
-    eventos: Evento[]; 
+    eventos: Evento[];
+    envios : Envio[]; //Envios planificados en el lote
 }
 
 export interface EventoBatchSimulation {

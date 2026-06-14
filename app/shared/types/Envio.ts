@@ -5,6 +5,8 @@ export type Envio = {
     fechaHora : string;
     cantidadMaletas : number;
     idCliente : string;
+    _estado ?: string;
+    _llegadaEpoch ?: number;
 }
 export type EscalaRuta = {
     codigoVuelo: number | string;

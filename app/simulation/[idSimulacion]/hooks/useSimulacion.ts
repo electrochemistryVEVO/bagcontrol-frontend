@@ -9,6 +9,7 @@ import {
   EventoBatch,
 } from "@/app/shared/types/Evento";
 import axios from 'axios';
+import {Envio} from "@/app/shared/types/Envio";
 
 export type EstadoSimulacion = 'sincronizando' | 'en_vivo' | 'pausada' | 'detenida' | 'finalizada' | 'error';
 type EventoConTipoAlternativo = Evento & { tipoEvento?: string };
@@ -25,6 +26,7 @@ export function useSimulacion(
   const [conectado, setConectado] = useState(false);
   const arrancadoRef = useRef(false);
   const vuelosActivos = useRef<Map<string, EventoVuelo>>(new Map());
+  const enviosPlanificados = useRef<Record<string,Envio>>({});
   const colaEventos = useRef<Evento[]>([]);
   const tiempoSimulacion = useRef<number>(new Date(fechaInicio + 'Z').getTime());
   const lotesRecibidosRef = useRef<number>(0);
@@ -107,6 +109,13 @@ export function useSimulacion(
       console.log('[MOTOR ARRANCA] reloj sincronizado a:', colaEventos.current[0].fechaHoraEvento);
       setEstadoSim('en_vivo');
     }
+
+    // 5. Agregar eventos planificados
+    enviosPlanificados.current = {...enviosPlanificados.current,
+    ...lote.envios.reduce((acum:Record<string, Envio>,val)=>{
+      (val as any)._estado = "PLANIFICADO"
+      acum[val.idPedido] = val;
+      return acum;},{})};
 
     onNuevoLoteRef.current?.();
   }, [setEstadoSim]);
@@ -196,6 +205,16 @@ export function useSimulacion(
       ultimoFrame = ahora;
       const tiempoActual = tiempoSimulacion.current;
 
+      for(let key in enviosPlanificados.current){
+        const envio = enviosPlanificados.current[key]
+        const epoch = envio._llegadaEpoch;
+        //console.log(ahora-epoch)
+        if(epoch && ((tiempoActual - epoch) >= 1000*60*60*4)){
+          console.log(`${envio.idPedido} eliminado`)
+          delete enviosPlanificados.current[key]
+        }
+      }
+
       let procesados = 0;
       while (colaEventos.current.length > 0) {
         const evento = colaEventos.current[0];
@@ -210,9 +229,26 @@ export function useSimulacion(
           (evVuelo as any)._salidaEpoch = new Date(evVuelo.horaSalidaUtc).getTime();
           (evVuelo as any)._llegadaEpoch = new Date(evVuelo.horaLlegadaUtc).getTime();
           vuelosActivos.current.set(evVuelo.codigoVuelo.toString(), evVuelo);
+          //Modificar estado de envios
+          for(let env of evVuelo.codigoEnvios){
+            const _envio = enviosPlanificados.current[env]
+            if(_envio){ //Vuelo es el primero
+              _envio._estado = "EN_CURSO"
+              enviosPlanificados.current[env] = _envio;
+            }
+          }
         } else if (tipo === 'VUELO_ATERRIZA') {
           const evVuelo = ev as EventoVuelo;
           vuelosActivos.current.delete(evVuelo.codigoVuelo.toString());
+          //Modificar estado de envios
+          for(let env of evVuelo.codigoEnvios){
+            const _envio = enviosPlanificados.current[env]
+            if(_envio && _envio.destinoIata === evVuelo.destinoIata){ //Vuelo es el ultimo
+              _envio._estado = "ENTREGADO";
+              _envio._llegadaEpoch = tiempoActual;
+              enviosPlanificados.current[env] = _envio;
+            }
+          }
         } else if (tipo === 'AEROPUERTO_ACTUALIZADO') {
           const evAero = ev as EventoAeropuerto;
           const codigo = evAero.codigoAeropuerto?.trim().toUpperCase();
@@ -245,6 +281,7 @@ export function useSimulacion(
     setEstadoSim,
     aeropuertosRef: aeropuertosSimulacion,
     vuelosActivosRef: vuelosActivos,
+    enviosPlanificadosRef : enviosPlanificados,
     tiempoSimulacionRef: tiempoSimulacion,
   };
 }
