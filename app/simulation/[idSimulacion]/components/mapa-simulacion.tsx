@@ -23,6 +23,7 @@ import { AeropuertoSimulacion, Aeropuerto } from '@/app/shared/types/Aeropuerto'
 import { EventoVuelo } from "@/app/shared/types/Evento";
 import { EnvioRuta } from '@/app/shared/types/Envio';
 import { SimulacionService } from '@/app/services/simulation.service';
+import { MAP_STYLE_URL } from '@/app/services/config/constants';
 import { AeropuertoPopupContent } from './pop-up-aeropuerto';
 import { RelojSimulacionOverlay } from './reloj-simulacion';
 import { PanelVuelos } from './panel-vuelos';
@@ -34,6 +35,12 @@ import { Drawer } from "@mui/material";
 // ============================================================================
 // STILOS DE CAPAS (Layers)
 // ============================================================================
+const COLOR_POR_ESTADO: Record<string, string> = {
+  ROJO: '#ef4444',
+  AMARILLO: '#eab308',
+  VERDE: '#22c55e',
+};
+
 const layerStyleAeropuertos: CircleLayerSpecification = {
   id: 'point',
   type: 'circle',
@@ -90,12 +97,10 @@ const layerStyleAirplane: SymbolLayerSpecification = {
   paint: {
     'icon-opacity': 1,
     'icon-color': [
-      'match',
-      ['get', 'estado'],
-      'ROJO', '#ef4444',
-      'AMARILLO', '#eab308',
-      'VERDE', '#22c55e',
-      '#ffffff'
+      'case',
+      ['==', ['get', 'cantidadMaletas'], 0],
+      '#222222',
+      ['get', 'color']
     ]
   },
   layout: {
@@ -107,6 +112,24 @@ const layerStyleAirplane: SymbolLayerSpecification = {
     'icon-size': 0.05
   }
 };
+
+function normalizarAeropuertoInicial(aeropuerto: Aeropuerto): AeropuertoSimulacion {
+  return {
+    ...aeropuerto,
+    maletasActuales: 0,
+    porcentajeOcupacion: 0,
+    estadoCapacidad: 'VERDE',
+    enviosProximosAVencer: [],
+  };
+}
+
+function crearFeatureAeropuerto(airport: AeropuertoSimulacion): Feature {
+  return {
+    type: 'Feature',
+    properties: { ...airport, isAirport: true },
+    geometry: { type: 'Point', coordinates: [airport.longitud, airport.latitud] },
+  };
+}
 
 function interpolar(inicio: number[], fin: number[], progreso: number) {
   return [
@@ -137,6 +160,11 @@ interface Props {
   conectado: boolean;
 }
 
+type VueloAnimado = EventoVuelo & {
+  _salidaEpoch?: number;
+  _llegadaEpoch?: number;
+};
+
 export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosActivosRef, tiempoSimulacionRef, idSimulacion, conectado }: Props) {
   const mapRef = useRef<MapRef>(null);
   const popupRef = useRef<PopupInstance | null>(null);
@@ -145,7 +173,9 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
   const [selFeature, setSelFeature] = useState<MapGeoJSONFeature | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [vuelosActivosSnapshot, setVuelosActivosSnapshot] = useState<EventoVuelo[]>([]);
-  const [aeropuertosSnapshot, setAeropuertosSnapshot] = useState<AeropuertoSimulacion[]>([]);
+  const [aeropuertosSnapshot, setAeropuertosSnapshot] = useState<AeropuertoSimulacion[]>(() =>
+    aeropuertosIniciales.map(normalizarAeropuertoInicial)
+  );
 
   // Controladores de estado para los Drawers laterales
   const [panelOpen, setPanelOpen] = useState(false);
@@ -164,6 +194,11 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
     });
     return dict;
   }, [aeropuertosIniciales]);
+
+  const featuresAeropuertosIniciales = useMemo<Feature[]>(
+    () => aeropuertosIniciales.map(normalizarAeropuertoInicial).map(crearFeatureAeropuerto),
+    [aeropuertosIniciales]
+  );
 
   const enfocarCoordenadas = useCallback((coords: [number, number], zoom = 6) => {
     mapRef.current?.getMap().flyTo({
@@ -202,7 +237,7 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
       setRutaEnvio(null);
       setRutaError(`No se encontro ruta para el envio ${idNormalizado}`);
     }
-  }, [idSimulacion]);
+  }, [idSimulacion, tiempoSimulacionRef]);
 
   const featuresRutaEnvio = useMemo<Feature[]>(() => {
     if (!rutaEnvio) return [];
@@ -304,8 +339,10 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
 
         if (!coordsOrigen || !coordsDestino) return;
 
-        const inicioMs = (vuelo as any)._salidaEpoch;
-        const finMs = (vuelo as any)._llegadaEpoch;
+        const vueloAnimado = vuelo as VueloAnimado;
+        const inicioMs = vueloAnimado._salidaEpoch ?? Date.parse(vuelo.horaSalidaUtc);
+        const finMs = vueloAnimado._llegadaEpoch ?? Date.parse(vuelo.horaLlegadaUtc);
+        if (!Number.isFinite(inicioMs) || !Number.isFinite(finMs)) return;
         
         const duracion = finMs - inicioMs;
         let progreso = duracion > 0 ? (tiempoActual - inicioMs) / duracion : 1;
@@ -316,15 +353,21 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
 
         featuresAviones.push({
           type: 'Feature',
-          properties: { ...vuelo, codigoVuelo: String(vuelo.codigoVuelo), bearing, isAirplane: true },
+          properties: {
+            ...vuelo,
+            codigoVuelo: String(vuelo.codigoVuelo),
+            bearing,
+            color: COLOR_POR_ESTADO[vuelo.estado] ?? '#ffffff',
+            isAirplane: true
+          },
           geometry: { type: 'Point', coordinates: posicionActual }
         });
 
-        if (progreso > 0.001) {
+        if (progreso < 0.999) {
           featuresRutas.push({
             type: 'Feature',
             properties: { estado: vuelo.estado },
-            geometry: { type: 'LineString', coordinates: [coordsOrigen, posicionActual] }
+            geometry: { type: 'LineString', coordinates: [posicionActual, coordsDestino] }
           });
         }
       });
@@ -338,11 +381,7 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
       // Aeropuertos: solo actualizar cada 30 frames (~500ms), no cambian posición ni a 60fps
       frameContador++;
       if (frameContador % 30 === 0) {
-        const featuresAeropuertos: Feature[] = Object.values(aeropuertosRef.current || {}).map((airport) => ({
-          type: 'Feature',
-          properties: { ...airport, isAirport: true },
-          geometry: { type: 'Point', coordinates: [airport.longitud, airport.latitud] },
-        }));
+        const featuresAeropuertos: Feature[] = Object.values(aeropuertosRef.current || {}).map(crearFeatureAeropuerto);
         const sourceAeropuertos = map.getSource('aeropuertos-data') as GeoJSONSource;
         if (sourceAeropuertos) sourceAeropuertos.setData({ type: 'FeatureCollection', features: featuresAeropuertos });
       }
@@ -352,7 +391,7 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
 
     animar();
     return () => cancelAnimationFrame(animationFrameId);
-  }, [coordsAeropuertos]); // solo depende de coordenadas (estables tras mount)
+  }, [aeropuertosRef, coordsAeropuertos, tiempoSimulacionRef, vuelosActivosRef]); // refs estables; coordenadas cambian si cambia la lista inicial
 
   // Ruta de envío: solo actualizar cuando featuresRutaEnvio cambia (búsqueda explícita)
   useEffect(() => {
@@ -472,7 +511,7 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
       <MapLibre
         ref={mapRef}
         initialViewState={{ longitude: -75, latitude: -10, zoom: 4 }} 
-        mapStyle="https://tiles.openfreemap.org/styles/bright"
+        mapStyle={MAP_STYLE_URL}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={() => setShowPopup(false)}
         onMouseDown={(e: MapLayerMouseEvent) => {
@@ -517,7 +556,7 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
           <Layer {...layerStyleRutaEnvio} />
         </Source>
 
-        <Source id="aeropuertos-data" type="geojson" data={{ type: 'FeatureCollection', features: [] }}>
+        <Source id="aeropuertos-data" type="geojson" data={{ type: 'FeatureCollection', features: featuresAeropuertosIniciales }}>
           <Layer {...layerStyleAeropuertos} />
         </Source>
 

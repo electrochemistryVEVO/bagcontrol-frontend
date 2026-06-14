@@ -99,12 +99,12 @@ export function SimulacionCliente({ id, topic, k, aeropuertosIniciales, errorIni
   };
 
   const colorEstado: Record<typeof estadoSim, string> = {
-    sincronizando: '#f87171',
-    en_vivo:       '#4ade80',
-    pausada:       '#fbbf24',
-    detenida:      '#f87171',
-    finalizada:    '#94a3b8',
-    error:         '#ef4444',
+    sincronizando: '#b91c1c',
+    en_vivo:       '#15803d',
+    pausada:       '#a16207',
+    detenida:      '#b91c1c',
+    finalizada:    '#475569',
+    error:         '#dc2626',
   };
 
 
@@ -112,12 +112,12 @@ export function SimulacionCliente({ id, topic, k, aeropuertosIniciales, errorIni
     display: 'inline-flex', alignItems: 'center', gap: '6px',
     padding: '6px 16px', borderRadius: '6px', fontWeight: 600,
     fontSize: '14px', cursor: 'pointer', border: '2px solid',
-    background: 'transparent', color: 'white', transition: 'opacity .15s',
+    color: '#111827', transition: 'opacity .15s',
   };
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <header style={{ padding: '0.6rem 1rem', background: '#1e293b', color: 'white', display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+      <header style={{ padding: '0.6rem 1rem', background: '#ffffff', color: '#111827', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
         {/* ID y estado */}
         <span style={{ fontSize: '13px', opacity: 0.8 }}>ID Simulación: {id}</span>
         <span style={{ color: colorEstado[estadoSim], fontWeight: 600 }}>
@@ -127,7 +127,7 @@ export function SimulacionCliente({ id, topic, k, aeropuertosIniciales, errorIni
         {/* Botones de control */}
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
-            style={{ ...btnBase, borderColor: '#22d3ee', color: '#22d3ee',
+            style={{ ...btnBase, borderColor: '#0891b2', background: '#22d3ee',
               opacity: estaActiva ? 1 : 0.35,
               cursor: estaActiva ? 'pointer' : 'not-allowed' }}
             onClick={handlePausar}
@@ -136,7 +136,7 @@ export function SimulacionCliente({ id, topic, k, aeropuertosIniciales, errorIni
             ⏸ Pausar
           </button>
           <button
-            style={{ ...btnBase, borderColor: '#e2e8f0', color: '#e2e8f0',
+            style={{ ...btnBase, borderColor: '#94a3b8', background: '#e2e8f0',
               opacity: estaPausada ? 1 : 0.35,
               cursor: estaPausada ? 'pointer' : 'not-allowed' }}
             onClick={handleReanudar}
@@ -145,7 +145,7 @@ export function SimulacionCliente({ id, topic, k, aeropuertosIniciales, errorIni
             ▶ Reanudar
           </button>
           <button
-            style={{ ...btnBase, borderColor: '#f87171', color: '#f87171',
+            style={{ ...btnBase, borderColor: '#dc2626', background: '#f87171',
               opacity: (estaActiva || estaPausada) ? 1 : 0.35,
               cursor: (estaActiva || estaPausada) ? 'pointer' : 'not-allowed' }}
             onClick={handleDetener}
@@ -157,7 +157,7 @@ export function SimulacionCliente({ id, topic, k, aeropuertosIniciales, errorIni
 
         {/* Velocidad - empujado a la derecha */}
         <div style={{ marginLeft: 'auto' }}>
-          <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+          <span style={{ fontSize: '0.8rem', color: '#334155' }}>
             Velocidad: {k} min simulados / {SaS_SEGUNDOS}s reales
           </span>
         </div>
