@@ -6,7 +6,6 @@ export type Envio = {
     cantidadMaletas : number;
     idCliente : string;
 }
-
 export type EscalaRuta = {
     codigoVuelo: number | string;
     origenIata: string;
@@ -33,4 +32,10 @@ export type EnvioAlmacen = {
     codigoAeropuerto: string;
     tipoAlmacen: 'DESTINO_FINAL' | 'TRANSITO' | string;
     estadoEnvio: string;
+}
+
+export type EnvioAeropuerto = {
+    envio : Envio;
+    fechaHoraSalidaUtc : Date;
+    fechaHoraLlegadaUtc : Date;
 }

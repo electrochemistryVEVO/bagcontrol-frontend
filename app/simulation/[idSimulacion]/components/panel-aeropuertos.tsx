@@ -1,20 +1,25 @@
 'use client';
 
 import {
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
-  Box,
-  Button,
-  Chip,
-  Paper,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  Typography,
+    Accordion,
+    AccordionDetails,
+    AccordionSummary,
+    Box,
+    Button,
+    Chip,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    Paper,
+    Stack,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableRow, TextField,
+    Typography,
+    SelectChangeEvent,
 } from '@mui/material';
 import { useMemo, useState } from 'react';
 import type { AeropuertoSimulacion } from '@/app/shared/types/Aeropuerto';
@@ -25,13 +30,41 @@ type PanelAeropuertosProps = {
   visible: boolean;
 };
 
+type Continente = 'america' | 'asia' | 'europa' | 'oceania' | 'africa';
+
 type DireccionOrden = 'asc' | 'desc';
+
+type OrderingFuncs = 'calcularOcupacion' | 'calcularProximidadSalida' | 'calcularProximidadLlegada'
 
 const colorPorEstado: Record<EstadoCapacidad, 'success' | 'warning' | 'error'> = {
   VERDE: 'success',
   AMARILLO: 'warning',
   ROJO: 'error',
 };
+
+const orderFunctions : Record<OrderingFuncs, (x:AeropuertoSimulacion) => number> = {
+    calcularOcupacion : function(aeropuerto: AeropuertoSimulacion) {
+        return calcularOcupacion(aeropuerto);
+    },
+    calcularProximidadSalida : function (aeropuerto : AeropuertoSimulacion){
+        let proximidad = Number.MAX_VALUE
+        if(!aeropuerto.enviosProximosAVencer)return proximidad;
+        for(const envio of aeropuerto.enviosProximosAVencer){
+            const envioProx = Date.now() - (new Date(envio.fechaHoraSalidaUtc)).getTime();
+            proximidad = envioProx < proximidad ? envioProx : proximidad;
+        }
+        return proximidad;
+    },
+    calcularProximidadLlegada : function(aeropuerto : AeropuertoSimulacion){
+        let proximidad = Number.MAX_VALUE
+        if(!aeropuerto.enviosProximosAVencer)return proximidad;
+        for(const envio of aeropuerto.enviosProximosAVencer){
+            const envioProx = Date.now() - (new Date(envio.fechaHoraLlegadaUtc)).getTime();
+            proximidad = envioProx < proximidad ? envioProx : proximidad;
+        }
+        return proximidad;
+    }
+}
 
 function calcularOcupacion(aeropuerto: AeropuertoSimulacion) {
   if (typeof aeropuerto.porcentajeOcupacion === 'number') {
@@ -40,16 +73,28 @@ function calcularOcupacion(aeropuerto: AeropuertoSimulacion) {
   if (!aeropuerto.capacidadAlmacen) return 0;
   return Math.round((aeropuerto.maletasActuales / aeropuerto.capacidadAlmacen) * 100);
 }
-
 export function PanelAeropuertos({ aeropuertos, visible }: PanelAeropuertosProps) {
   const [panelAbierto, setPanelAbierto] = useState(false);
   const [direccionOrden, setDireccionOrden] = useState<DireccionOrden>('desc');
+  const [busqueda, setBusqueda] = useState('');
+  const [filtroContinente,setFiltroContinente] = useState('');
+  const [tipoOrden,setTipoOrden] = useState<OrderingFuncs>('calcularOcupacion');
   const [aeropuertoExpandido, setAeropuertoExpandido] = useState<string | null>(null);
 
   const aeropuertosOrdenados = useMemo(() => {
-    return [...aeropuertos].sort((a, b) => {
-      const diferencia = calcularOcupacion(a) - calcularOcupacion(b);
-      return direccionOrden === 'asc' ? diferencia : -diferencia;
+    return [...aeropuertos]
+        .filter((aeropuerto)=>{
+            const filtro = busqueda.trim().toLowerCase()
+            const filtrado = !filtro ? true
+                : aeropuerto.codigoIata.toLowerCase().includes(filtro);
+            const filtradoContinente = !filtroContinente ? true:
+                aeropuerto.continente.toLowerCase().includes(filtroContinente);
+            return filtrado && filtradoContinente;
+        })
+        .sort((a, b) => {
+            const sortFunc = orderFunctions[tipoOrden];
+            const diferencia = sortFunc(a) - sortFunc(b);
+            return direccionOrden === 'asc' ? diferencia : -diferencia;
     });
   }, [aeropuertos, direccionOrden]);
 
@@ -113,19 +158,57 @@ export function PanelAeropuertos({ aeropuertos, visible }: PanelAeropuertosProps
           }}
         >
           <Stack spacing={1.5} sx={{ flexShrink: 0, pb: 1.5 }}>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => setDireccionOrden((actual) => (actual === 'asc' ? 'desc' : 'asc'))}
-              sx={{
-                color: '#e2e8f0',
-                borderColor: 'rgba(148, 163, 184, 0.35)',
-                textTransform: 'none',
-                alignSelf: 'flex-start',
-              }}
-            >
-              Ocupacion {direccionOrden === 'asc' ? 'ascendente' : 'descendente'}
-            </Button>
+              <TextField
+                  size="small"
+                  value={busqueda}
+                  onChange={(event) => setBusqueda(event.target.value)}
+                  placeholder="Buscar por código IATA"
+                  fullWidth
+                  sx={inputSx}
+              />
+              <FormControl size="small" fullWidth sx={inputSx}>
+                  <InputLabel id="filtro-continente-label">Filtrar por continente</InputLabel>
+                  <Select
+                      labelId="filtro-continente-label"
+                      value={filtroContinente}
+                      label="Filtrar por continente"
+                      onChange={(event: SelectChangeEvent) => setFiltroContinente(event.target.value as Continente)}
+                  >
+                      <MenuItem value="america">América</MenuItem>
+                      <MenuItem value="asia">Asia</MenuItem>
+                      <MenuItem value="oceania">Oceanía</MenuItem>
+                      <MenuItem value="europa">Europa</MenuItem>
+                      <MenuItem value="africa">África</MenuItem>
+                  </Select>
+              </FormControl>
+              <Stack spacing={1.5} sx={{ flexShrink: 0, pb: 0.5 }} direction="row">
+                  <FormControl size="small" sx={inputSx}>
+                      <InputLabel id="orden-aeropuertos-label">Ordenar por</InputLabel>
+                      <Select
+                          labelId="orden-aeropuertos-label"
+                          value={tipoOrden}
+                          label="Filtrar por continente"
+                          onChange={(event: SelectChangeEvent) => setTipoOrden(event.target.value as OrderingFuncs)}
+                      >
+                          <MenuItem value="calcularOcupacion">Ocupación</MenuItem>
+                          <MenuItem value="calcularProximidadSalida">Proximidad de hora de salida</MenuItem>
+                          <MenuItem value="calcularProximidadLlegada">Proximidad de hora de llegada</MenuItem>
+                      </Select>
+                  </FormControl>
+                  <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => setDireccionOrden((actual) => (actual === 'asc' ? 'desc' : 'asc'))}
+                      sx={{
+                          color: '#e2e8f0',
+                          borderColor: 'rgba(148, 163, 184, 0.35)',
+                          textTransform: 'none',
+                          alignSelf: 'flex-start',
+                      }}
+                  >
+                      Orden {direccionOrden === 'asc' ? 'ascendente' : 'descendente'}
+                  </Button>
+              </Stack>
           </Stack>
 
           {aeropuertosOrdenados.length === 0 ? (
@@ -211,11 +294,11 @@ export function PanelAeropuertos({ aeropuertos, visible }: PanelAeropuertosProps
                               </TableHead>
                               <TableBody>
                                 {enviosProximos.map((envio) => (
-                                  <TableRow key={envio.idPedido}>
-                                    <TableCell>{envio.idPedido}</TableCell>
-                                    <TableCell>{envio.origenIata}</TableCell>
-                                    <TableCell>{envio.destinoIata}</TableCell>
-                                    <TableCell align="right">{envio.cantidadMaletas}</TableCell>
+                                  <TableRow key={envio.envio.idPedido}>
+                                    <TableCell>{envio.envio.idPedido}</TableCell>
+                                    <TableCell>{envio.envio.origenIata}</TableCell>
+                                    <TableCell>{envio.envio.destinoIata}</TableCell>
+                                    <TableCell align="right">{envio.envio.cantidadMaletas}</TableCell>
                                   </TableRow>
                                 ))}
                               </TableBody>
@@ -253,6 +336,16 @@ const tableSx = {
     color: '#93c5fd',
     fontWeight: 700,
   },
+};
+
+const inputSx = {
+    '& .MuiInputBase-root': {
+        color: '#f8fafc',
+        bgcolor: 'rgba(15, 23, 42, 0.72)',
+    },
+    '& .MuiInputLabel-root': { color: '#cbd5e1' },
+    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(148, 163, 184, 0.35)' },
+    '& .MuiSvgIcon-root': { color: '#cbd5e1' },
 };
 
 const scrollListSx = {
