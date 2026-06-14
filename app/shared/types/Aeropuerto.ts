@@ -1,4 +1,4 @@
-import { Envio } from './Envio';
+import {Envio, EnvioAeropuerto} from './Envio';
 import { EstadoCapacidad } from './Evento';
 
 export interface Aeropuerto {
@@ -17,5 +17,5 @@ export interface AeropuertoSimulacion extends Aeropuerto {
   maletasActuales: number;
   porcentajeOcupacion: number;
   estadoCapacidad: EstadoCapacidad;
-  enviosProximosAVencer?: Envio[];
+  enviosProximosAVencer?: EnvioAeropuerto[];
 }

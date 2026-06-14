@@ -1,6 +1,6 @@
 
 import {Aeropuerto} from "@/app/shared/types/Aeropuerto";
-import { Envio } from './Envio'; 
+import {Envio, EnvioAeropuerto} from './Envio';
 
 export type TipoEvento = 
     | "SIMULACION_INICIADA"
@@ -36,7 +36,7 @@ export interface EventoAeropuerto extends EventoBase {
     porcentajeOcupacion: number;
     maletasActuales: number;
     capacidadAlmacen: number;
-    enviosProximosAVencer?: Envio[];
+    enviosProximosAVencer?: EnvioAeropuerto[];
 }
 
 export interface EventoVuelo extends EventoBase {
