@@ -21,9 +21,11 @@ import {
     Typography,
     SelectChangeEvent,
 } from '@mui/material';
-import { useMemo, useState } from 'react';
+import {memo, useMemo, useState} from 'react';
 import type { AeropuertoSimulacion } from '@/app/shared/types/Aeropuerto';
 import type { EstadoCapacidad } from '@/app/shared/types/Evento';
+import {AeropuertoEnvioBox, AeropuertosScrollList} from "./panel-aeropuertos-styled";
+import {number} from "prop-types";
 
 type PanelAeropuertosProps = {
   aeropuertos: AeropuertoSimulacion[];
@@ -47,22 +49,12 @@ const orderFunctions : Record<OrderingFuncs, (x:AeropuertoSimulacion) => number>
         return calcularOcupacion(aeropuerto);
     },
     calcularProximidadSalida : function (aeropuerto : AeropuertoSimulacion){
-        let proximidad = Number.MAX_VALUE
-        if(!aeropuerto.enviosProximosAVencer)return proximidad;
-        for(const envio of aeropuerto.enviosProximosAVencer){
-            const envioProx = Date.now() - (new Date(envio.fechaHoraSalidaUtc)).getTime();
-            proximidad = envioProx < proximidad ? envioProx : proximidad;
-        }
-        return proximidad;
+        if(!aeropuerto.enviosProximosAVencer || aeropuerto.enviosProximosAVencer.length < 1)return Number.MAX_VALUE;
+        return Date.now() - (new Date(aeropuerto.enviosProximosAVencer[0].fechaHoraSalidaUtc)).getTime();
     },
     calcularProximidadLlegada : function(aeropuerto : AeropuertoSimulacion){
-        let proximidad = Number.MAX_VALUE
-        if(!aeropuerto.enviosProximosAVencer)return proximidad;
-        for(const envio of aeropuerto.enviosProximosAVencer){
-            const envioProx = Date.now() - (new Date(envio.fechaHoraLlegadaUtc)).getTime();
-            proximidad = envioProx < proximidad ? envioProx : proximidad;
-        }
-        return proximidad;
+        if(!aeropuerto.enviosProximosAVencer || aeropuerto.enviosProximosAVencer.length < 1)return Number.MAX_VALUE;
+        return Date.now() - (new Date(aeropuerto.enviosProximosAVencer[0].fechaHoraLlegadaUtc)).getTime();
     }
 }
 
@@ -73,6 +65,7 @@ function calcularOcupacion(aeropuerto: AeropuertoSimulacion) {
   if (!aeropuerto.capacidadAlmacen) return 0;
   return Math.round((aeropuerto.maletasActuales / aeropuerto.capacidadAlmacen) * 100);
 }
+
 export function PanelAeropuertos({ aeropuertos, visible }: PanelAeropuertosProps) {
   const [panelAbierto, setPanelAbierto] = useState(false);
   const [direccionOrden, setDireccionOrden] = useState<DireccionOrden>('desc');
@@ -96,7 +89,7 @@ export function PanelAeropuertos({ aeropuertos, visible }: PanelAeropuertosProps
             const diferencia = sortFunc(a) - sortFunc(b);
             return direccionOrden === 'asc' ? diferencia : -diferencia;
     });
-  }, [aeropuertos, direccionOrden]);
+  }, [aeropuertos, direccionOrden,tipoOrden,busqueda,filtroContinente]);
 
   if (!visible) return null;
 
@@ -157,160 +150,155 @@ export function PanelAeropuertos({ aeropuertos, visible }: PanelAeropuertosProps
             overflow: 'hidden',
           }}
         >
-          <Stack spacing={1.5} sx={{ flexShrink: 0, pb: 1.5 }}>
-              <TextField
-                  size="small"
-                  value={busqueda}
-                  onChange={(event) => setBusqueda(event.target.value)}
-                  placeholder="Buscar por código IATA"
-                  fullWidth
-                  sx={inputSx}
-              />
-              <FormControl size="small" fullWidth sx={inputSx}>
-                  <InputLabel id="filtro-continente-label">Filtrar por continente</InputLabel>
-                  <Select
-                      labelId="filtro-continente-label"
-                      value={filtroContinente}
-                      label="Filtrar por continente"
-                      onChange={(event: SelectChangeEvent) => setFiltroContinente(event.target.value as Continente)}
-                  >
-                      <MenuItem value="america">América</MenuItem>
-                      <MenuItem value="asia">Asia</MenuItem>
-                      <MenuItem value="oceania">Oceanía</MenuItem>
-                      <MenuItem value="europa">Europa</MenuItem>
-                      <MenuItem value="africa">África</MenuItem>
-                  </Select>
-              </FormControl>
-              <Stack spacing={1.5} sx={{ flexShrink: 0, pb: 0.5 }} direction="row">
-                  <FormControl size="small" sx={inputSx}>
-                      <InputLabel id="orden-aeropuertos-label">Ordenar por</InputLabel>
-                      <Select
-                          labelId="orden-aeropuertos-label"
-                          value={tipoOrden}
-                          label="Filtrar por continente"
-                          onChange={(event: SelectChangeEvent) => setTipoOrden(event.target.value as OrderingFuncs)}
-                      >
-                          <MenuItem value="calcularOcupacion">Ocupación</MenuItem>
-                          <MenuItem value="calcularProximidadSalida">Proximidad de hora de salida</MenuItem>
-                          <MenuItem value="calcularProximidadLlegada">Proximidad de hora de llegada</MenuItem>
-                      </Select>
-                  </FormControl>
-                  <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={() => setDireccionOrden((actual) => (actual === 'asc' ? 'desc' : 'asc'))}
-                      sx={{
-                          color: '#e2e8f0',
-                          borderColor: 'rgba(148, 163, 184, 0.35)',
-                          textTransform: 'none',
-                          alignSelf: 'flex-start',
-                      }}
-                  >
-                      Orden {direccionOrden === 'asc' ? 'ascendente' : 'descendente'}
-                  </Button>
-              </Stack>
-          </Stack>
-
-          {aeropuertosOrdenados.length === 0 ? (
-            <Box sx={emptySx}>No hay aeropuertos disponibles</Box>
-          ) : (
-            <Stack spacing={1} sx={scrollListSx}>
-              {aeropuertosOrdenados.map((aeropuerto) => {
-                const ocupacion = calcularOcupacion(aeropuerto);
-                const enviosProximos = aeropuerto.enviosProximosAVencer || [];
-                const expandido = aeropuertoExpandido === aeropuerto.codigoIata;
-
-                return (
-                  <Box
-                    key={aeropuerto.codigoIata}
-                    sx={{
-                      border: '1px solid rgba(148, 163, 184, 0.2)',
-                      borderRadius: 1,
-                      overflow: 'hidden',
-                      bgcolor: 'rgba(30, 41, 59, 0.82)',
-                      flexShrink: 0,
-                    }}
-                  >
-                      <Button
+            {panelAbierto && (<>
+                <Stack spacing={1.5} sx={{ flexShrink: 0, pb: 1.5 }}>
+                    <TextField
+                        size="small"
+                        value={busqueda}
+                        onChange={(event) => setBusqueda(event.target.value)}
+                        placeholder="Buscar por código IATA"
                         fullWidth
-                        onClick={() => setAeropuertoExpandido((actual) => (
-                          actual === aeropuerto.codigoIata ? null : aeropuerto.codigoIata
-                        ))}
-                        sx={{
-                          justifyContent: 'stretch',
-                          color: 'inherit',
-                          textTransform: 'none',
-                          p: 1.25,
-                        }}
-                      >
-                        <Box sx={{ width: '100%', textAlign: 'left' }}>
-                          <Stack sx={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-                            <Typography sx={{ fontWeight: 700 }}>{aeropuerto.codigoIata}</Typography>
-                            <Stack sx={{ flexDirection: 'row', gap: 0.75 }}>
-                              {enviosProximos.length > 0 && (
-                                <Chip
-                                  size="small"
-                                  label={`${enviosProximos.length} SLA`}
-                                  color="warning"
-                                  variant="outlined"
-                                />
-                              )}
-                              <Chip
-                                size="small"
-                                label={aeropuerto.estadoCapacidad}
-                                color={colorPorEstado[aeropuerto.estadoCapacidad]}
-                              />
-                            </Stack>
-                          </Stack>
+                        sx={inputSx}
+                    />
+                    <FormControl size="small" fullWidth sx={inputSx}>
+                        <InputLabel id="filtro-continente-label">Filtrar por continente</InputLabel>
+                        <Select
+                            labelId="filtro-continente-label"
+                            value={filtroContinente}
+                            label="Filtrar por continente"
+                            onChange={(event: SelectChangeEvent) => setFiltroContinente(event.target.value as Continente)}
+                        >
+                            <MenuItem value="america">América</MenuItem>
+                            <MenuItem value="asia">Asia</MenuItem>
+                            <MenuItem value="oceania">Oceanía</MenuItem>
+                            <MenuItem value="europa">Europa</MenuItem>
+                            <MenuItem value="africa">África</MenuItem>
+                        </Select>
+                    </FormControl>
+                    <Stack spacing={1.5} sx={{ flexShrink: 0, pb: 0.5 }} direction="row">
+                        <FormControl size="small" sx={inputSx}>
+                            <InputLabel id="orden-aeropuertos-label">Ordenar por</InputLabel>
+                            <Select
+                                labelId="orden-aeropuertos-label"
+                                value={tipoOrden}
+                                label="Filtrar por continente"
+                                onChange={(event: SelectChangeEvent) => setTipoOrden(event.target.value as OrderingFuncs)}
+                            >
+                                <MenuItem value="calcularOcupacion">Ocupación</MenuItem>
+                                <MenuItem value="calcularProximidadSalida">Proximidad de hora de salida</MenuItem>
+                                <MenuItem value="calcularProximidadLlegada">Proximidad de hora de llegada</MenuItem>
+                            </Select>
+                        </FormControl>
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() => setDireccionOrden((actual) => (actual === 'asc' ? 'desc' : 'asc'))}
+                            sx={{
+                                color: '#e2e8f0',
+                                borderColor: 'rgba(148, 163, 184, 0.35)',
+                                textTransform: 'none',
+                                alignSelf: 'flex-start',
+                            }}
+                        >
+                            Orden {direccionOrden === 'asc' ? 'ascendente' : 'descendente'}
+                        </Button>
+                    </Stack>
+                </Stack>
 
-                          <Typography variant="body2" sx={{ color: '#cbd5e1', mt: 0.5 }}>
-                            {aeropuerto.ciudad} - {aeropuerto.pais}
-                          </Typography>
+                {aeropuertosOrdenados.length === 0 ? (
+                    <Box sx={emptySx}>No hay aeropuertos disponibles</Box>
+                ) : (
+                    <AeropuertosScrollList spacing={1}>
+                        {aeropuertosOrdenados.map((aeropuerto) => {
+                            const ocupacion = calcularOcupacion(aeropuerto);
+                            const enviosProximos = aeropuerto.enviosProximosAVencer || [];
+                            const expandido = aeropuertoExpandido === aeropuerto.codigoIata;
 
-                          <Stack sx={{ mt: 0.75, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <Typography variant="caption" sx={{ color: '#94a3b8' }}>
-                              {aeropuerto.maletasActuales}/{aeropuerto.capacidadAlmacen} maletas
-                            </Typography>
-                            <Typography variant="caption" sx={{ fontWeight: 700 }}>
-                              {ocupacion}%
-                            </Typography>
-                          </Stack>
-                        </Box>
-                      </Button>
+                            return (
+                                <AeropuertoEnvioBox
+                                    key={aeropuerto.codigoIata}
+                                >
+                                    <Button
+                                        fullWidth
+                                        onClick={() => setAeropuertoExpandido((actual) => (
+                                            actual === aeropuerto.codigoIata ? null : aeropuerto.codigoIata
+                                        ))}
+                                        sx={{
+                                            justifyContent: 'stretch',
+                                            color: 'inherit',
+                                            textTransform: 'none',
+                                            p: 1.25,
+                                        }}
+                                    >
+                                        <Box sx={{ width: '100%', textAlign: 'left' }}>
+                                            <Stack sx={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                                                <Typography sx={{ fontWeight: 700 }}>{aeropuerto.codigoIata}</Typography>
+                                                <Stack sx={{ flexDirection: 'row', gap: 0.75 }}>
+                                                    {enviosProximos.length > 0 && (
+                                                        <Chip
+                                                            size="small"
+                                                            label={`${enviosProximos.length} SLA`}
+                                                            color="warning"
+                                                            variant="outlined"
+                                                        />
+                                                    )}
+                                                    <Chip
+                                                        size="small"
+                                                        label={aeropuerto.estadoCapacidad}
+                                                        color={colorPorEstado[aeropuerto.estadoCapacidad]}
+                                                    />
+                                                </Stack>
+                                            </Stack>
 
-                      {expandido && (
-                        <Box sx={{ px: 1.25, pb: 1.25 }}>
-                          {enviosProximos.length === 0 ? (
-                            <Box sx={emptySx}>Sin envios proximos a vencer</Box>
-                          ) : (
-                            <Table size="small" sx={tableSx}>
-                              <TableHead>
-                                <TableRow>
-                                  <TableCell>ID</TableCell>
-                                  <TableCell>Origen</TableCell>
-                                  <TableCell>Destino</TableCell>
-                                  <TableCell align="right">Maletas</TableCell>
-                                </TableRow>
-                              </TableHead>
-                              <TableBody>
-                                {enviosProximos.map((envio) => (
-                                  <TableRow key={envio.envio.idPedido}>
-                                    <TableCell>{envio.envio.idPedido}</TableCell>
-                                    <TableCell>{envio.envio.origenIata}</TableCell>
-                                    <TableCell>{envio.envio.destinoIata}</TableCell>
-                                    <TableCell align="right">{envio.envio.cantidadMaletas}</TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          )}
-                        </Box>
-                      )}
-                  </Box>
-                );
-              })}
-            </Stack>
-          )}
+                                            <Typography variant="body2" sx={{ color: '#cbd5e1', mt: 0.5 }}>
+                                                {aeropuerto.ciudad} - {aeropuerto.pais}
+                                            </Typography>
+
+                                            <Stack sx={{ mt: 0.75, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                                                    {aeropuerto.maletasActuales}/{aeropuerto.capacidadAlmacen} maletas
+                                                </Typography>
+                                                <Typography variant="caption" sx={{ fontWeight: 700 }}>
+                                                    {ocupacion}%
+                                                </Typography>
+                                            </Stack>
+                                        </Box>
+                                    </Button>
+
+                                    {expandido && (
+                                        <Box sx={{ px: 1.25, pb: 1.25 }}>
+                                            {enviosProximos.length === 0 ? (
+                                                <Box sx={emptySx}>Sin envios proximos a vencer</Box>
+                                            ) : (
+                                                <Table size="small" sx={tableSx}>
+                                                    <TableHead>
+                                                        <TableRow>
+                                                            <TableCell>ID</TableCell>
+                                                            <TableCell>Origen</TableCell>
+                                                            <TableCell>Destino</TableCell>
+                                                            <TableCell align="right">Maletas</TableCell>
+                                                        </TableRow>
+                                                    </TableHead>
+                                                    <TableBody>
+                                                        {enviosProximos.map((envio) => (
+                                                            <TableRow key={envio.envio.idPedido}>
+                                                                <TableCell>{envio.envio.idPedido}</TableCell>
+                                                                <TableCell>{envio.envio.origenIata}</TableCell>
+                                                                <TableCell>{envio.envio.destinoIata}</TableCell>
+                                                                <TableCell align="right">{envio.envio.cantidadMaletas}</TableCell>
+                                                            </TableRow>
+                                                        ))}
+                                                    </TableBody>
+                                                </Table>
+                                            )}
+                                        </Box>
+                                    )}
+                                </AeropuertoEnvioBox>
+                            );
+                        })}
+                    </AeropuertosScrollList>
+                )}
+            </>)}
         </AccordionDetails>
       </Accordion>
     </Paper>

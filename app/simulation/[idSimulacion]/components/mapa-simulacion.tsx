@@ -407,12 +407,14 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
         visible={conectado}
       />
 
+      <PanelEnvios aeropuertos={aeropuertosSnapshot} envios={enviosSnapshot} visible={conectado}/>
+
       <PanelAeropuertos
         aeropuertos={aeropuertosSnapshot}
         visible={conectado}
       />
 
-      <PanelEnvios aeropuertos={aeropuertosSnapshot} envios={enviosSnapshot} visible={conectado}/>
+
 
       <div style={{
         position: 'absolute',
