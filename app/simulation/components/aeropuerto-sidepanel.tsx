@@ -4,7 +4,7 @@ import { Box, Table, TableBody, TableCell, TablePagination, TableRow } from "@mu
 import { memo, useEffect, useState, RefObject } from "react";
 import styles from "../../stylesheets/sidepanel.module.css";
 import { AeropuertoSimulacion } from "@/app/shared/types/Aeropuerto";
-import { Envio, EnvioAlmacen } from "@/app/shared/types/Envio";
+import {Envio, EnvioAeropuerto, EnvioAlmacen} from "@/app/shared/types/Envio";
 import { MapGeoJSONFeature } from "@vis.gl/react-maplibre";
 import { HourFormat } from "@/app/shared/Utils";
 import { SimulacionService } from "@/app/services/simulation.service";
@@ -230,13 +230,13 @@ function AeropuertoPanelContents({
                         ) : (
                             listaCriticos
                                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                                .map((envio: Envio) => (
-                                    <TableRow key={envio.idPedido} className={styles["package-item"]}>
+                                .map((envio: EnvioAeropuerto) => (
+                                    <TableRow key={envio.envio.idPedido} className={styles["package-item"]}>
                                         <TableCell className={styles["package-code"]}>
-                                            Pedido #{envio.idPedido}
+                                            Pedido #{envio.envio.idPedido}
                                         </TableCell>
                                         <TableCell className={`${styles["package-time"]} ${styles.red}`}>
-                                            Plazo: {envio.fechaHora ? HourFormat(new Date(envio.fechaHora)) : 'N/A'}
+                                            Plazo: {envio.envio.fechaHora ? HourFormat(new Date(envio.envio.fechaHora)) : 'N/A'}
                                         </TableCell>
                                         <TableCell style={{ width: 40 }}>
                                             <svg className={styles["external"]} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

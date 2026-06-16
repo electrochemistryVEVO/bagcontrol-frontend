@@ -17,6 +17,8 @@ import { useMemo, useRef, useState, useEffect, RefObject, useCallback } from 're
 import { Feature } from 'geojson';
 import { MapLibreEvent } from 'maplibre-gl';
 import type { GeoJSONSource } from 'maplibre-gl';
+// @ts-ignore
+import * as syncMaps from '@mapbox/mapbox-gl-sync-move';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import { AeropuertoSimulacion, Aeropuerto } from '@/app/shared/types/Aeropuerto';
@@ -141,11 +143,13 @@ interface Props {
 
 export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosActivosRef, enviosPlanificadosRef, tiempoSimulacionRef, idSimulacion, conectado }: Props) {
   const mapRef = useRef<MapRef>(null);
+  const backgroundMapRef = useRef<MapRef>(null);
   const popupRef = useRef<PopupInstance | null>(null);
   
   const [showPopup, setShowPopup] = useState(false);
   const [selFeature, setSelFeature] = useState<MapGeoJSONFeature | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [backgroundLoaded,setBackgroundLoaded] = useState(false);
   const [vuelosActivosSnapshot, setVuelosActivosSnapshot] = useState<EventoVuelo[]>([]);
   const [aeropuertosSnapshot, setAeropuertosSnapshot] = useState<AeropuertoSimulacion[]>([]);
   const [enviosSnapshot, setEnviosSnapshot] = useState<Envio[]>([]);
@@ -372,6 +376,11 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
     popupRef.current?.trackPointer();
   };
 
+  useEffect(()=>{
+    if(imageLoaded && backgroundLoaded)
+      syncMaps(mapRef.current,backgroundMapRef.current);
+  },[imageLoaded,backgroundLoaded])
+
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       {/* DRAWER PARA AVIONES */}
@@ -476,11 +485,18 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
           </div>
         )}
       </div>
-      
+      <MapLibre
+          ref={backgroundMapRef}
+          style={{zIndex:17,position:'absolute'}}
+          mapStyle="https://tiles.openfreemap.org/styles/bright"
+          onLoad={async (e: MapLibreEvent) => {
+            setBackgroundLoaded(true);
+          }}
+      ></MapLibre>
       <MapLibre
         ref={mapRef}
-        initialViewState={{ longitude: -75, latitude: -10, zoom: 4 }} 
-        mapStyle="https://tiles.openfreemap.org/styles/bright"
+        style={{position:'absolute',zIndex:18}}
+        initialViewState={{ longitude: -75, latitude: -10, zoom: 4 }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={() => setShowPopup(false)}
         onMouseDown={(e: MapLayerMouseEvent) => {

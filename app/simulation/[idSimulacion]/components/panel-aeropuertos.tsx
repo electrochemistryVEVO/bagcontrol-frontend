@@ -26,6 +26,7 @@ import type { AeropuertoSimulacion } from '@/app/shared/types/Aeropuerto';
 import type { EstadoCapacidad } from '@/app/shared/types/Evento';
 import {AeropuertoEnvioBox, AeropuertosScrollList} from "./panel-aeropuertos-styled";
 import {number} from "prop-types";
+import styles from "../../../stylesheets/simpanel.module.css";
 
 type PanelAeropuertosProps = {
   aeropuertos: AeropuertoSimulacion[];
@@ -74,6 +75,7 @@ export function PanelAeropuertos({ aeropuertos, visible }: PanelAeropuertosProps
   const [tipoOrden,setTipoOrden] = useState<OrderingFuncs>('calcularOcupacion');
   const [aeropuertoExpandido, setAeropuertoExpandido] = useState<string | null>(null);
 
+
   const aeropuertosOrdenados = useMemo(() => {
     return [...aeropuertos]
         .filter((aeropuerto)=>{
@@ -96,71 +98,35 @@ export function PanelAeropuertos({ aeropuertos, visible }: PanelAeropuertosProps
   return (
     <Paper
       elevation={8}
-      sx={{
-        position: 'absolute',
-        top: 88,
-        right: 16,
-        zIndex: 20,
-        width: 430,
-        maxWidth: 'calc(100vw - 32px)',
-        maxHeight: '70vh',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        bgcolor: 'rgba(15, 23, 42, 0.94)',
-        color: '#f8fafc',
-        border: '1px solid rgba(148, 163, 184, 0.24)',
-      }}
+      className={styles.paper}
     >
       <Accordion
         expanded={panelAbierto}
         onChange={(_, expanded) => setPanelAbierto(expanded)}
         disableGutters
-        sx={{
-          bgcolor: 'transparent',
-          color: 'inherit',
-          display: 'flex',
-          flexDirection: 'column',
-          maxHeight: '70vh',
-          overflow: 'hidden',
-          '&:before': { display: 'none' },
-        }}
+        className={styles.accordion}
       >
         <AccordionSummary
-          sx={{
-            minHeight: 48,
-            '& .MuiAccordionSummary-content': {
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 2,
-            },
-          }}
+            className={styles.accordionSummary}
         >
           <Typography sx={{ fontWeight: 700 }}>Aeropuertos</Typography>
           <Chip size="small" label={aeropuertos.length} color={aeropuertos.length ? 'primary' : 'default'} />
         </AccordionSummary>
 
         <AccordionDetails
-          sx={{
-            pt: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            maxHeight: 'calc(70vh - 48px)',
-            minHeight: 0,
-            overflow: 'hidden',
-          }}
+            className={styles.accordionDetails}
         >
             {panelAbierto && (<>
-                <Stack spacing={1.5} sx={{ flexShrink: 0, pb: 1.5 }}>
+                <Stack spacing={1.5} className={styles.filtersContainer}>
                     <TextField
                         size="small"
                         value={busqueda}
                         onChange={(event) => setBusqueda(event.target.value)}
                         placeholder="Buscar por código IATA"
                         fullWidth
-                        sx={inputSx}
+                        className={styles.input}
                     />
-                    <FormControl size="small" fullWidth sx={inputSx}>
+                    <FormControl size="small" fullWidth className={styles.input}>
                         <InputLabel id="filtro-continente-label">Filtrar por continente</InputLabel>
                         <Select
                             labelId="filtro-continente-label"
@@ -175,8 +141,8 @@ export function PanelAeropuertos({ aeropuertos, visible }: PanelAeropuertosProps
                             <MenuItem value="africa">África</MenuItem>
                         </Select>
                     </FormControl>
-                    <Stack spacing={1.5} sx={{ flexShrink: 0, pb: 0.5 }} direction="row">
-                        <FormControl size="small" sx={inputSx}>
+                    <Stack spacing={1.5} className={styles.orderContainer} direction="row">
+                        <FormControl size="small" className={styles.input}>
                             <InputLabel id="orden-aeropuertos-label">Ordenar por</InputLabel>
                             <Select
                                 labelId="orden-aeropuertos-label"
@@ -193,12 +159,7 @@ export function PanelAeropuertos({ aeropuertos, visible }: PanelAeropuertosProps
                             variant="outlined"
                             size="small"
                             onClick={() => setDireccionOrden((actual) => (actual === 'asc' ? 'desc' : 'asc'))}
-                            sx={{
-                                color: '#e2e8f0',
-                                borderColor: 'rgba(148, 163, 184, 0.35)',
-                                textTransform: 'none',
-                                alignSelf: 'flex-start',
-                            }}
+                            className={styles.orderButton}
                         >
                             Orden {direccionOrden === 'asc' ? 'ascendente' : 'descendente'}
                         </Button>
@@ -206,16 +167,16 @@ export function PanelAeropuertos({ aeropuertos, visible }: PanelAeropuertosProps
                 </Stack>
 
                 {aeropuertosOrdenados.length === 0 ? (
-                    <Box sx={emptySx}>No hay aeropuertos disponibles</Box>
+                    <Box className={styles.empty}>No hay aeropuertos disponibles</Box>
                 ) : (
-                    <AeropuertosScrollList spacing={1}>
+                    <Stack spacing={1} className={styles.scrollList}>
                         {aeropuertosOrdenados.map((aeropuerto) => {
                             const ocupacion = calcularOcupacion(aeropuerto);
                             const enviosProximos = aeropuerto.enviosProximosAVencer || [];
                             const expandido = aeropuertoExpandido === aeropuerto.codigoIata;
 
                             return (
-                                <AeropuertoEnvioBox
+                                <Box className={styles.airportBoxList}
                                     key={aeropuerto.codigoIata}
                                 >
                                     <Button
@@ -223,17 +184,12 @@ export function PanelAeropuertos({ aeropuertos, visible }: PanelAeropuertosProps
                                         onClick={() => setAeropuertoExpandido((actual) => (
                                             actual === aeropuerto.codigoIata ? null : aeropuerto.codigoIata
                                         ))}
-                                        sx={{
-                                            justifyContent: 'stretch',
-                                            color: 'inherit',
-                                            textTransform: 'none',
-                                            p: 1.25,
-                                        }}
+                                        className={styles.airportButton}
                                     >
-                                        <Box sx={{ width: '100%', textAlign: 'left' }}>
-                                            <Stack sx={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-                                                <Typography sx={{ fontWeight: 700 }}>{aeropuerto.codigoIata}</Typography>
-                                                <Stack sx={{ flexDirection: 'row', gap: 0.75 }}>
+                                        <Box className={styles.airportContent}>
+                                            <Stack className={styles.airportHeader}>
+                                                <Typography className={styles.airportCode}>{aeropuerto.codigoIata}</Typography>
+                                                <Stack className={styles.airportChips}>
                                                     {enviosProximos.length > 0 && (
                                                         <Chip
                                                             size="small"
@@ -250,15 +206,15 @@ export function PanelAeropuertos({ aeropuertos, visible }: PanelAeropuertosProps
                                                 </Stack>
                                             </Stack>
 
-                                            <Typography variant="body2" sx={{ color: '#cbd5e1', mt: 0.5 }}>
+                                            <Typography variant="body2" className={styles.airportLocation}>
                                                 {aeropuerto.ciudad} - {aeropuerto.pais}
                                             </Typography>
 
-                                            <Stack sx={{ mt: 0.75, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                                <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                                            <Stack className={styles.airportFooter}>
+                                                <Typography variant="caption" className={styles.airportCapacity}>
                                                     {aeropuerto.maletasActuales}/{aeropuerto.capacidadAlmacen} maletas
                                                 </Typography>
-                                                <Typography variant="caption" sx={{ fontWeight: 700 }}>
+                                                <Typography variant="caption" className={styles.airportCode}>
                                                     {ocupacion}%
                                                 </Typography>
                                             </Stack>
@@ -266,11 +222,11 @@ export function PanelAeropuertos({ aeropuertos, visible }: PanelAeropuertosProps
                                     </Button>
 
                                     {expandido && (
-                                        <Box sx={{ px: 1.25, pb: 1.25 }}>
+                                        <Box className={styles.expandedContent}>
                                             {enviosProximos.length === 0 ? (
-                                                <Box sx={emptySx}>Sin envios proximos a vencer</Box>
+                                                <Box className={styles.empty}>Sin envios proximos a vencer</Box>
                                             ) : (
-                                                <Table size="small" sx={tableSx}>
+                                                <Table size="small" className={styles.table}>
                                                     <TableHead>
                                                         <TableRow>
                                                             <TableCell>ID</TableCell>
@@ -293,10 +249,10 @@ export function PanelAeropuertos({ aeropuertos, visible }: PanelAeropuertosProps
                                             )}
                                         </Box>
                                     )}
-                                </AeropuertoEnvioBox>
+                                </Box>
                             );
                         })}
-                    </AeropuertosScrollList>
+                    </Stack>
                 )}
             </>)}
         </AccordionDetails>
@@ -304,55 +260,3 @@ export function PanelAeropuertos({ aeropuertos, visible }: PanelAeropuertosProps
     </Paper>
   );
 }
-
-const emptySx = {
-  py: 2,
-  textAlign: 'center',
-  color: '#94a3b8',
-  fontSize: 13,
-};
-
-const tableSx = {
-  '& .MuiTableCell-root': {
-    color: '#e2e8f0',
-    borderColor: 'rgba(148, 163, 184, 0.18)',
-    px: 0.75,
-    py: 0.75,
-    fontSize: 12,
-  },
-  '& .MuiTableCell-head': {
-    color: '#93c5fd',
-    fontWeight: 700,
-  },
-};
-
-const inputSx = {
-    '& .MuiInputBase-root': {
-        color: '#f8fafc',
-        bgcolor: 'rgba(15, 23, 42, 0.72)',
-    },
-    '& .MuiInputLabel-root': { color: '#cbd5e1' },
-    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(148, 163, 184, 0.35)' },
-    '& .MuiSvgIcon-root': { color: '#cbd5e1' },
-};
-
-const scrollListSx = {
-  flex: 1,
-  minHeight: 0,
-  overflowY: 'auto',
-  pr: 0.5,
-  scrollbarWidth: 'thin',
-  scrollbarColor: '#64748b rgba(15, 23, 42, 0.45)',
-  '&::-webkit-scrollbar': {
-    width: 10,
-  },
-  '&::-webkit-scrollbar-track': {
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
-    borderRadius: 8,
-  },
-  '&::-webkit-scrollbar-thumb': {
-    backgroundColor: '#64748b',
-    borderRadius: 8,
-    border: '2px solid rgba(15, 23, 42, 0.45)',
-  },
-};
