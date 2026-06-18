@@ -9,6 +9,7 @@ const POR_PAGINA = 15
 
 export function GestionEnvios() {
   const [vista, setVista] = useState<'lista' | 'registro'>('lista')
+  const [envioEditando, setEnvioEditando] = useState<Envio | null>(null)
   const [csvAbierto, setCsvAbierto] = useState(false)
   const [envios, setEnvios] = useState<Envio[]>([])
   const [loading, setLoading] = useState(true)
@@ -31,7 +32,7 @@ export function GestionEnvios() {
     setLoading(true)
     setErrorMsg('')
     try {
-      const { data } = await EnvioService.listarEnviosPaginados(fechaInicio, 60, page, POR_PAGINA, filtrosActuales)
+      const { data } = await EnvioService.listarEnviosPaginados(fechaInicio, 90, page, POR_PAGINA, filtrosActuales)
       setEnvios(data.content)
       setTotalPaginas(data.totalPages || 1)
       setTotalElementos(data.totalElements)
@@ -44,6 +45,7 @@ export function GestionEnvios() {
   }, [fechaInicio])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     cargarEnvios(0)
   }, [cargarEnvios])
 
@@ -73,16 +75,39 @@ export function GestionEnvios() {
     cargarEnvios(nuevaPagina, filtros)
   }
 
+  const eliminarEnvio = async (envio: Envio) => {
+    if (!window.confirm(`¿Eliminar el envío ${envio.idPedido}?`)) return
+    setErrorMsg('')
+    try {
+      await EnvioService.eliminarEnvio(envio.idPedido)
+      await cargarEnvios(pagina, filtros)
+    } catch {
+      setErrorMsg(`No se pudo eliminar el envío ${envio.idPedido}.`)
+    }
+  }
+
   if (vista === 'registro') {
     return (
       <div>
         <button
-          onClick={() => { setVista('lista'); cargarEnvios(pagina, filtros) }}
+          onClick={() => { setVista('lista'); setEnvioEditando(null); cargarEnvios(pagina, filtros) }}
           style={{ padding: '8px 16px', marginBottom: 20, cursor: 'pointer', borderRadius: 8, border: '1px solid #ccc', color: '#111827' }}
         >
           ← Volver a la lista
         </button>
-        <RegistroEnvio onSuccess={() => { setVista('lista'); cargarEnvios(0, {}) }} />
+        <RegistroEnvio
+          envioInicial={envioEditando}
+          onCancel={() => { setVista('lista'); setEnvioEditando(null) }}
+          onSuccess={(envioGuardado) => {
+            const filtroGuardado = { q: envioGuardado.idPedido }
+            setVista('lista')
+            setEnvioEditando(null)
+            setPagina(0)
+            setFiltroBusqueda(envioGuardado.idPedido)
+            setFiltros(filtroGuardado)
+            cargarEnvios(0, filtroGuardado)
+          }}
+        />
       </div>
     )
   }
@@ -96,7 +121,7 @@ export function GestionEnvios() {
         <div>
           <h2 style={{ fontSize: 22, fontWeight: 700, color: '#000000', margin: 0 }}>Gestión de equipajes</h2>
           <p style={{ fontSize: 13, color: '#000000', marginTop: 4 }}>
-            Envíos de los últimos 60 días
+            Envíos del rango operativo de 90 días
             {!loading && <span style={{ marginLeft: 8 }}>({totalElementos.toLocaleString()} registros)</span>}
           </p>
         </div>
@@ -111,7 +136,7 @@ export function GestionEnvios() {
             ⬆ Cargar CSV
           </button>
           <button
-            onClick={() => setVista('registro')}
+            onClick={() => { setEnvioEditando(null); setVista('registro') }}
             style={{
               padding: '10px 20px', borderRadius: 8, border: 'none',
               background: '#1e293b', color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer',
@@ -217,7 +242,7 @@ export function GestionEnvios() {
         <table style={{ width: '100%', borderCollapse: 'collapse' as const, fontSize: 13 }}>
           <thead>
             <tr style={{ background: '#f8fafc' }}>
-              {['Código', 'Origen', 'Destino', 'Hora de registro', 'Maletas', 'Cliente'].map(col => (
+              {['Código', 'Origen', 'Destino', 'Hora de registro', 'Maletas', 'Cliente', 'Acciones'].map(col => (
                 <th key={col} style={{ textAlign: 'left' as const, padding: '10px 14px', borderBottom: '1px solid #e2e8f0', fontWeight: 700, color: '#000000', fontSize: 12 }}>
                   {col}
                 </th>
@@ -226,9 +251,9 @@ export function GestionEnvios() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center' as const, color: '#374151' }}>Cargando envíos…</td></tr>
+              <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center' as const, color: '#374151' }}>Cargando envíos…</td></tr>
             ) : envios.length === 0 ? (
-              <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center' as const, color: '#374151' }}>
+              <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center' as const, color: '#374151' }}>
                 {hayFiltros ? 'No hay envíos que coincidan con los filtros' : 'No hay envíos registrados en este período'}
               </td></tr>
             ) : envios.map((e, i) => (
@@ -241,6 +266,20 @@ export function GestionEnvios() {
                 </td>
                 <td style={{ padding: '10px 14px', borderBottom: '1px solid #f1f5f9', color: '#000' }}>{e.cantidadMaletas}</td>
                 <td style={{ padding: '10px 14px', borderBottom: '1px solid #f1f5f9', color: '#000' }}>{e.idCliente}</td>
+                <td style={{ padding: '10px 14px', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
+                  <button
+                    onClick={() => { setEnvioEditando(e); setVista('registro') }}
+                    style={{ ...actionButtonStyle, color: '#1d4ed8', background: '#eff6ff' }}
+                  >
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => eliminarEnvio(e)}
+                    style={{ ...actionButtonStyle, color: '#b91c1c', background: '#fef2f2', marginLeft: 6 }}
+                  >
+                    Eliminar
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -300,6 +339,15 @@ function paginaActual(actual: number, total: number): (number | '...')[] {
 const inputStyle: React.CSSProperties = {
   padding: '7px 10px', borderRadius: 6, border: '1px solid #d1d5db',
   fontSize: 13, color: '#111827', outline: 'none', background: '#fff',
+}
+
+const actionButtonStyle: React.CSSProperties = {
+  padding: '5px 9px',
+  border: 'none',
+  borderRadius: 6,
+  cursor: 'pointer',
+  fontSize: 12,
+  fontWeight: 600,
 }
 
 function pagBtnStyle(disabled: boolean): React.CSSProperties {

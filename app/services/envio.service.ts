@@ -1,4 +1,5 @@
 import axiosApi, { axiosSimulacion } from './config/axios'
+import { Envio } from '@/app/shared/types/Envio'
 
 export type NuevoEnvioDTO = {
   origenIata: string
@@ -30,7 +31,13 @@ export type PageResponse<T> = {
 
 export const EnvioService = {
   registrarEnvio: (data: NuevoEnvioDTO) =>
-    axiosApi.post('/envios', data),
+    axiosApi.post<Envio>('/envios', data),
+
+  actualizarEnvio: (idPedido: string, data: NuevoEnvioDTO) =>
+    axiosApi.put<Envio>(`/envios/${encodeURIComponent(idPedido)}`, data),
+
+  eliminarEnvio: (idPedido: string) =>
+    axiosApi.delete(`/envios/${encodeURIComponent(idPedido)}`),
 
   listarEnviosVentana: (inicio: string, fin: string) =>
     axiosApi.get('/envios/ventana', { params: { inicio, fin } }),
@@ -52,7 +59,7 @@ export const EnvioService = {
     if (filtros?.q) params.q = filtros.q
     if (filtros?.maletasMin != null) params.maletasMin = filtros.maletasMin
     if (filtros?.maletasMax != null) params.maletasMax = filtros.maletasMax
-    return axiosSimulacion.get<PageResponse<any>>('/envios/paginados', { params })
+    return axiosSimulacion.get<PageResponse<Envio>>('/envios/paginados', { params })
   },
 
   cargarCsv: (archivo: File) => {

@@ -3,18 +3,31 @@ import { useState, useEffect } from 'react'
 import { AeropuertoService } from '@/app/services/aeropuerto.service'
 import { EnvioService, NuevoEnvioDTO } from '@/app/services/envio.service'
 import { Aeropuerto } from '@/app/shared/types/Aeropuerto'
+import { Envio } from '@/app/shared/types/Envio'
 
-type Props = { onSuccess?: () => void }
+type Props = {
+  envioInicial?: Envio | null
+  onSuccess?: (envio: Envio) => void
+  onCancel?: () => void
+}
 
-export function RegistroEnvio({ onSuccess }: Props) {
+const formularioVacio = {
+  origenIata: '',
+  destinoIata: '',
+  idCliente: '',
+  cantidadMaletas: 1,
+  fechaHora: '',
+}
+
+export function RegistroEnvio({ envioInicial, onSuccess, onCancel }: Props) {
   const [aeropuertos, setAeropuertos] = useState<Aeropuerto[]>([])
-  const [form, setForm] = useState({
-    origenIata: '',
-    destinoIata: '',
-    idCliente: '',
-    cantidadMaletas: 1,
-    fechaHora: '',
-  })
+  const [form, setForm] = useState(() => envioInicial ? {
+    origenIata: envioInicial.origenIata,
+    destinoIata: envioInicial.destinoIata,
+    idCliente: envioInicial.idCliente,
+    cantidadMaletas: envioInicial.cantidadMaletas,
+    fechaHora: toDateTimeLocal(envioInicial.fechaHora),
+  } : formularioVacio)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [exito, setExito] = useState(false)
@@ -48,10 +61,12 @@ export function RegistroEnvio({ onSuccess }: Props) {
         cantidadMaletas: form.cantidadMaletas,
         fechaHora: new Date(form.fechaHora).toISOString(),
       }
-      await EnvioService.registrarEnvio(payload)
+      const respuesta = envioInicial
+        ? await EnvioService.actualizarEnvio(envioInicial.idPedido, payload)
+        : await EnvioService.registrarEnvio(payload)
       setExito(true)
-      setForm({ origenIata: '', destinoIata: '', idCliente: '', cantidadMaletas: 1, fechaHora: '' })
-      onSuccess?.()
+      setForm(formularioVacio)
+      onSuccess?.(respuesta.data)
       setTimeout(() => setExito(false), 3000)
     } catch {
       setError('Error al registrar el envío. Verifica que el servidor esté activo.')
@@ -64,8 +79,10 @@ export function RegistroEnvio({ onSuccess }: Props) {
 
   return (
     <div>
-      <h2 style={S.pageTitle}>Registro de equipaje</h2>
-      <p style={S.pageSubtitle}>Registra un nuevo envío de maletas en el sistema</p>
+      <h2 style={S.pageTitle}>{envioInicial ? 'Editar equipaje' : 'Registro de equipaje'}</h2>
+      <p style={S.pageSubtitle}>
+        {envioInicial ? `Actualiza el envío ${envioInicial.idPedido}` : 'Registra un nuevo envío de maletas en el sistema'}
+      </p>
 
       <div style={S.card}>
         <div style={S.grid2}>
@@ -122,23 +139,29 @@ export function RegistroEnvio({ onSuccess }: Props) {
         </div>
 
         {error && <div style={S.alertError}>{error}</div>}
-        {exito && <div style={S.alertSuccess}>✓ Envío registrado exitosamente</div>}
+        {exito && <div style={S.alertSuccess}>✓ Envío guardado exitosamente</div>}
 
         <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
           <button onClick={handleSubmit} disabled={loading} style={{
             ...S.btnPrimary, background: loading ? '#94a3b8' : '#1e293b',
             cursor: loading ? 'not-allowed' : 'pointer',
           }}>
-            {loading ? 'Registrando...' : 'Registrar envío'}
+            {loading ? 'Guardando...' : envioInicial ? 'Guardar cambios' : 'Registrar envío'}
           </button>
-          <button onClick={() => setForm({ origenIata: '', destinoIata: '', idCliente: '', cantidadMaletas: 1, fechaHora: '' })}
+          <button onClick={() => envioInicial ? onCancel?.() : setForm(formularioVacio)}
             style={S.btnSecondary}>
-            Limpiar
+            {envioInicial ? 'Cancelar' : 'Limpiar'}
           </button>
         </div>
       </div>
     </div>
   )
+}
+
+function toDateTimeLocal(fechaHora: string): string {
+  const fecha = new Date(fechaHora)
+  const offsetMs = fecha.getTimezoneOffset() * 60_000
+  return new Date(fecha.getTime() - offsetMs).toISOString().slice(0, 16)
 }
 
 // ─── Shared styles object ────────────────────────────────────────────────────
