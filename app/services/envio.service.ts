@@ -54,4 +54,13 @@ export const EnvioService = {
     if (filtros?.maletasMax != null) params.maletasMax = filtros.maletasMax
     return axiosSimulacion.get<PageResponse<any>>('/envios/paginados', { params })
   },
+
+  cargarCsv: (archivo: File) => {
+    const fd = new FormData()
+    fd.append('archivo', archivo)
+    return axiosApi.post<{ insertados: number; errores: string[]; totalFilas: number }>(
+      '/envios/cargar-csv', fd,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    )
+  },
 }

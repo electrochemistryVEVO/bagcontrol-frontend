@@ -33,10 +33,10 @@ export default function ManagementPage() {
         display: 'flex', flexDirection: 'column', padding: '20px 0', flexShrink: 0,
       }}>
         <div style={{ padding: '0 20px 16px', borderBottom: '1px solid #f1f5f9' }}>
-          <p style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: 1, textTransform: 'uppercase' }}>
+          <p style={{ fontSize: 11, fontWeight: 700, color: '#000000', letterSpacing: 1, textTransform: 'uppercase' }}>
             Gestión de entidades
           </p>
-          <p style={{ fontSize: 11, color: '#cbd5e1', marginTop: 2 }}>operativas</p>
+          <p style={{ fontSize: 11, color: '#000000', marginTop: 2 }}>operativas</p>
         </div>
 
         <nav style={{ flex: 1, padding: '12px 0' }}>
@@ -45,8 +45,8 @@ export default function ManagementPage() {
             <button key={item.id} onClick={() => setSeccion(item.id)} style={{
               ...navItemStyle,
               background: seccion === item.id ? '#f1f5f9' : 'transparent',
-              color:      seccion === item.id ? '#0f172a'  : '#475569',
-              fontWeight: seccion === item.id ? 600 : 400,
+              color: '#000000',
+              fontWeight: seccion === item.id ? 700 : 500,
             }}>
               <span style={{ fontSize: 15 }}>{item.icon}</span>
               {item.label}
@@ -59,8 +59,8 @@ export default function ManagementPage() {
               ...navItemStyle,
               paddingLeft: 32,
               background: seccion === item.id ? '#f1f5f9' : 'transparent',
-              color:      seccion === item.id ? '#0f172a'  : '#475569',
-              fontWeight: seccion === item.id ? 600 : 400,
+              color: '#000000',
+              fontWeight: seccion === item.id ? 700 : 500,
             }}>
               <span style={{ fontSize: 14 }}>{item.icon}</span>
               {item.label}
@@ -91,10 +91,10 @@ function LandingGestion({ onSeleccionar }: { onSeleccionar: (s: Exclude<Seccion,
   ]
   return (
     <div>
-      <h2 style={{ fontSize: 22, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>
+      <h2 style={{ fontSize: 22, fontWeight: 700, color: '#000000', marginBottom: 6 }}>
         Gestión de entidades
       </h2>
-      <p style={{ fontSize: 14, color: '#64748b', marginBottom: 36 }}>
+      <p style={{ fontSize: 14, color: '#000000', marginBottom: 36 }}>
         Selecciona una sección en el menú lateral o haz clic en una tarjeta para comenzar.
       </p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 20, maxWidth: 720 }}>
@@ -112,8 +112,8 @@ function LandingGestion({ onSeleccionar }: { onSeleccionar: (s: Exclude<Seccion,
           >
             <span style={{ fontSize: 32 }}>{c.icon}</span>
             <div>
-              <p style={{ fontWeight: 700, fontSize: 15, color: '#0f172a', marginBottom: 4 }}>{c.title}</p>
-              <p style={{ fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>{c.desc}</p>
+              <p style={{ fontWeight: 700, fontSize: 15, color: '#000000', marginBottom: 4 }}>{c.title}</p>
+              <p style={{ fontSize: 13, color: '#000000', lineHeight: 1.5 }}>{c.desc}</p>
             </div>
           </button>
         ))}
@@ -124,7 +124,7 @@ function LandingGestion({ onSeleccionar }: { onSeleccionar: (s: Exclude<Seccion,
 
 // ─── Estilos locales ──────────────────────────────────────────────────────────
 const groupLabelStyle: React.CSSProperties = {
-  fontSize: 11, fontWeight: 600, color: '#94a3b8',
+  fontSize: 11, fontWeight: 700, color: '#000000',
   letterSpacing: 0.5, textTransform: 'uppercase',
   padding: '6px 20px 4px',
 }

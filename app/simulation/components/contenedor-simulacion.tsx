@@ -9,6 +9,7 @@ import { useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { useToast } from '@/app/shared/hooks/useToast';
+import { MAP_STYLE_URL } from '@/app/services/config/constants';
 
 enum SimulationType {
     TIEMPO_REAL,
@@ -75,7 +76,7 @@ export function ContenedorSimulacion() {
         <div className={styles.mapContainer}>
             <Map
                 initialViewState={{ longitude: 0, latitude: 0, zoom: 3.5 }}
-                mapStyle="https://demotiles.maplibre.org/style.json"
+                mapStyle={MAP_STYLE_URL}
                 interactiveLayerIds={['point']}
             />            
                 

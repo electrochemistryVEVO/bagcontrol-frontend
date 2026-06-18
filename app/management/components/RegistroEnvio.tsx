@@ -144,14 +144,14 @@ export function RegistroEnvio({ onSuccess }: Props) {
 // ─── Shared styles object ────────────────────────────────────────────────────
 export const styles = {
   pageTitle: { fontSize: 22, fontWeight: 700, color: '#0f172a', marginBottom: 4 } as React.CSSProperties,
-  pageSubtitle: { fontSize: 13, color: '#64748b', marginBottom: 28 } as React.CSSProperties,
+  pageSubtitle: { fontSize: 13, color: '#000000', marginBottom: 28 } as React.CSSProperties,
   card: {
     background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12,
     padding: 28, maxWidth: 820,
   } as React.CSSProperties,
   grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 } as React.CSSProperties,
-  label: { display: 'block', fontWeight: 600, fontSize: 13, color: '#374151', marginBottom: 6 } as React.CSSProperties,
-  hint: { fontSize: 12, color: '#94a3b8', marginTop: 6 } as React.CSSProperties,
+  label: { display: 'block', fontWeight: 600, fontSize: 13, color: '#000000', marginBottom: 6 } as React.CSSProperties,
+  hint: { fontSize: 12, color: '#000000', marginTop: 6 } as React.CSSProperties,
   select: {
     width: '100%', padding: '10px 14px', borderRadius: 8,
     border: '1px solid #e2e8f0', fontSize: 14, background: '#fff',
@@ -190,9 +190,9 @@ export const styles = {
   table: { width: '100%', borderCollapse: 'collapse' as const, fontSize: 13 } as React.CSSProperties,
   th: {
     textAlign: 'left' as const, padding: '10px 12px', background: '#f8fafc',
-    borderBottom: '1px solid #e2e8f0', fontWeight: 600, color: '#374151', fontSize: 12,
+    borderBottom: '1px solid #e2e8f0', fontWeight: 700, color: '#000000', fontSize: 12,
   } as React.CSSProperties,
   td: {
-    padding: '10px 12px', borderBottom: '1px solid #f1f5f9', color: '#1e293b',
+    padding: '10px 12px', borderBottom: '1px solid #f1f5f9', color: '#000000', fontWeight: 500,
   } as React.CSSProperties,
 }

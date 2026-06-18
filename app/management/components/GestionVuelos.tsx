@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { VueloService, VueloDTO } from '@/app/services/vuelo.service'
+import { CargaCsvModal } from './CargaCsvModal'
 import { styles as S } from './RegistroEnvio'
 
 const VACIO: VueloDTO = {
@@ -18,6 +19,7 @@ export function GestionVuelos() {
   const [error, setError] = useState<string | null>(null)
   const [exito, setExito] = useState<string | null>(null)
   const [pagina, setPagina] = useState(1)
+  const [csvAbierto, setCsvAbierto] = useState(false)
 
   const cargar = () =>
     VueloService.listarVuelos()
@@ -117,8 +119,22 @@ export function GestionVuelos() {
           <h2 style={S.pageTitle}>Gestión de vuelos</h2>
           <p style={S.pageSubtitle}>Administra los planes de vuelo y sus capacidades</p>
         </div>
-        <button onClick={abrirCrear} style={S.btnPrimary}>Registrar Vuelo</button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={() => setCsvAbierto(true)} style={S.btnSecondary}>⬆ Cargar CSV</button>
+          <button onClick={abrirCrear} style={S.btnPrimary}>Registrar Vuelo</button>
+        </div>
       </div>
+
+      {csvAbierto && (
+        <CargaCsvModal
+          titulo="Cargar vuelos desde CSV"
+          formato="ORIGEN-DESTINO-HH:MM-HH:MM-CAPACIDAD"
+          ejemplo="SPIM-SBBR-10:30-22:45-150"
+          onCargar={VueloService.cargarCsv}
+          onCerrar={() => setCsvAbierto(false)}
+          onExito={() => { setCsvAbierto(false); cargar() }}
+        />
+      )}
 
       {exito && <div style={{ ...S.alertSuccess, marginBottom: 16 }}>{exito}</div>}
       {error && !modo && <div style={{ ...S.alertError, marginBottom: 16 }}>{error}</div>}
@@ -140,7 +156,7 @@ export function GestionVuelos() {
             )}
             {filas.map(v => (
               <tr key={v.codigo}>
-                <td style={{ ...S.td, fontWeight: 700, color: '#64748b' }}>{v.codigo}</td>
+                <td style={{ ...S.td, fontWeight: 700, color: '#111827' }}>{v.codigo}</td>
                 <td style={{ ...S.td, fontWeight: 600 }}>{v.origenIata}</td>
                 <td style={{ ...S.td, fontWeight: 600 }}>{v.destinoIata}</td>
                 <td style={S.td}>{v.horaSalida}</td>
@@ -180,7 +196,7 @@ export function GestionVuelos() {
             disabled={pagina === 1}
             style={{ padding: '6px 16px', borderRadius: 8, border: '1px solid #e2e8f0', cursor: 'pointer', color: '#111827' }}
           >‹</button>
-          <span style={{ fontSize: 13, color: '#64748b' }}>Página {pagina} de {totalPaginas}</span>
+          <span style={{ fontSize: 13, color: '#111827' }}>Página {pagina} de {totalPaginas}</span>
           <button
             onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))}
             disabled={pagina === totalPaginas}
