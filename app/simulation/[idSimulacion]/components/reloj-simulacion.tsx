@@ -17,7 +17,7 @@ export function RelojSimulacionOverlay({
 
   useEffect(() => {
     const timer = setInterval(() => {
-      if (tiempoRef.current) {
+      if (tiempoRef.current != null && !isNaN(tiempoRef.current)) {
         const d = new Date(tiempoRef.current);
         setHora(d.toLocaleString('es-PE', { timeZone: 'UTC' }));
       }
@@ -47,7 +47,7 @@ export function RelojSimulacionOverlay({
       fontSize: '1.2rem',
       fontWeight: 'bold',
       border: '1px solid rgba(56, 189, 248, 0.3)',
-      zIndex: 10,
+      zIndex: 20,
       pointerEvents: 'none',
       boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
     }}>
