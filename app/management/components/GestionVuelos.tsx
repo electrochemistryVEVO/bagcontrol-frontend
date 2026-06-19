@@ -1,11 +1,13 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { VueloService, VueloDTO } from '@/app/services/vuelo.service'
+import axios from 'axios'
+import { VueloService, VueloDTO, VueloPayload } from '@/app/services/vuelo.service'
 import { CargaCsvModal } from './CargaCsvModal'
 import { styles as S } from './RegistroEnvio'
 
 const VACIO: VueloDTO = {
   origenIata: '', destinoIata: '', horaSalida: '00:00', horaLlegada: '00:00', capacidadMax: 0,
+  estaCancelado: false,
 }
 
 const POR_PAGINA = 15
@@ -21,10 +23,36 @@ export function GestionVuelos() {
   const [pagina, setPagina] = useState(1)
   const [csvAbierto, setCsvAbierto] = useState(false)
 
-  const cargar = () =>
-    VueloService.listarVuelos()
-      .then(({ data }) => { setVuelos(data); setPagina(1) })
-      .catch(() => setError('No se pudieron cargar los vuelos'))
+  const registrarError = (contexto: string, error: unknown) => {
+    console.error(`[VUELO-FRONT] ${contexto} - error completo`, error)
+    console.error(
+      `[VUELO-FRONT] ${contexto} - response data`,
+      axios.isAxiosError(error) ? error.response?.data : undefined,
+    )
+    console.error(
+      `[VUELO-FRONT] ${contexto} - status`,
+      axios.isAxiosError(error) ? error.response?.status : undefined,
+    )
+    console.error(
+      `[VUELO-FRONT] ${contexto} - message`,
+      error instanceof Error ? error.message : String(error),
+    )
+  }
+
+  const cargar = async (mostrarError = true): Promise<boolean> => {
+    console.log('[VUELO-FRONT] recargando vuelos')
+    try {
+      const vuelosRecibidos = await VueloService.listarVuelos()
+      console.log('[VUELO-FRONT] respuesta listar', vuelosRecibidos)
+      setVuelos(vuelosRecibidos)
+      setPagina(1)
+      return true
+    } catch (error) {
+      registrarError('listar vuelos', error)
+      if (mostrarError) setError('No se pudieron cargar los vuelos')
+      return false
+    }
+  }
 
   useEffect(() => { cargar() }, [])
 
@@ -53,22 +81,46 @@ export function GestionVuelos() {
       setError('La capacidad debe ser al menos 1')
       return
     }
+    const payload: VueloPayload = {
+      origenIata: form.origenIata.trim().toUpperCase(),
+      destinoIata: form.destinoIata.trim().toUpperCase(),
+      horaSalida: form.horaSalida.slice(0, 5),
+      horaLlegada: form.horaLlegada.slice(0, 5),
+      capacidadMax: Number(form.capacidadMax),
+      estaCancelado: modo === 'crear' ? false : form.estaCancelado,
+    }
+
+    console.log('[VUELO-FRONT] payload enviado', payload)
     setLoading(true)
+    let vueloGuardado: VueloDTO
     try {
       if (modo === 'crear') {
-        await VueloService.crearVuelo(form)
+        vueloGuardado = await VueloService.crearVuelo(payload)
+        setVuelos(actuales => [vueloGuardado, ...actuales])
         flash('Vuelo creado exitosamente')
       } else if (modo === 'editar' && editandoId !== null) {
-        await VueloService.actualizarVuelo(editandoId, form)
+        vueloGuardado = await VueloService.actualizarVuelo(editandoId, payload)
+        setVuelos(actuales =>
+          actuales.map(vuelo => vuelo.codigo === editandoId ? vueloGuardado : vuelo),
+        )
         flash('Vuelo actualizado exitosamente')
+      } else {
+        throw new Error('No se pudo determinar la operación de guardado')
       }
+      console.log('[VUELO-FRONT] respuesta guardar', vueloGuardado)
       cerrar()
-      cargar()
-    } catch {
+    } catch (error) {
+      registrarError('guardar vuelo', error)
       setError('Error al guardar. Verifica los datos e intenta nuevamente.')
-    } finally {
       setLoading(false)
+      return
     }
+
+    const recargaExitosa = await cargar(false)
+    if (!recargaExitosa) {
+      setError('Vuelo guardado, pero no se pudo refrescar la lista.')
+    }
+    setLoading(false)
   }
 
   const cancelar = async (id: number) => {
