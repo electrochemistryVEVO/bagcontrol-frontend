@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import axios from 'axios'
 import { AeropuertoService, NuevoAeropuertoDTO, ActualizarAeropuertoDTO } from '@/app/services/aeropuerto.service'
 import { CargaCsvModal } from './CargaCsvModal'
 import { Aeropuerto } from '@/app/shared/types/Aeropuerto'
@@ -25,10 +26,18 @@ export function GestionAeropuertos() {
   const [pagina, setPagina] = useState(1)
   const [csvAbierto, setCsvAbierto] = useState(false)
 
-  const cargar = () =>
-    AeropuertoService.listarAeropuertos()
-      .then(({ data }) => { setAeropuertos(data); setPagina(1) })
-      .catch(() => setError('No se pudieron cargar los aeropuertos'))
+  const cargar = async (mostrarError = true): Promise<boolean> => {
+    try {
+      const { data: aeropuertosRecibidos } = await AeropuertoService.listarAeropuertos()
+      setAeropuertos(aeropuertosRecibidos)
+      setPagina(1)
+      return true
+    } catch (error) {
+      console.error('[AEROPUERTO-FRONT] error al listar', error)
+      if (mostrarError) setError('No se pudieron cargar los aeropuertos')
+      return false
+    }
+  }
 
   useEffect(() => { cargar() }, [])
 
@@ -54,9 +63,21 @@ export function GestionAeropuertos() {
       return
     }
     setLoading(true)
+    let aeropuertoGuardado: Aeropuerto
     try {
       if (modo === 'crear') {
-        await AeropuertoService.crearAeropuerto(form)
+        const payload: NuevoAeropuertoDTO = {
+          codigoIata: form.codigoIata.trim().toUpperCase(),
+          ciudad: form.ciudad.trim(),
+          pais: form.pais.trim(),
+          continente: form.continente.trim(),
+          gmt: Number(form.gmt),
+          capacidadAlmacen: Number(form.capacidadAlmacen),
+          latitud: Number(form.latitud),
+          longitud: Number(form.longitud),
+        }
+        aeropuertoGuardado = await AeropuertoService.crearAeropuerto(payload)
+        setAeropuertos(actuales => [aeropuertoGuardado, ...actuales])
         flash('Aeropuerto creado exitosamente')
       } else if (modo === 'editar' && editandoIata) {
         const datos: ActualizarAeropuertoDTO = {
@@ -68,16 +89,30 @@ export function GestionAeropuertos() {
           latitud: form.latitud,
           longitud: form.longitud,
         }
-        await AeropuertoService.actualizarAeropuerto(editandoIata, datos)
+        aeropuertoGuardado = await AeropuertoService.actualizarAeropuerto(editandoIata, datos)
+        setAeropuertos(actuales =>
+          actuales.map(a => a.codigoIata === editandoIata ? aeropuertoGuardado : a),
+        )
         flash('Aeropuerto actualizado exitosamente')
+      } else {
+        throw new Error('No se pudo determinar la operación de guardado')
       }
       cerrar()
-      cargar()
-    } catch {
-      setError('Error al guardar. Verifica los datos e intenta nuevamente.')
-    } finally {
+    } catch (error) {
+      console.error('[AEROPUERTO-FRONT] error al guardar', error)
+      const mensajeBackend = axios.isAxiosError(error)
+        ? error.response?.data?.error
+        : undefined
+      setError(mensajeBackend || 'Error al guardar. Verifica los datos e intenta nuevamente.')
       setLoading(false)
+      return
     }
+
+    const recargaExitosa = await cargar(false)
+    if (!recargaExitosa) {
+      setError('Aeropuerto guardado, pero no se pudo refrescar la lista.')
+    }
+    setLoading(false)
   }
 
   const eliminar = async (iata: string) => {
