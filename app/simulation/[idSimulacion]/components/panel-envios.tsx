@@ -34,7 +34,8 @@ type PanelAeropuertosProps = {
 type PanelEnviosProps = {
     aeropuertos: AeropuertoSimulacion[],
     envios : Envio[],
-    visible: boolean
+    visible: boolean,
+    onMostrarRutaEnvio: (idPedido: string) => void,
 }
 
 type Continente = 'america' | 'asia' | 'europa' | 'oceania' | 'africa';
@@ -48,7 +49,7 @@ function calcularOcupacion(aeropuerto: AeropuertoSimulacion) {
     if (!aeropuerto.capacidadAlmacen) return 0;
     return Math.round((aeropuerto.maletasActuales / aeropuerto.capacidadAlmacen) * 100);
 }
-export function PanelEnvios({ aeropuertos,envios, visible }: PanelEnviosProps) {
+export function PanelEnvios({ aeropuertos,envios, visible, onMostrarRutaEnvio }: PanelEnviosProps) {
     const [panelAbierto, setPanelAbierto] = useState(false);
     //const [direccionOrden, setDireccionOrden] = useState<DireccionOrden>('desc');
     const [busquedaOrigen, setBusquedaOrigen] = useState('');
@@ -200,7 +201,11 @@ export function PanelEnvios({ aeropuertos,envios, visible }: PanelEnviosProps) {
                                             {enviosFiltrados
                                                 .slice(page*rowsPerPage,(page+1)*rowsPerPage)
                                                 .map((envio) => (
-                                                    <TableRow key={envio.idPedido}>
+                                                    <TableRow
+                                                        key={envio.idPedido}
+                                                        onClick={() => onMostrarRutaEnvio(envio.idPedido)}
+                                                        sx={clickableRowSx}
+                                                    >
                                                         <TableCell>{envio.idPedido}</TableCell>
                                                         <TableCell>{envio.origenIata}</TableCell>
                                                         <TableCell>{envio.destinoIata}</TableCell>
@@ -245,6 +250,13 @@ const tableSx = {
     '& .MuiTableCell-head': {
         color: '#93c5fd',
         fontWeight: 700,
+    },
+};
+
+const clickableRowSx = {
+    cursor: 'pointer',
+    '&:hover': {
+        backgroundColor: 'rgba(56, 189, 248, 0.12)',
     },
 };
 

@@ -38,7 +38,7 @@ export function useSimulacion(
     Object.fromEntries(
       aeropuertosIniciales.map(a => [
         a.codigoIata?.trim().toUpperCase(),
-        { ...a, maletasActuales: 0, porcentajeOcupacion: 0, estadoCapacidad: 'VERDE', enviosProximosAVencer: [] }
+        { ...a, maletasActuales: 0, porcentajeOcupacion: 0, estadoCapacidad: 'VERDE', enviosProximosAVencer: [], tieneDatos: false }
       ])
     )
   );
@@ -257,6 +257,7 @@ export function useSimulacion(
             aeropuertosSimulacion.current[codigo].porcentajeOcupacion = evAero.porcentajeOcupacion;
             aeropuertosSimulacion.current[codigo].estadoCapacidad     = evAero.estadoCapacidad;
             aeropuertosSimulacion.current[codigo].enviosProximosAVencer = evAero.enviosProximosAVencer || [];
+            aeropuertosSimulacion.current[codigo].tieneDatos = true;
           }
         }
         procesados++;

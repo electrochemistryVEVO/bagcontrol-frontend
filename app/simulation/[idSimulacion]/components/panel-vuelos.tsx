@@ -37,6 +37,7 @@ type PanelVuelosProps = {
   vuelosActivos: EventoVuelo[];
   tiempoSimulacionRef: RefObject<number>;
   visible: boolean;
+  onEnfocarVuelo: (codigoVuelo: string | number) => void;
 };
 
 type EnviosPorVuelo = Record<string, Envio[]>;
@@ -46,6 +47,14 @@ const colorPorEstado: Record<EstadoCapacidad, 'success' | 'warning' | 'error'> =
   VERDE: 'success',
   AMARILLO: 'warning',
   ROJO: 'error',
+};
+
+const ESTADOS_CAPACIDAD: EstadoCapacidad[] = ['VERDE', 'AMARILLO', 'ROJO'];
+
+const etiquetaPorEstado: Record<EstadoCapacidad, string> = {
+  VERDE: 'Verde',
+  AMARILLO: 'Amarillo',
+  ROJO: 'Rojo',
 };
 
 function calcularOcupacionPorMaletas(cantidadMaletas: number, capacidadMax: number) {
@@ -72,10 +81,11 @@ function compararTexto(a: string, b: string) {
   return a.localeCompare(b, 'es', { sensitivity: 'base' });
 }
 
-export function PanelVuelos({ idSimulacion, vuelosActivos, tiempoSimulacionRef, visible }: PanelVuelosProps) {
+export function PanelVuelos({ idSimulacion, vuelosActivos, tiempoSimulacionRef, visible, onEnfocarVuelo }: PanelVuelosProps) {
   const [panelAbierto, setPanelAbierto] = useState(false);
   const [busqueda, setBusqueda] = useState('');
   const [orden, setOrden] = useState<OrdenVuelos>('ocupacion');
+  const [filtroEstados, setFiltroEstados] = useState<EstadoCapacidad[]>(ESTADOS_CAPACIDAD);
   const [vueloExpandido, setVueloExpandido] = useState<string | null>(null);
   const [enviosPorVuelo, setEnviosPorVuelo] = useState<EnviosPorVuelo>({});
   const [loadingPorVuelo, setLoadingPorVuelo] = useState<LoadingPorVuelo>({});
@@ -90,12 +100,13 @@ export function PanelVuelos({ idSimulacion, vuelosActivos, tiempoSimulacionRef, 
 
     return [...vuelosActivos]
       .filter((vuelo) => {
-        if (!filtro) return true;
-        return [
+        const coincideTexto = !filtro || [
           String(vuelo.codigoVuelo),
           vuelo.origenIata,
           vuelo.destinoIata,
         ].some((valor) => valor.toLowerCase().includes(filtro));
+        const coincideEstado = filtroEstados.includes(obtenerEstadoVuelo(vuelo));
+        return coincideTexto && coincideEstado;
       })
       .sort((a, b) => {
         switch (orden) {
@@ -112,12 +123,23 @@ export function PanelVuelos({ idSimulacion, vuelosActivos, tiempoSimulacionRef, 
             return calcularOcupacion(b) - calcularOcupacion(a);
         }
       });
-  }, [busqueda, orden, vuelosActivos]);
+  }, [busqueda, orden, filtroEstados, vuelosActivos]);
+
+  const toggleFiltroEstado = (estado: EstadoCapacidad) => {
+    setFiltroEstados((actual) =>
+      actual.includes(estado) ? actual.filter((e) => e !== estado) : [...actual, estado]
+    );
+  };
 
   if (!visible) return null;
 
   const cargarEnvios = async (vuelo: EventoVuelo) => {
     const codigoVuelo = String(vuelo.codigoVuelo);
+
+    // Enfocamos el mapa en el vuelo cada vez que se hace clic en la fila,
+    // independientemente de si se expande o colapsa el detalle de envios.
+    onEnfocarVuelo(vuelo.codigoVuelo);
+
     const estaExpandido = vueloExpandido === codigoVuelo;
 
     if (estaExpandido) {
@@ -225,6 +247,23 @@ export function PanelVuelos({ idSimulacion, vuelosActivos, tiempoSimulacionRef, 
                         </MenuItem>
                       </Select>
                     </FormControl>
+
+                    <Stack direction="row" spacing={1}>
+                      {ESTADOS_CAPACIDAD.map((estado) => {
+                        const activo = filtroEstados.includes(estado);
+                        return (
+                          <Chip
+                            key={estado}
+                            size="small"
+                            label={etiquetaPorEstado[estado]}
+                            color={colorPorEstado[estado]}
+                            variant={activo ? 'filled' : 'outlined'}
+                            onClick={() => toggleFiltroEstado(estado)}
+                            sx={{ cursor: 'pointer', fontWeight: activo ? 700 : 400 }}
+                          />
+                        );
+                      })}
+                    </Stack>
                   </Stack>
 
                   {vuelosFiltrados.length === 0 ? (

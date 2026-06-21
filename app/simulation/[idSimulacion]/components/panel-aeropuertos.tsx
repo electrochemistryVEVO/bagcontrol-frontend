@@ -31,6 +31,7 @@ import styles from "../../../stylesheets/simpanel.module.css";
 type PanelAeropuertosProps = {
   aeropuertos: AeropuertoSimulacion[];
   visible: boolean;
+  onEnfocarAeropuerto: (codigoIata: string) => void;
 };
 
 type Continente = 'america' | 'asia' | 'europa' | 'oceania' | 'africa';
@@ -43,6 +44,14 @@ const colorPorEstado: Record<EstadoCapacidad, 'success' | 'warning' | 'error'> =
   VERDE: 'success',
   AMARILLO: 'warning',
   ROJO: 'error',
+};
+
+const ESTADOS_CAPACIDAD: EstadoCapacidad[] = ['VERDE', 'AMARILLO', 'ROJO'];
+
+const etiquetaPorEstado: Record<EstadoCapacidad, string> = {
+  VERDE: 'Verde',
+  AMARILLO: 'Amarillo',
+  ROJO: 'Rojo',
 };
 
 const orderFunctions : Record<OrderingFuncs, (x:AeropuertoSimulacion) => number> = {
@@ -67,11 +76,12 @@ function calcularOcupacion(aeropuerto: AeropuertoSimulacion) {
   return Math.round((aeropuerto.maletasActuales / aeropuerto.capacidadAlmacen) * 100);
 }
 
-export function PanelAeropuertos({ aeropuertos, visible }: PanelAeropuertosProps) {
+export function PanelAeropuertos({ aeropuertos, visible, onEnfocarAeropuerto }: PanelAeropuertosProps) {
   const [panelAbierto, setPanelAbierto] = useState(false);
   const [direccionOrden, setDireccionOrden] = useState<DireccionOrden>('desc');
   const [busqueda, setBusqueda] = useState('');
   const [filtroContinente,setFiltroContinente] = useState('');
+  const [filtroEstados, setFiltroEstados] = useState<EstadoCapacidad[]>(ESTADOS_CAPACIDAD);
   const [tipoOrden,setTipoOrden] = useState<OrderingFuncs>('calcularOcupacion');
   const [aeropuertoExpandido, setAeropuertoExpandido] = useState<string | null>(null);
 
@@ -84,14 +94,21 @@ export function PanelAeropuertos({ aeropuertos, visible }: PanelAeropuertosProps
                 : aeropuerto.codigoIata.toLowerCase().includes(filtro);
             const filtradoContinente = !filtroContinente ? true:
                 aeropuerto.continente.toLowerCase().includes(filtroContinente);
-            return filtrado && filtradoContinente;
+            const filtradoEstado = filtroEstados.includes(aeropuerto.estadoCapacidad);
+            return filtrado && filtradoContinente && filtradoEstado;
         })
         .sort((a, b) => {
             const sortFunc = orderFunctions[tipoOrden];
             const diferencia = sortFunc(a) - sortFunc(b);
             return direccionOrden === 'asc' ? diferencia : -diferencia;
     });
-  }, [aeropuertos, direccionOrden,tipoOrden,busqueda,filtroContinente]);
+  }, [aeropuertos, direccionOrden,tipoOrden,busqueda,filtroContinente,filtroEstados]);
+
+  const toggleFiltroEstado = (estado: EstadoCapacidad) => {
+    setFiltroEstados((actual) =>
+      actual.includes(estado) ? actual.filter((e) => e !== estado) : [...actual, estado]
+    );
+  };
 
   if (!visible) return null;
 
@@ -141,6 +158,22 @@ export function PanelAeropuertos({ aeropuertos, visible }: PanelAeropuertosProps
                             <MenuItem value="africa">África</MenuItem>
                         </Select>
                     </FormControl>
+                    <Stack direction="row" spacing={1}>
+                        {ESTADOS_CAPACIDAD.map((estado) => {
+                            const activo = filtroEstados.includes(estado);
+                            return (
+                                <Chip
+                                    key={estado}
+                                    size="small"
+                                    label={etiquetaPorEstado[estado]}
+                                    color={colorPorEstado[estado]}
+                                    variant={activo ? 'filled' : 'outlined'}
+                                    onClick={() => toggleFiltroEstado(estado)}
+                                    sx={{ cursor: 'pointer', fontWeight: activo ? 700 : 400 }}
+                                />
+                            );
+                        })}
+                    </Stack>
                     <Stack spacing={1.5} className={styles.orderContainer} direction="row">
                         <FormControl size="small" className={styles.input}>
                             <InputLabel id="orden-aeropuertos-label">Ordenar por</InputLabel>
@@ -181,9 +214,14 @@ export function PanelAeropuertos({ aeropuertos, visible }: PanelAeropuertosProps
                                 >
                                     <Button
                                         fullWidth
-                                        onClick={() => setAeropuertoExpandido((actual) => (
-                                            actual === aeropuerto.codigoIata ? null : aeropuerto.codigoIata
-                                        ))}
+                                        onClick={() => {
+                                            // Enfocamos el mapa en el aeropuerto cada vez que se hace clic en la fila,
+                                            // independientemente de si se expande o colapsa el detalle.
+                                            onEnfocarAeropuerto(aeropuerto.codigoIata);
+                                            setAeropuertoExpandido((actual) => (
+                                                actual === aeropuerto.codigoIata ? null : aeropuerto.codigoIata
+                                            ));
+                                        }}
                                         className={styles.airportButton}
                                     >
                                         <Box className={styles.airportContent}>

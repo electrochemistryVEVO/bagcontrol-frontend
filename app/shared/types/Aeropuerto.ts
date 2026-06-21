@@ -18,4 +18,7 @@ export interface AeropuertoSimulacion extends Aeropuerto {
   porcentajeOcupacion: number;
   estadoCapacidad: EstadoCapacidad;
   enviosProximosAVencer?: EnvioAeropuerto[];
+  // true recien cuando llega el primer evento AEROPUERTO_ACTUALIZADO con datos reales.
+  // Mientras sea false/undefined, el icono del mapa se muestra en blanco (sin semaforo).
+  tieneDatos?: boolean;
 }
