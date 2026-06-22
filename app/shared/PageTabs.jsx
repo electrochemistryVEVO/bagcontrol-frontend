@@ -10,7 +10,7 @@ function useRouteMatch(patterns) {
 
     for (let i = 0; i < patterns.length; i += 1) {
         const pattern = patterns[i];
-        const possibleMatch = basePath?.startsWith(pattern) ? i : null;
+        const possibleMatch = basePath?.includes(pattern) ? i : null;
         if (possibleMatch !== null) {
             return possibleMatch;
         }
@@ -22,7 +22,7 @@ function useRouteMatch(patterns) {
 export default function PageTabs(){
     const routeMatch = useRouteMatch(valueMap);
     const currentTab = routeMatch ?? 0;
-    return (
+    return (routeMatch !== null) && (
         <Tabs
             value={currentTab}
             aria-label="Pestañas de navegación"
