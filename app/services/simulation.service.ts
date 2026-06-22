@@ -1,6 +1,7 @@
 import { RespuestaInicioSimulacionDTO } from '../shared/types/Simulacion';
 import { Envio, EnvioAlmacen, EnvioRuta } from '@/app/shared/types/Envio';
 import axiosApi, { axiosSimulacion } from './config/axios';
+import {EventoVuelo} from "@/app/shared/types/Evento";
 
 export type ParametrosSimulacion = {
   fechaInicio: string; // Formato ISO: 'YYYY-MM-DD'
@@ -20,8 +21,8 @@ export const SimulacionService = {
 
     obtenerEstado : (idSimulacion: string) =>
         axiosApi.get(`/simulacion/${idSimulacion}/estado`),
-    obtenerEnviosPorVuelo: (idSimulacion: string, codigoVuelo: string | number, timestamp: string) =>
-        axiosApi.get<Envio[]>(`/simulacion/${idSimulacion}/vuelos/${codigoVuelo}/envios`, { params: { timestamp } }),
+    obtenerEnviosPorVuelo: (idSimulacion: string, flight:EventoVuelo,timestamp:String) =>
+        axiosApi.post<Envio[]>(`/simulacion/${idSimulacion}/vuelos/envios`, { flight,timestamp }),
     obtenerRutaEnvio: (idSimulacion: string, idPedido: string, timestamp: string) =>
         axiosApi.get<EnvioRuta>(`/simulacion/${idSimulacion}/envios/${idPedido}/ruta`, { params: { timestamp } }),
     obtenerEnviosPorAlmacen: (idSimulacion: string, codigoIata: string, timestamp: string) =>

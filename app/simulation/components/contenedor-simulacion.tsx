@@ -2,14 +2,13 @@
 
 import { ParametrosSimulacion, SimulacionService } from '@/app/services/simulation.service';
 import { useRouter } from 'next/navigation';
-import { Map } from '@vis.gl/react-maplibre';
+import {Map, MapRef} from '@vis.gl/react-maplibre';
 import styles from '../../stylesheets/contenedor.module.css';
 import { MenuItem, Typography, Select, TextField } from "@mui/material";
-import { useState } from "react";
+import {useRef, useState} from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { useToast } from '@/app/shared/hooks/useToast';
-import { MAP_STYLE_URL } from '@/app/services/config/constants';
 
 enum SimulationType {
     TIEMPO_REAL,
@@ -24,6 +23,7 @@ export function ContenedorSimulacion() {
     const [endDate, setEndDate] = useState<Date | null>(new Date('2026-02-15T18:00:00'));
     const [timeScale, setTimeScale] = useState<number>(300);
     const { showToast, ToastComponent } = useToast();
+    const mapRef  = useRef<MapRef|null>(null);
 
     // Función para formatear el objeto Date a 'YYYY-MM-DDTHH:mm' respetando la hora local elegida
     const formatLocalDateTime = (date: Date): string => {
@@ -38,18 +38,16 @@ export function ContenedorSimulacion() {
     const handlePreparar = async () => {
         if (simulationType == null) return showToast("Tienes que seleccionar un tipo de simulación");
         if (startDate == null) return showToast("Tienes que seleccionar la fecha de inicio");
-      
-        if (simulationType === SimulationType.VENTANA_TIEMPO) {
-            if (endDate == null) return showToast("Tienes que seleccionar la fecha de fin");
-        }
-      
+
         const _startDate = startDate;
         const _endDate = (
-            simulationType === SimulationType.VENTANA_TIEMPO ? endDate :
-            simulationType === SimulationType.TIEMPO_REAL ? new Date(_startDate.getTime() + 1000 * 60 * 60 * 24) : null
+            simulationType === SimulationType.VENTANA_TIEMPO ? new Date(_startDate.getTime() + 1000*60*60*24*5) :
+            simulationType === SimulationType.TIEMPO_REAL ? new Date(_startDate.getTime() + 1000 * 60 * 60 * 24)
+                : null
         );
         const _k = simulationType === SimulationType.TIEMPO_REAL ? 1 : timeScale;
-        
+
+
         const formattedStart = formatLocalDateTime(_startDate);
         localStorage.setItem("fechaInicio", formattedStart);
         
@@ -75,8 +73,23 @@ export function ContenedorSimulacion() {
     return (
         <div className={styles.mapContainer}>
             <Map
+                ref={mapRef}
                 initialViewState={{ longitude: 0, latitude: 0, zoom: 3.5 }}
-                mapStyle={MAP_STYLE_URL}
+                mapStyle="https://tiles.openfreemap.org/styles/bright"
+                onLoad={(_map)=>{
+                    const language = 'es'
+                    mapRef.current?.getMap().setLayoutProperty('label_country_1', 'text-field', [
+                    'get',
+                    `name:${language}`
+                ]);
+                    mapRef.current?.getMap().setLayoutProperty('label_country_2', 'text-field', [
+                        'get',
+                        `name:${language}`
+                    ]);
+                    mapRef.current?.getMap().setLayoutProperty('label_country_3', 'text-field', [
+                        'get',
+                        `name:${language}`
+                    ]);}}
                 interactiveLayerIds={['point']}
             />            
                 
@@ -106,44 +119,24 @@ export function ContenedorSimulacion() {
                         }}
                     >
                         <MenuItem value={SimulationType.TIEMPO_REAL}>Ejecución en tiempo real</MenuItem>
-                        <MenuItem value={SimulationType.VENTANA_TIEMPO}>Ventana de 3 a 5 días</MenuItem>
+                        <MenuItem value={SimulationType.VENTANA_TIEMPO}>Simulación de 5 días</MenuItem>
                         <MenuItem value={SimulationType.COLAPSO_OPERATIVO}>Hasta el colapso operativo</MenuItem>
                     </Select>
-                </div>                
+                </div>
 
-                    { (simulationType === SimulationType.VENTANA_TIEMPO) && (
-                        <div className={styles.datePickerWrapper}>
-                            <span id="select_date_range_label" className={styles.fieldLabel}>Rango de fechas y horas</span>
-                            <DatePicker 
-                                aria-labelledby="select_date_range_label" 
-                                showMonthYearDropdown 
-                                selectsRange 
-                                showTimeSelect
-                                timeFormat="HH:mm"
-                                timeIntervals={15}
-                                dateFormat="yyyy-MM-dd HH:mm"
-                                startDate={startDate} 
-                                endDate={endDate}
-                                onChange={(update) => { setStartDate(update[0]); setEndDate(update[1]); }}
-                            />
-                        </div>
-                    )}
-
-                    {(simulationType === SimulationType.TIEMPO_REAL || simulationType === SimulationType.COLAPSO_OPERATIVO) && (
-                        <div className={styles.datePickerWrapper}>
-                            <span id="select_date_start_label" className={styles.fieldLabel}>Fecha y hora de inicio</span>
-                            <DatePicker 
-                                aria-labelledby="select_date_start_label" 
-                                showMonthYearDropdown
-                                showTimeSelect
-                                timeFormat="HH:mm"
-                                timeIntervals={15}
-                                dateFormat="yyyy-MM-dd HH:mm"
-                                onChange={(date: Date | null) => { setStartDate(date); }}
-                                selected={startDate}
-                            />
-                        </div>
-                    )}
+                    <div className={styles.datePickerWrapper}>
+                        <span id="select_date_start_label" className={styles.fieldLabel}>Fecha y hora de inicio</span>
+                        <DatePicker
+                            aria-labelledby="select_date_start_label"
+                            showMonthYearDropdown
+                            showTimeSelect
+                            timeFormat="HH:mm"
+                            timeIntervals={15}
+                            dateFormat="yyyy-MM-dd HH:mm"
+                            onChange={(date: Date | null) => { setStartDate(date); }}
+                            selected={startDate}
+                        />
+                    </div>
 
                     {/* Selector de escala de tiempo (K) */}
                     {(simulationType === SimulationType.VENTANA_TIEMPO || simulationType === SimulationType.COLAPSO_OPERATIVO) && (

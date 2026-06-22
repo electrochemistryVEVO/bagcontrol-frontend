@@ -14,7 +14,7 @@ import {
   SymbolLayerSpecification,
 } from '@vis.gl/react-maplibre';
 import { useMemo, useRef, useState, useEffect, RefObject, useCallback } from 'react';
-import { Feature } from 'geojson';
+import {Feature, FeatureCollection} from 'geojson';
 import { MapLibreEvent } from 'maplibre-gl';
 import type { GeoJSONSource } from 'maplibre-gl';
 // @ts-ignore
@@ -231,6 +231,8 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
     }
   }, [enfocarCoordenadas, selFlight]);
 
+
+
   const mostrarRutaEnvio = useCallback(async (idPedido: string) => {
     const idNormalizado = idPedido.trim();
     if (!idNormalizado) return;
@@ -243,7 +245,7 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
       setIdEnvioBusqueda(idNormalizado);
     } catch {
       setRutaEnvio(null);
-      setRutaError(`No se encontro ruta para el envio ${idNormalizado}`);
+      setRutaError(`No se encontró ruta para el envío ${idNormalizado}`);
     }
   }, [idSimulacion, tiempoSimulacionRef]);
 
@@ -267,6 +269,18 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
       })
       .filter((feature): feature is Feature => feature !== null);
   }, [coordsAeropuertos, rutaEnvio]);
+
+  const seleccionarVuelo = useCallback(async (codigoVuelo : string)=>{
+    const map = mapRef.current?.getMap();
+    if(!map)return;
+    const sourceAviones = map.getSource('aviones-data') as GeoJSONSource;
+    const feature = ((await sourceAviones.getData()) as FeatureCollection).features.find(e=>e.properties?.codigoVuelo === codigoVuelo) as MapGeoJSONFeature;
+    console.log(feature)
+    setSelFlight(feature ?? null);
+    setPanelOpen(true);
+    const coords = obtenerCoordenadasFeature(feature ?? null);
+    if (coords) enfocarCoordenadas(coords, 6.5);
+  },[featuresRutaEnvio,enfocarCoordenadas])
 
   const enfocarRutaEnvio = useCallback(() => {
     const coords = featuresRutaEnvio.flatMap((feature) => {
@@ -453,6 +467,7 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
         idSimulacion={idSimulacion}
         vuelosActivos={vuelosActivosSnapshot}
         tiempoSimulacionRef={tiempoSimulacionRef}
+        seleccionarVuelo={seleccionarVuelo}
         visible={conectado}
       />
 
@@ -487,7 +502,7 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
           <input
             value={idEnvioBusqueda}
             onChange={(e) => setIdEnvioBusqueda(e.target.value)}
-            placeholder="ID de envio"
+            placeholder="ID de envío"
             style={{
               flex: 1,
               borderRadius: 6,
@@ -507,7 +522,7 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
           <div style={{ marginTop: 10, fontSize: 12, lineHeight: 1.45 }}>
             <div style={{ fontWeight: 700 }}>Envio {rutaEnvio.envio.idPedido}</div>
             <div>{rutaEnvio.envio.origenIata} - {rutaEnvio.envio.destinoIata} · {rutaEnvio.envio.cantidadMaletas} maletas</div>
-            <div>Estado: {rutaEnvio.estado} · Actual: {rutaEnvio.aeropuertoActual ?? 'N/A'}</div>
+            <div>Estado: {rutaEnvio.estado} · Actual: {rutaEnvio.aeropuertoActual ?? 'No disponible'}</div>
             <div style={{ marginTop: 6, maxHeight: 120, overflowY: 'auto' }}>
               {rutaEnvio.escalas.length === 0 ? (
                 <div>Sin itinerario asignado.</div>
@@ -530,6 +545,19 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
           style={{zIndex:17,position:'absolute'}}
           mapStyle="https://tiles.openfreemap.org/styles/bright"
           onLoad={async (e: MapLibreEvent) => {
+            const language = 'es';
+            backgroundMapRef.current?.getMap().setLayoutProperty('label_country_1', 'text-field', [
+              'get',
+              `name:${language}`
+            ]);
+            backgroundMapRef.current?.getMap().setLayoutProperty('label_country_2', 'text-field', [
+              'get',
+              `name:${language}`
+            ]);
+            backgroundMapRef.current?.getMap().setLayoutProperty('label_country_3', 'text-field', [
+              'get',
+              `name:${language}`
+            ]);
             setBackgroundLoaded(true);
           }}
       ></MapLibre>
