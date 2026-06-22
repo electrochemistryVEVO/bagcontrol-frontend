@@ -29,6 +29,7 @@ function SidePanelContents({
     //Envios
     const [enviosAsignados,setEnviosAsignados] = useState<Envio[]>([]);
 
+
     //Paginacion
     const [page,setPage] = useState<number>(0);
     const [rowsPerPage,setRowsPerPage] = useState<number>(5);
@@ -38,7 +39,8 @@ function SidePanelContents({
     useEffect(() => {
         if(flight){
             const timestamp = new Date(tiempoSimulacionRef.current).toISOString();
-            SimulacionService.obtenerEnviosPorVuelo(idSimulacion, flight.codigoVuelo, timestamp)
+            const _flight : EventoVuelo = {...flight,codigoEnvios:[]}
+            SimulacionService.obtenerEnviosPorVuelo(idSimulacion, _flight,timestamp)
                 .then(({data}: {data: Envio[]}) => {
                     setEnviosAsignados(data)})
                 .catch((err) => {console.error(err)})

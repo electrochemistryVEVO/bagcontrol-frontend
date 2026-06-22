@@ -21,12 +21,12 @@ import {
     Typography,
     SelectChangeEvent,
 } from '@mui/material';
-import {memo, useMemo, useState} from 'react';
+import {memo, RefObject, useMemo, useRef, useState} from 'react';
 import type { AeropuertoSimulacion } from '@/app/shared/types/Aeropuerto';
 import type { EstadoCapacidad } from '@/app/shared/types/Evento';
-import {AeropuertoEnvioBox, AeropuertosScrollList} from "./panel-aeropuertos-styled";
 import {number} from "prop-types";
 import styles from "../../../stylesheets/simpanel.module.css";
+import Draggable from 'react-draggable';
 
 type PanelAeropuertosProps = {
   aeropuertos: AeropuertoSimulacion[];
@@ -75,6 +75,8 @@ export function PanelAeropuertos({ aeropuertos, visible }: PanelAeropuertosProps
   const [tipoOrden,setTipoOrden] = useState<OrderingFuncs>('calcularOcupacion');
   const [aeropuertoExpandido, setAeropuertoExpandido] = useState<string | null>(null);
 
+  const nodeRef = useRef<HTMLDivElement>(null);
+
 
   const aeropuertosOrdenados = useMemo(() => {
     return [...aeropuertos]
@@ -96,167 +98,173 @@ export function PanelAeropuertos({ aeropuertos, visible }: PanelAeropuertosProps
   if (!visible) return null;
 
   return (
-    <Paper
-      elevation={8}
-      className={styles.paper}
-    >
-      <Accordion
-        expanded={panelAbierto}
-        onChange={(_, expanded) => setPanelAbierto(expanded)}
-        disableGutters
-        className={styles.accordion}
+      <Draggable
+          nodeRef={nodeRef as RefObject<HTMLDivElement>}
       >
-        <AccordionSummary
-            className={styles.accordionSummary}
-        >
-          <Typography sx={{ fontWeight: 700 }}>Aeropuertos</Typography>
-          <Chip size="small" label={aeropuertos.length} color={aeropuertos.length ? 'primary' : 'default'} />
-        </AccordionSummary>
+          <Paper
+              elevation={8}
+              className={styles.paper}
+              ref={nodeRef}
+          >
+              <Accordion
+                  expanded={panelAbierto}
+                  onChange={(_, expanded) => setPanelAbierto(expanded)}
+                  disableGutters
+                  className={styles.accordion}
+              >
+                  <AccordionSummary
+                      className={styles.accordionSummary}
+                  >
+                      <Typography sx={{ fontWeight: 700 }}>Aeropuertos</Typography>
+                      <Chip size="small" label={aeropuertos.length} color={aeropuertos.length ? 'primary' : 'default'} />
+                  </AccordionSummary>
 
-        <AccordionDetails
-            className={styles.accordionDetails}
-        >
-            {panelAbierto && (<>
-                <Stack spacing={1.5} className={styles.filtersContainer}>
-                    <TextField
-                        size="small"
-                        value={busqueda}
-                        onChange={(event) => setBusqueda(event.target.value)}
-                        placeholder="Buscar por código IATA"
-                        fullWidth
-                        className={styles.input}
-                    />
-                    <FormControl size="small" fullWidth className={styles.input}>
-                        <InputLabel id="filtro-continente-label">Filtrar por continente</InputLabel>
-                        <Select
-                            labelId="filtro-continente-label"
-                            value={filtroContinente}
-                            label="Filtrar por continente"
-                            onChange={(event: SelectChangeEvent) => setFiltroContinente(event.target.value as Continente)}
-                        >
-                            <MenuItem value="america">América</MenuItem>
-                            <MenuItem value="asia">Asia</MenuItem>
-                            <MenuItem value="oceania">Oceanía</MenuItem>
-                            <MenuItem value="europa">Europa</MenuItem>
-                            <MenuItem value="africa">África</MenuItem>
-                        </Select>
-                    </FormControl>
-                    <Stack spacing={1.5} className={styles.orderContainer} direction="row">
-                        <FormControl size="small" className={styles.input}>
-                            <InputLabel id="orden-aeropuertos-label">Ordenar por</InputLabel>
-                            <Select
-                                labelId="orden-aeropuertos-label"
-                                value={tipoOrden}
-                                label="Filtrar por continente"
-                                onChange={(event: SelectChangeEvent) => setTipoOrden(event.target.value as OrderingFuncs)}
-                            >
-                                <MenuItem value="calcularOcupacion">Ocupación</MenuItem>
-                                <MenuItem value="calcularProximidadSalida">Proximidad de hora de salida</MenuItem>
-                                <MenuItem value="calcularProximidadLlegada">Proximidad de hora de llegada</MenuItem>
-                            </Select>
-                        </FormControl>
-                        <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={() => setDireccionOrden((actual) => (actual === 'asc' ? 'desc' : 'asc'))}
-                            className={styles.orderButton}
-                        >
-                            Orden {direccionOrden === 'asc' ? 'ascendente' : 'descendente'}
-                        </Button>
-                    </Stack>
-                </Stack>
+                  <AccordionDetails
+                      className={styles.accordionDetails}
+                  >
+                      {panelAbierto && (<>
+                          <Stack spacing={1.5} className={styles.filtersContainer}>
+                              <TextField
+                                  size="small"
+                                  value={busqueda}
+                                  onChange={(event) => setBusqueda(event.target.value)}
+                                  placeholder="Buscar por código IATA"
+                                  fullWidth
+                                  className={styles.input}
+                              />
+                              <FormControl size="small" fullWidth className={styles.input}>
+                                  <InputLabel id="filtro-continente-label">Filtrar por continente</InputLabel>
+                                  <Select
+                                      labelId="filtro-continente-label"
+                                      value={filtroContinente}
+                                      label="Filtrar por continente"
+                                      onChange={(event: SelectChangeEvent) => setFiltroContinente(event.target.value as Continente)}
+                                  >
+                                      <MenuItem value="america">América</MenuItem>
+                                      <MenuItem value="asia">Asia</MenuItem>
+                                      <MenuItem value="oceania">Oceanía</MenuItem>
+                                      <MenuItem value="europa">Europa</MenuItem>
+                                      <MenuItem value="africa">África</MenuItem>
+                                  </Select>
+                              </FormControl>
+                              <Stack spacing={1.5} className={styles.orderContainer} direction="row">
+                                  <FormControl size="small" className={styles.input}>
+                                      <InputLabel id="orden-aeropuertos-label">Ordenar por</InputLabel>
+                                      <Select
+                                          labelId="orden-aeropuertos-label"
+                                          value={tipoOrden}
+                                          label="Filtrar por continente"
+                                          onChange={(event: SelectChangeEvent) => setTipoOrden(event.target.value as OrderingFuncs)}
+                                      >
+                                          <MenuItem value="calcularOcupacion">Ocupación</MenuItem>
+                                          <MenuItem value="calcularProximidadSalida">Proximidad de hora de salida</MenuItem>
+                                          <MenuItem value="calcularProximidadLlegada">Proximidad de hora de llegada</MenuItem>
+                                      </Select>
+                                  </FormControl>
+                                  <Button
+                                      variant="outlined"
+                                      size="small"
+                                      onClick={() => setDireccionOrden((actual) => (actual === 'asc' ? 'desc' : 'asc'))}
+                                      className={styles.orderButton}
+                                  >
+                                      Orden {direccionOrden === 'asc' ? 'ascendente' : 'descendente'}
+                                  </Button>
+                              </Stack>
+                          </Stack>
 
-                {aeropuertosOrdenados.length === 0 ? (
-                    <Box className={styles.empty}>No hay aeropuertos disponibles</Box>
-                ) : (
-                    <Stack spacing={1} className={styles.scrollList}>
-                        {aeropuertosOrdenados.map((aeropuerto) => {
-                            const ocupacion = calcularOcupacion(aeropuerto);
-                            const enviosProximos = aeropuerto.enviosProximosAVencer || [];
-                            const expandido = aeropuertoExpandido === aeropuerto.codigoIata;
+                          {aeropuertosOrdenados.length === 0 ? (
+                              <Box className={styles.empty}>No hay aeropuertos disponibles</Box>
+                          ) : (
+                              <Stack spacing={1} className={styles.scrollList}>
+                                  {aeropuertosOrdenados.map((aeropuerto) => {
+                                      const ocupacion = calcularOcupacion(aeropuerto);
+                                      const enviosProximos = aeropuerto.enviosProximosAVencer || [];
+                                      const expandido = aeropuertoExpandido === aeropuerto.codigoIata;
 
-                            return (
-                                <Box className={styles.airportBoxList}
-                                    key={aeropuerto.codigoIata}
-                                >
-                                    <Button
-                                        fullWidth
-                                        onClick={() => setAeropuertoExpandido((actual) => (
-                                            actual === aeropuerto.codigoIata ? null : aeropuerto.codigoIata
-                                        ))}
-                                        className={styles.airportButton}
-                                    >
-                                        <Box className={styles.airportContent}>
-                                            <Stack className={styles.airportHeader}>
-                                                <Typography className={styles.airportCode}>{aeropuerto.codigoIata}</Typography>
-                                                <Stack className={styles.airportChips}>
-                                                    {enviosProximos.length > 0 && (
-                                                        <Chip
-                                                            size="small"
-                                                            label={`${enviosProximos.length} SLA`}
-                                                            color="warning"
-                                                            variant="outlined"
-                                                        />
-                                                    )}
-                                                    <Chip
-                                                        size="small"
-                                                        label={aeropuerto.estadoCapacidad}
-                                                        color={colorPorEstado[aeropuerto.estadoCapacidad]}
-                                                    />
-                                                </Stack>
-                                            </Stack>
+                                      return (
+                                          <Box className={styles.airportBoxList}
+                                               key={aeropuerto.codigoIata}
+                                          >
+                                              <Button
+                                                  fullWidth
+                                                  onClick={() => setAeropuertoExpandido((actual) => (
+                                                      actual === aeropuerto.codigoIata ? null : aeropuerto.codigoIata
+                                                  ))}
+                                                  className={styles.airportButton}
+                                              >
+                                                  <Box className={styles.airportContent}>
+                                                      <Stack className={styles.airportHeader}>
+                                                          <Typography className={styles.airportCode}>{aeropuerto.codigoIata}</Typography>
+                                                          <Stack className={styles.airportChips}>
+                                                              {enviosProximos.length > 0 && (
+                                                                  <Chip
+                                                                      size="small"
+                                                                      label={`${enviosProximos.length} SLA`}
+                                                                      color="warning"
+                                                                      variant="outlined"
+                                                                  />
+                                                              )}
+                                                              <Chip
+                                                                  size="small"
+                                                                  label={aeropuerto.estadoCapacidad}
+                                                                  color={colorPorEstado[aeropuerto.estadoCapacidad]}
+                                                              />
+                                                          </Stack>
+                                                      </Stack>
 
-                                            <Typography variant="body2" className={styles.airportLocation}>
-                                                {aeropuerto.ciudad} - {aeropuerto.pais}
-                                            </Typography>
+                                                      <Typography variant="body2" className={styles.airportLocation}>
+                                                          {aeropuerto.ciudad} - {aeropuerto.pais}
+                                                      </Typography>
 
-                                            <Stack className={styles.airportFooter}>
-                                                <Typography variant="caption" className={styles.airportCapacity}>
-                                                    {aeropuerto.maletasActuales}/{aeropuerto.capacidadAlmacen} maletas
-                                                </Typography>
-                                                <Typography variant="caption" className={styles.airportCode}>
-                                                    {ocupacion}%
-                                                </Typography>
-                                            </Stack>
-                                        </Box>
-                                    </Button>
+                                                      <Stack className={styles.airportFooter}>
+                                                          <Typography variant="caption" className={styles.airportCapacity}>
+                                                              {aeropuerto.maletasActuales}/{aeropuerto.capacidadAlmacen} maletas
+                                                          </Typography>
+                                                          <Typography variant="caption" className={styles.airportCode}>
+                                                              {ocupacion}%
+                                                          </Typography>
+                                                      </Stack>
+                                                  </Box>
+                                              </Button>
 
-                                    {expandido && (
-                                        <Box className={styles.expandedContent}>
-                                            {enviosProximos.length === 0 ? (
-                                                <Box className={styles.empty}>Sin envios proximos a vencer</Box>
-                                            ) : (
-                                                <Table size="small" className={styles.table}>
-                                                    <TableHead>
-                                                        <TableRow>
-                                                            <TableCell>ID</TableCell>
-                                                            <TableCell>Origen</TableCell>
-                                                            <TableCell>Destino</TableCell>
-                                                            <TableCell align="right">Maletas</TableCell>
-                                                        </TableRow>
-                                                    </TableHead>
-                                                    <TableBody>
-                                                        {enviosProximos.map((envio) => (
-                                                            <TableRow key={envio.envio.idPedido}>
-                                                                <TableCell>{envio.envio.idPedido}</TableCell>
-                                                                <TableCell>{envio.envio.origenIata}</TableCell>
-                                                                <TableCell>{envio.envio.destinoIata}</TableCell>
-                                                                <TableCell align="right">{envio.envio.cantidadMaletas}</TableCell>
-                                                            </TableRow>
-                                                        ))}
-                                                    </TableBody>
-                                                </Table>
-                                            )}
-                                        </Box>
-                                    )}
-                                </Box>
-                            );
-                        })}
-                    </Stack>
-                )}
-            </>)}
-        </AccordionDetails>
-      </Accordion>
-    </Paper>
+                                              {expandido && (
+                                                  <Box className={styles.expandedContent}>
+                                                      {enviosProximos.length === 0 ? (
+                                                          <Box className={styles.empty}>Sin envios proximos a vencer</Box>
+                                                      ) : (
+                                                          <Table size="small" className={styles.table}>
+                                                              <TableHead>
+                                                                  <TableRow>
+                                                                      <TableCell>ID</TableCell>
+                                                                      <TableCell>Origen</TableCell>
+                                                                      <TableCell>Destino</TableCell>
+                                                                      <TableCell align="right">Maletas</TableCell>
+                                                                  </TableRow>
+                                                              </TableHead>
+                                                              <TableBody>
+                                                                  {enviosProximos.map((envio) => (
+                                                                      <TableRow key={envio.envio.idPedido}>
+                                                                          <TableCell>{envio.envio.idPedido}</TableCell>
+                                                                          <TableCell>{envio.envio.origenIata}</TableCell>
+                                                                          <TableCell>{envio.envio.destinoIata}</TableCell>
+                                                                          <TableCell align="right">{envio.envio.cantidadMaletas}</TableCell>
+                                                                      </TableRow>
+                                                                  ))}
+                                                              </TableBody>
+                                                          </Table>
+                                                      )}
+                                                  </Box>
+                                              )}
+                                          </Box>
+                                      );
+                                  })}
+                              </Stack>
+                          )}
+                      </>)}
+                  </AccordionDetails>
+              </Accordion>
+          </Paper>
+      </Draggable>
+
   );
 }

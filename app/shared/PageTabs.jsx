@@ -25,21 +25,21 @@ export default function PageTabs(){
     return (
         <Tabs
             value={currentTab}
-            aria-label="nav tabs example"
+            aria-label="Pestañas de navegación"
             role="navigation"
             sx={{
                 '& .MuiTab-root': {
-                    color: '#ffffff',
+                    color: '#000000',
                 },
                 '& .MuiTab-root.Mui-selected': {
-                    color: '#ffffff',
+                    color: '#000000',
                 },
                 '& .MuiTabs-indicator': {
-                    backgroundColor: '#ffffff',
+                    backgroundColor: '#000000',
                 },
             }}
         >
-            <LinkTab label="SIMULACIÓN" href="/simulation" />
+            <LinkTab  label="SIMULACIÓN" href="/simulation" />
             <LinkTab label="DASHBOARD" href="/dashboard" />
             <LinkTab label="GEST. ENTIDADES" href="/management" />
         </Tabs>)

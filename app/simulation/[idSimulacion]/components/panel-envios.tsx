@@ -21,10 +21,11 @@ import {
     Typography,
     SelectChangeEvent, TablePagination,
 } from '@mui/material';
-import { useMemo, useState } from 'react';
+import {RefObject, useMemo, useRef, useState} from 'react';
 import type { AeropuertoSimulacion } from '@/app/shared/types/Aeropuerto';
 import type { EstadoCapacidad } from '@/app/shared/types/Evento';
 import {Envio} from "@/app/shared/types/Envio";
+import Draggable from "react-draggable";
 
 type PanelAeropuertosProps = {
     aeropuertos: AeropuertoSimulacion[];
@@ -57,6 +58,8 @@ export function PanelEnvios({ aeropuertos,envios, visible }: PanelEnviosProps) {
     //const [tipoOrden,setTipoOrden] = useState<OrderingFuncs>('calcularOcupacion');
     //const [aeropuertoExpandido, setAeropuertoExpandido] = useState<string | null>(null);
 
+    const nodeRef = useRef<HTMLDivElement>(null);
+
     //Paginacion
     const [page,setPage] = useState<number>(0);
     const [rowsPerPage,setRowsPerPage] = useState<number>(10);
@@ -82,148 +85,154 @@ export function PanelEnvios({ aeropuertos,envios, visible }: PanelEnviosProps) {
     if (!visible) return null;
 
     return (
-        <Paper
-            elevation={8}
-            sx={{
-                position: 'absolute',
-                top: 200,
-                right: 16,
-                zIndex: 19,
-                width: 430,
-                maxWidth: 'calc(100vw - 32px)',
-                maxHeight: '70vh',
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden',
-                bgcolor: 'rgba(15, 23, 42, 0.94)',
-                color: '#f8fafc',
-                border: '1px solid rgba(148, 163, 184, 0.24)',
-            }}
+        <Draggable
+            nodeRef={nodeRef as RefObject<HTMLDivElement>}
         >
-            <Accordion
-                expanded={panelAbierto}
-                onChange={(_, expanded) => setPanelAbierto(expanded)}
-                disableGutters
+            <Paper
+                elevation={8}
+                ref={nodeRef}
                 sx={{
-                    bgcolor: 'transparent',
-                    color: 'inherit',
+                    position: 'absolute',
+                    top: 200,
+                    right: 16,
+                    zIndex: 19,
+                    width: 430,
+                    maxWidth: 'calc(100vw - 32px)',
+                    maxHeight: '70vh',
                     display: 'flex',
                     flexDirection: 'column',
-                    maxHeight: '70vh',
                     overflow: 'hidden',
-                    '&:before': { display: 'none' },
+                    bgcolor: 'rgba(15, 23, 42, 0.94)',
+                    color: '#f8fafc',
+                    border: '1px solid rgba(148, 163, 184, 0.24)',
                 }}
             >
-                {/*Titulo*/}
-                <AccordionSummary
+                <Accordion
+                    expanded={panelAbierto}
+                    onChange={(_, expanded) => setPanelAbierto(expanded)}
+                    disableGutters
                     sx={{
-                        minHeight: 48,
-                        '& .MuiAccordionSummary-content': {
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: 2,
-                        },
-                    }}
-                >
-                    <Typography sx={{ fontWeight: 700 }}>Envios</Typography>
-                    <Chip size="small" label={envios.length} color={envios.length ? 'primary' : 'default'} />
-                </AccordionSummary>
-                {/*Detalles*/}
-                <AccordionDetails
-                    sx={{
-                        pt: 0,
+                        bgcolor: 'transparent',
+                        color: 'inherit',
                         display: 'flex',
                         flexDirection: 'column',
-                        maxHeight: 'calc(70vh - 48px)',
-                        minHeight: 0,
+                        maxHeight: '70vh',
                         overflow: 'hidden',
+                        '&:before': { display: 'none' },
                     }}
                 >
-                    {panelAbierto && (<>{/*Filtros y orden de envios*/}
-                        <Stack spacing={1.5} sx={{ flexShrink: 0, pb: 1.5 }}>
-                            <Stack spacing={1.5} sx={{ flexShrink: 0, pb: 0.5 }} direction="row">
-                                <TextField
-                                    size="small"
-                                    value={busquedaOrigen}
-                                    onChange={(event) => setBusquedaOrigen(event.target.value)}
-                                    placeholder="IATA origen"
-                                    fullWidth
-                                    sx={inputSx}
-                                />
-                                <TextField
-                                    size="small"
-                                    value={busquedaDestino}
-                                    onChange={(event) => setBusquedaDestino(event.target.value)}
-                                    placeholder="IATA destino"
-                                    fullWidth
-                                    sx={inputSx}
-                                />
+                    {/*Titulo*/}
+                    <AccordionSummary
+                        sx={{
+                            minHeight: 48,
+                            '& .MuiAccordionSummary-content': {
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: 2,
+                            },
+                        }}
+                    >
+                        <Typography sx={{ fontWeight: 700 }}>Envios</Typography>
+                        <Chip size="small" label={envios.length} color={envios.length ? 'primary' : 'default'} />
+                    </AccordionSummary>
+                    {/*Detalles*/}
+                    <AccordionDetails
+                        sx={{
+                            pt: 0,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            maxHeight: 'calc(70vh - 48px)',
+                            minHeight: 0,
+                            overflow: 'hidden',
+                        }}
+                    >
+                        {panelAbierto && (<>{/*Filtros y orden de envios*/}
+                            <Stack spacing={1.5} sx={{ flexShrink: 0, pb: 1.5 }}>
+                                <Stack spacing={1.5} sx={{ flexShrink: 0, pb: 0.5 }} direction="row">
+                                    <TextField
+                                        size="small"
+                                        value={busquedaOrigen}
+                                        onChange={(event) => setBusquedaOrigen(event.target.value)}
+                                        placeholder="IATA origen"
+                                        fullWidth
+                                        sx={inputSx}
+                                    />
+                                    <TextField
+                                        size="small"
+                                        value={busquedaDestino}
+                                        onChange={(event) => setBusquedaDestino(event.target.value)}
+                                        placeholder="IATA destino"
+                                        fullWidth
+                                        sx={inputSx}
+                                    />
+                                </Stack>
+                                <FormControl size="small" fullWidth sx={inputSx}>
+                                    <InputLabel id="filtro-continente-label">Filtrar por estado</InputLabel>
+                                    <Select
+                                        labelId="filtro-continente-label"
+                                        value={filtroEstado}
+                                        label="Filtrar por continente"
+                                        onChange={(event: SelectChangeEvent) => setFiltroEstado(event.target.value as EstadoEnvio)}
+                                    >
+                                        <MenuItem value="PLANIFICADO">Envios planificados</MenuItem>
+                                        <MenuItem value="EN_CURSO">Envios en vuelos</MenuItem>
+                                        <MenuItem value="ENTREGADO">Envios entregados</MenuItem>
+                                    </Select>
+                                </FormControl>
                             </Stack>
-                            <FormControl size="small" fullWidth sx={inputSx}>
-                                <InputLabel id="filtro-continente-label">Filtrar por estado</InputLabel>
-                                <Select
-                                    labelId="filtro-continente-label"
-                                    value={filtroEstado}
-                                    label="Filtrar por continente"
-                                    onChange={(event: SelectChangeEvent) => setFiltroEstado(event.target.value as EstadoEnvio)}
-                                >
-                                    <MenuItem value="PLANIFICADO">Envios planificados</MenuItem>
-                                    <MenuItem value="EN_CURSO">Envios en vuelos</MenuItem>
-                                    <MenuItem value="ENTREGADO">Envios entregados</MenuItem>
-                                </Select>
-                            </FormControl>
-                        </Stack>
-                        {/*Lista de envios en transporte, planificados y en las ultimas 4 horas*/}
-                        {enviosFiltrados.length === 0 ? (
-                            <Box sx={emptySx}>No hay envios disponibles</Box>
-                        ) : (
-                            <Stack spacing={1} sx={scrollListSx}>
-                                <Box
-                                    sx={{
-                                        border: '1px solid rgba(148, 163, 184, 0.2)',
-                                        borderRadius: 1,
-                                        overflow: 'hidden',
-                                        bgcolor: 'rgba(30, 41, 59, 0.82)',
-                                        flexShrink: 0,
-                                    }}
-                                >
-                                    <Table size="small" sx={tableSx}>
-                                        <TableHead>
-                                            <TableRow>
-                                                <TableCell>ID</TableCell>
-                                                <TableCell>Origen</TableCell>
-                                                <TableCell>Destino</TableCell>
-                                                <TableCell align="right">Maletas</TableCell>
-                                            </TableRow>
-                                        </TableHead>
-                                        <TableBody>
-                                            {enviosFiltrados
-                                                .slice(page*rowsPerPage,(page+1)*rowsPerPage)
-                                                .map((envio) => (
-                                                    <TableRow key={envio.idPedido}>
-                                                        <TableCell>{envio.idPedido}</TableCell>
-                                                        <TableCell>{envio.origenIata}</TableCell>
-                                                        <TableCell>{envio.destinoIata}</TableCell>
-                                                        <TableCell align="right">{envio.cantidadMaletas}</TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            <TableRow>
-                                                <TablePagination page={page}
-                                                                 onPageChange={(_,value)=>setPage(value)}
-                                                                 rowsPerPage={rowsPerPage}
-                                                                 onRowsPerPageChange={(e)=>setRowsPerPage(Number(e.target.value))}
-                                                                 count={enviosFiltrados.length}
-                                                />
-                                            </TableRow>
-                                        </TableBody>
+                            {/*Lista de envios en transporte, planificados y en las ultimas 4 horas*/}
+                            {enviosFiltrados.length === 0 ? (
+                                <Box sx={emptySx}>No hay envios disponibles</Box>
+                            ) : (
+                                <Stack spacing={1} sx={scrollListSx}>
+                                    <Box
+                                        sx={{
+                                            border: '1px solid rgba(148, 163, 184, 0.2)',
+                                            borderRadius: 1,
+                                            overflow: 'hidden',
+                                            bgcolor: 'rgba(30, 41, 59, 0.82)',
+                                            flexShrink: 0,
+                                        }}
+                                    >
+                                        <Table size="small" sx={tableSx}>
+                                            <TableHead>
+                                                <TableRow>
+                                                    <TableCell>ID</TableCell>
+                                                    <TableCell>Origen</TableCell>
+                                                    <TableCell>Destino</TableCell>
+                                                    <TableCell align="right">Maletas</TableCell>
+                                                </TableRow>
+                                            </TableHead>
+                                            <TableBody>
+                                                {enviosFiltrados
+                                                    .slice(page*rowsPerPage,(page+1)*rowsPerPage)
+                                                    .map((envio) => (
+                                                        <TableRow key={envio.idPedido}>
+                                                            <TableCell>{envio.idPedido}</TableCell>
+                                                            <TableCell>{envio.origenIata}</TableCell>
+                                                            <TableCell>{envio.destinoIata}</TableCell>
+                                                            <TableCell align="right">{envio.cantidadMaletas}</TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                <TableRow>
+                                                    <TablePagination page={page}
+                                                                     onPageChange={(_,value)=>setPage(value)}
+                                                                     rowsPerPage={rowsPerPage}
+                                                                     onRowsPerPageChange={(e)=>setRowsPerPage(Number(e.target.value))}
+                                                                     count={enviosFiltrados.length}
+                                                    />
+                                                </TableRow>
+                                            </TableBody>
 
-                                    </Table>
-                                </Box>
-                            </Stack>
-                        )}</>)}
-                </AccordionDetails>
-            </Accordion>
-        </Paper>
+                                        </Table>
+                                    </Box>
+                                </Stack>
+                            )}</>)}
+                    </AccordionDetails>
+                </Accordion>
+            </Paper>
+        </Draggable>
+
     );
 }
 
