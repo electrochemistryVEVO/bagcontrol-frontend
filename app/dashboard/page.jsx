@@ -1,3 +1,3 @@
 export default function Home(){
-    return (<div>Pagina de dashboard</div>);
+    return (<div>Panel de control</div>);
 }

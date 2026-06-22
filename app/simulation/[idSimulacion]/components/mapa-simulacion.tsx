@@ -13,7 +13,7 @@ import {
   SymbolLayerSpecification,
 } from '@vis.gl/react-maplibre';
 import { useMemo, useRef, useState, useEffect, RefObject, useCallback } from 'react';
-import { Feature } from 'geojson';
+import {Feature, FeatureCollection} from 'geojson';
 import { MapLibreEvent } from 'maplibre-gl';
 import type { GeoJSONSource, StyleSpecification } from 'maplibre-gl';
 // @ts-ignore
@@ -382,7 +382,10 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
     enfocarCoordenadas([pos[0], pos[1]], 6.5);
   }, [coordsAeropuertos, enfocarCoordenadas, tiempoSimulacionRef, vuelosActivosRef]);
 
+
   const mostrarRutaEnvio = useCallback(async (idPedido: string) => {
+    const idNormalizado = idPedido.trim();
+    if (!idNormalizado) return;  
     const id = idPedido.trim();
     if (!id) return;
     try {
@@ -393,7 +396,7 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
       setIdEnvioBusqueda(id);
     } catch {
       setRutaEnvio(null);
-      setRutaError(`No se encontro ruta para el envio ${id}`);
+      setRutaError(`No se encontró ruta para el envío ${idNormalizado}`);
     }
   }, [idSimulacion, tiempoSimulacionRef]);
 
@@ -406,6 +409,18 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
       return { type: 'Feature', properties: { index: i + 1, codigoVuelo: String(escala.codigoVuelo), origenIata: escala.origenIata, destinoIata: escala.destinoIata }, geometry: { type: 'LineString', coordinates: [o, d] } };
     }).filter((f): f is Feature => f !== null);
   }, [coordsAeropuertos, rutaEnvio]);
+
+  const seleccionarVuelo = useCallback(async (codigoVuelo : string)=>{
+    const map = mapRef.current?.getMap();
+    if(!map)return;
+    const sourceAviones = map.getSource('aviones-data') as GeoJSONSource;
+    const feature = ((await sourceAviones.getData()) as FeatureCollection).features.find(e=>e.properties?.codigoVuelo === codigoVuelo) as MapGeoJSONFeature;
+    console.log(feature)
+    setSelFlight(feature ?? null);
+    setPanelOpen(true);
+    const coords = obtenerCoordenadasFeature(feature ?? null);
+    if (coords) enfocarCoordenadas(coords, 6.5);
+  },[featuresRutaEnvio,enfocarCoordenadas])
 
   const enfocarRutaEnvio = useCallback(() => {
     const coords = featuresRutaEnvio.flatMap(f => f.geometry.type === 'LineString' ? (f.geometry.coordinates as [number, number][]) : []);
@@ -553,6 +568,10 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
     popupRef.current?.trackPointer();
   };
 
+    function setBackgroundLoaded(arg0: boolean) {
+      throw new Error('Function not implemented.');
+    }
+
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <Drawer open={panelOpen} onClose={() => setPanelOpen(false)}>
@@ -566,18 +585,49 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
       <PanelEnvios aeropuertos={aeropuertosSnapshot} envios={enviosSnapshot} visible={conectado} onMostrarRutaEnvio={mostrarRutaEnvio} />
       <PanelAeropuertos aeropuertos={aeropuertosSnapshot} visible={conectado} onEnfocarAeropuerto={enfocarAeropuerto} />
 
-      {/* BUSCADOR DE ENVÍOS */}
-      <div style={{ position: 'absolute', top: 16, left: 16, zIndex: 10, background: 'rgba(15, 23, 42, 0.92)', color: '#fff', padding: 12, borderRadius: 8, width: 320, boxShadow: '0 8px 20px rgba(0,0,0,0.25)' }}>
-        <form onSubmit={(e) => { e.preventDefault(); mostrarRutaEnvio(idEnvioBusqueda); }} style={{ display: 'flex', gap: 8 }}>
-          <input value={idEnvioBusqueda} onChange={(e) => setIdEnvioBusqueda(e.target.value)} placeholder="ID de envio" style={{ flex: 1, borderRadius: 6, border: '1px solid #64748b', padding: '7px 9px', color: '#fff', background: '#1e293b', outline: 'none' }} />
-          <button type="submit" style={{ border: 'none', borderRadius: 6, padding: '7px 10px', background: '#38bdf8', color: '#0f172a', fontWeight: 700 }}>Ruta</button>
+      <div style={{
+        position: 'absolute',
+        top: 16,
+        left: 16,
+        zIndex: 10,
+        background: 'rgba(15, 23, 42, 0.92)',
+        color: '#fff',
+        padding: 12,
+        borderRadius: 8,
+        width: 320,
+        boxShadow: '0 8px 20px rgba(0,0,0,0.25)'
+      }}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            mostrarRutaEnvio(idEnvioBusqueda);
+          }}
+          style={{ display: 'flex', gap: 8 }}
+        >
+          <input
+            value={idEnvioBusqueda}
+            onChange={(e) => setIdEnvioBusqueda(e.target.value)}
+            placeholder="ID de envío"
+            style={{
+              flex: 1,
+              borderRadius: 6,
+              border: '1px solid #64748b',
+              padding: '7px 9px',
+              color: '#fff',
+              background: '#1e293b',
+              outline: 'none'
+            }}
+          />
+          <button type="submit" style={{ border: 'none', borderRadius: 6, padding: '7px 10px', background: '#38bdf8', color: '#0f172a', fontWeight: 700 }}>
+            Ruta
+          </button>
         </form>
         {rutaError && <div style={{ marginTop: 8, fontSize: 12, color: '#fecaca' }}>{rutaError}</div>}
         {rutaEnvio && (
           <div style={{ marginTop: 10, fontSize: 12, lineHeight: 1.45 }}>
             <div style={{ fontWeight: 700 }}>Envio {rutaEnvio.envio.idPedido}</div>
             <div>{rutaEnvio.envio.origenIata} - {rutaEnvio.envio.destinoIata} · {rutaEnvio.envio.cantidadMaletas} maletas</div>
-            <div>Estado: {rutaEnvio.estado} · Actual: {rutaEnvio.aeropuertoActual ?? 'N/A'}</div>
+            <div>Estado: {rutaEnvio.estado} · Actual: {rutaEnvio.aeropuertoActual ?? 'No disponible'}</div>
             <div style={{ marginTop: 6, maxHeight: 120, overflowY: 'auto' }}>
               {rutaEnvio.escalas.length === 0 ? <div>Sin itinerario asignado.</div>
                 : rutaEnvio.escalas.map((escala, i) => (
@@ -590,9 +640,27 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
           </div>
         )}
       </div>
-
-      <MapLibre ref={backgroundMapRef} style={{ zIndex: 17, position: 'absolute' }} mapStyle={MAP_STYLE_URL} />
-
+      <MapLibre
+          ref={backgroundMapRef}
+          style={{zIndex:17,position:'absolute'}}
+          mapStyle="https://tiles.openfreemap.org/styles/bright"
+          onLoad={async (e: MapLibreEvent) => {
+            const language = 'es';
+            backgroundMapRef.current?.getMap().setLayoutProperty('label_country_1', 'text-field', [
+              'get',
+              `name:${language}`
+            ]);
+            backgroundMapRef.current?.getMap().setLayoutProperty('label_country_2', 'text-field', [
+              'get',
+              `name:${language}`
+            ]);
+            backgroundMapRef.current?.getMap().setLayoutProperty('label_country_3', 'text-field', [
+              'get',
+              `name:${language}`
+            ]);
+            setBackgroundLoaded(true);
+          }}
+      ></MapLibre>
       <MapLibre
         ref={mapRef}
         style={{ position: 'absolute', zIndex: 18 }}
@@ -623,7 +691,7 @@ export function MapaSimulacion({ aeropuertosIniciales, aeropuertosRef, vuelosAct
           <Layer {...layerStyleRutaEnvio} />
         </Source>
 
-        {/* Aeropuertos: se montan apenas su propio ícono esta listo, sin esperar a los aviones */}
+        
         {iconosAeropuertoListos && (
           <Source id="aeropuertos-data" type="geojson" data={{ type: 'FeatureCollection', features: featuresAeropuertosIniciales }}>
             <Layer {...layerStyleAeropuertos} />

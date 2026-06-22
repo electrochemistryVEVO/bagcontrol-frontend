@@ -24,11 +24,12 @@ import {
   Typography,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
-import { useMemo, useState, RefObject } from 'react';
+import {useMemo, useState, RefObject, useRef} from 'react';
 import { SimulacionService } from '@/app/services/simulation.service';
 import type { Envio } from '@/app/shared/types/Envio';
 import type { EstadoCapacidad, EventoVuelo } from '@/app/shared/types/Evento';
 import styles from '../../../stylesheets/simpanel.module.css'
+import Draggable from "react-draggable";
 
 type OrdenVuelos = 'ocupacion' | 'salida' | 'llegada' | 'origen' | 'destino';
 
@@ -36,6 +37,7 @@ type PanelVuelosProps = {
   idSimulacion: string;
   vuelosActivos: EventoVuelo[];
   tiempoSimulacionRef: RefObject<number>;
+  seleccionarVuelo:(codigoVuelo: string) => void;
   visible: boolean;
   onEnfocarVuelo: (codigoVuelo: string | number) => void;
 };
@@ -81,7 +83,8 @@ function compararTexto(a: string, b: string) {
   return a.localeCompare(b, 'es', { sensitivity: 'base' });
 }
 
-export function PanelVuelos({ idSimulacion, vuelosActivos, tiempoSimulacionRef, visible, onEnfocarVuelo }: PanelVuelosProps) {
+export function PanelVuelos({ idSimulacion, vuelosActivos, tiempoSimulacionRef, visible,seleccionarVuelo, onEnfocarVuelo }: PanelVuelosProps) {
+
   const [panelAbierto, setPanelAbierto] = useState(false);
   const [busqueda, setBusqueda] = useState('');
   const [orden, setOrden] = useState<OrdenVuelos>('ocupacion');
@@ -90,6 +93,8 @@ export function PanelVuelos({ idSimulacion, vuelosActivos, tiempoSimulacionRef, 
   const [enviosPorVuelo, setEnviosPorVuelo] = useState<EnviosPorVuelo>({});
   const [loadingPorVuelo, setLoadingPorVuelo] = useState<LoadingPorVuelo>({});
   const [errorPorVuelo, setErrorPorVuelo] = useState<Record<string, string>>({});
+
+  const nodeRef = useRef<HTMLDivElement>(null);
 
   const [page,setPage] = useState<number>(1);
   //const [rowsPerPage,setRowsPerPage] = useState<number>(10);
@@ -171,7 +176,7 @@ export function PanelVuelos({ idSimulacion, vuelosActivos, tiempoSimulacionRef, 
 
     try {
       const timestamp = new Date(tiempoSimulacionRef.current).toISOString();
-      const { data } = await SimulacionService.obtenerEnviosPorVuelo(idSimulacion, vuelo.codigoVuelo, timestamp);
+      const { data } = await SimulacionService.obtenerEnviosPorVuelo(idSimulacion, vuelo, timestamp);
       setEnviosPorVuelo((actual) => ({ ...actual, [codigoVuelo]: data }));
     } catch {
       setErrorPorVuelo((actual) => ({
@@ -184,347 +189,335 @@ export function PanelVuelos({ idSimulacion, vuelosActivos, tiempoSimulacionRef, 
   };
 
   return (
-      <Paper elevation={8} className={styles.paperVuelos}>
-        <Accordion
-            expanded={panelAbierto}
-            onChange={(_, expanded) => setPanelAbierto(expanded)}
-            disableGutters
-            className={styles.accordion}
-        >
-          <AccordionSummary className={styles.accordionSummary}>
-            <Typography sx={{ fontWeight: 700 }}>Vuelos en aire</Typography>
-            <Chip
-                size="small"
-                label={vuelosActivos.length}
-                color={vuelosActivos.length ? "primary" : "default"}
-            />
-          </AccordionSummary>
+      <Draggable
+          nodeRef={nodeRef as RefObject<HTMLDivElement>}
+      >
+        <Paper elevation={8} ref={nodeRef} className={styles.paperVuelos}>
+          <Accordion
+              expanded={panelAbierto}
+              onChange={(_, expanded) => setPanelAbierto(expanded)}
+              disableGutters
+              className={styles.accordion}
+          >
+            <AccordionSummary className={styles.accordionSummary}>
+              <Typography sx={{ fontWeight: 700 }}>Vuelos en aire</Typography>
+              <Chip
+                  size="small"
+                  label={vuelosActivos.length}
+                  color={vuelosActivos.length ? "primary" : "default"}
+              />
+            </AccordionSummary>
 
-          <AccordionDetails className={styles.accordionDetails}>
-            {panelAbierto && (
-                <>
-                  <Stack spacing={1.5} className={styles.filtersContainer}>
-                    <TextField
-                        size="small"
-                        value={busqueda}
-                        onChange={(event) => setBusqueda(event.target.value)}
-                        placeholder="Buscar vuelo, origen o destino"
-                        fullWidth
-                        className={styles.input}
-                    />
+            <AccordionDetails className={styles.accordionDetails}>
+              {panelAbierto && (
+                  <>
+                    <Stack spacing={1.5} className={styles.filtersContainer}>
+                      <TextField
+                          size="small"
+                          value={busqueda}
+                          onChange={(event) => setBusqueda(event.target.value)}
+                          placeholder="Buscar vuelo, origen o destino"
+                          fullWidth
+                          className={styles.input}
+                      />
 
-                    <FormControl
-                        size="small"
-                        fullWidth
-                        className={styles.input}
-                    >
-                      <InputLabel id="orden-vuelos-label">
-                        Ordenar por
-                      </InputLabel>
-
-                      <Select
-                          labelId="orden-vuelos-label"
-                          value={orden}
-                          label="Ordenar por"
-                          onChange={(event: SelectChangeEvent) =>
-                              setOrden(event.target.value as OrdenVuelos)
-                          }
+                      <FormControl
+                          size="small"
+                          fullWidth
+                          className={styles.input}
                       >
-                        <MenuItem value="ocupacion">
-                          Nivel de ocupacion
-                        </MenuItem>
-                        <MenuItem value="salida">
-                          Hora salida
-                        </MenuItem>
-                        <MenuItem value="llegada">
-                          Hora llegada
-                        </MenuItem>
-                        <MenuItem value="origen">
-                          Origen
-                        </MenuItem>
-                        <MenuItem value="destino">
-                          Destino
-                        </MenuItem>
-                      </Select>
-                    </FormControl>
+                        <InputLabel id="orden-vuelos-label">
+                          Ordenar por
+                        </InputLabel>
 
-                    <Stack direction="row" spacing={1}>
-                      {ESTADOS_CAPACIDAD.map((estado) => {
-                        const activo = filtroEstados.includes(estado);
-                        return (
-                          <Chip
-                            key={estado}
-                            size="small"
-                            label={etiquetaPorEstado[estado]}
-                            color={colorPorEstado[estado]}
-                            variant={activo ? 'filled' : 'outlined'}
-                            onClick={() => toggleFiltroEstado(estado)}
-                            sx={{ cursor: 'pointer', fontWeight: activo ? 700 : 400 }}
-                          />
-                        );
-                      })}
+                        <Select
+                            labelId="orden-vuelos-label"
+                            value={orden}
+                            label="Ordenar por"
+                            onChange={(event: SelectChangeEvent) =>
+                                setOrden(event.target.value as OrdenVuelos)
+                            }
+                        >
+                          <MenuItem value="ocupacion">
+                            Nivel de ocupacion
+                          </MenuItem>
+                          <MenuItem value="salida">
+                            Hora salida
+                          </MenuItem>
+                          <MenuItem value="llegada">
+                            Hora llegada
+                          </MenuItem>
+                          <MenuItem value="origen">
+                            Origen
+                          </MenuItem>
+                          <MenuItem value="destino">
+                            Destino
+                          </MenuItem>
+                        </Select>
+                      </FormControl>
                     </Stack>
-                  </Stack>
 
-                  {vuelosFiltrados.length === 0 ? (
-                      <Box className={styles.empty}>
-                        No hay vuelos activos
-                      </Box>
-                  ) : (
-                      <Stack spacing={1} className={styles.scrollList}>
-                        {vuelosFiltrados
-                            .slice(
-                                (page - 1) * rowsPerPage,
-                                page * rowsPerPage
-                            )
-                            .map((vuelo) => {
-                              const codigoVuelo = String(
-                                  vuelo.codigoVuelo
-                              );
+                    {vuelosFiltrados.length === 0 ? (
+                        <Box className={styles.empty}>
+                          No hay vuelos activos
+                        </Box>
+                    ) : (
+                        <Stack spacing={1} className={styles.scrollList}>
+                          {vuelosFiltrados
+                              .slice(
+                                  (page - 1) * rowsPerPage,
+                                  page * rowsPerPage
+                              )
+                              .map((vuelo) => {
+                                const codigoVuelo = String(
+                                    vuelo.codigoVuelo
+                                );
 
-                              const expandido =
-                                  vueloExpandido === codigoVuelo;
+                                const expandido =
+                                    vueloExpandido === codigoVuelo;
 
-                              const envios =
-                                  enviosPorVuelo[codigoVuelo] || [];
+                                const envios =
+                                    enviosPorVuelo[codigoVuelo] || [];
 
-                              const enviosCargados =
-                                  expandido &&
-                                  enviosPorVuelo[codigoVuelo] !==
-                                  undefined;
+                                const enviosCargados =
+                                    expandido &&
+                                    enviosPorVuelo[codigoVuelo] !==
+                                    undefined;
 
-                              const cantidadMaletasHeader =
-                                  enviosCargados
-                                      ? envios.reduce(
-                                          (sum, envio) =>
-                                              sum +
-                                              envio.cantidadMaletas,
-                                          0
-                                      )
-                                      : vuelo.cantidadMaletas;
+                                const cantidadMaletasHeader =
+                                    enviosCargados
+                                        ? envios.reduce(
+                                            (sum, envio) =>
+                                                sum +
+                                                envio.cantidadMaletas,
+                                            0
+                                        )
+                                        : vuelo.cantidadMaletas;
 
-                              const ocupacion =
-                                  calcularOcupacionPorMaletas(
-                                      cantidadMaletasHeader,
-                                      vuelo.capacidadMax
-                                  );
+                                const ocupacion =
+                                    calcularOcupacionPorMaletas(
+                                        cantidadMaletasHeader,
+                                        vuelo.capacidadMax
+                                    );
 
-                              const estado = enviosCargados
-                                  ? obtenerEstadoPorOcupacion(
-                                      ocupacion
-                                  )
-                                  : obtenerEstadoVuelo(vuelo);
+                                const estado = enviosCargados
+                                    ? obtenerEstadoPorOcupacion(
+                                        ocupacion
+                                    )
+                                    : obtenerEstadoVuelo(vuelo);
 
-                              return (
-                                  <Box
-                                      key={codigoVuelo}
-                                      className={styles.airportBoxList}
-                                  >
-                                    <Button
-                                        fullWidth
-                                        onClick={() =>
-                                            cargarEnvios(vuelo)
-                                        }
-                                        className={styles.airportButton}
+                                return (
+                                    <Box
+                                        key={codigoVuelo}
+                                        className={styles.airportBoxList}
                                     >
-                                      <Box
-                                          className={
-                                            styles.airportContent
+                                      <Button
+                                          fullWidth
+                                          onClick={() =>
+                                              seleccionarVuelo(String(vuelo.codigoVuelo))
                                           }
+                                          className={styles.airportButton}
                                       >
-                                        <Stack
-                                            className={
-                                              styles.airportHeader
-                                            }
-                                        >
-                                          <Typography
-                                              className={
-                                                styles.airportCode
-                                              }
-                                          >
-                                            Vuelo {codigoVuelo}
-                                          </Typography>
-
-                                          <Chip
-                                              size="small"
-                                              label={estado}
-                                              color={
-                                                colorPorEstado[
-                                                    estado
-                                                    ]
-                                              }
-                                          />
-                                        </Stack>
-
-                                        <Typography
-                                            variant="body2"
-                                            className={
-                                              styles.airportLocation
-                                            }
-                                        >
-                                          {vuelo.origenIata} -{" "}
-                                          {vuelo.destinoIata}
-                                        </Typography>
-
-                                        <Stack
-                                            className={
-                                              styles.airportFooter
-                                            }
-                                        >
-                                          <Typography
-                                              variant="caption"
-                                              className={
-                                                styles.airportCapacity
-                                              }
-                                          >
-                                            {
-                                              cantidadMaletasHeader
-                                            }
-                                            /
-                                            {
-                                              vuelo.capacidadMax
-                                            }{" "}
-                                            maletas
-                                          </Typography>
-
-                                          <Typography
-                                              variant="caption"
-                                              className={
-                                                styles.airportOccupation
-                                              }
-                                          >
-                                            {ocupacion}%
-                                          </Typography>
-                                        </Stack>
-                                      </Box>
-                                    </Button>
-
-                                    {expandido && (
                                         <Box
                                             className={
-                                              styles.expandedContent
+                                              styles.airportContent
                                             }
                                         >
-                                          {loadingPorVuelo[
-                                              codigoVuelo
-                                              ] ? (
-                                              <Box
-                                                  sx={{
-                                                    display: "flex",
-                                                    justifyContent:
-                                                        "center",
-                                                    py: 2,
-                                                  }}
-                                              >
-                                                <CircularProgress
-                                                    size={22}
-                                                    className={styles.loadingContainer}
-                                                />
-                                              </Box>
-                                          ) : errorPorVuelo[
-                                              codigoVuelo
-                                              ] ? (
-                                              <Typography
-                                                  variant="body2"
-                                                  color="error"
-                                              >
-                                                {
-                                                  errorPorVuelo[
-                                                      codigoVuelo
+                                          <Stack
+                                              className={
+                                                styles.airportHeader
+                                              }
+                                          >
+                                            <Typography
+                                                className={
+                                                  styles.airportCode
+                                                }
+                                            >
+                                              Vuelo {codigoVuelo}
+                                            </Typography>
+
+                                            <Chip
+                                                size="small"
+                                                label={estado}
+                                                color={
+                                                  colorPorEstado[
+                                                      estado
                                                       ]
                                                 }
-                                              </Typography>
-                                          ) : envios.length ===
-                                          0 ? (
-                                              <Box
-                                                  className={
-                                                    styles.empty
-                                                  }
-                                              >
-                                                Sin envios asignados
-                                              </Box>
-                                          ) : (
-                                              <Table
-                                                  size="small"
-                                                  className={
-                                                    styles.table
-                                                  }
-                                              >
-                                                <TableHead>
-                                                  <TableRow>
-                                                    <TableCell>
-                                                      ID
-                                                    </TableCell>
-                                                    <TableCell>
-                                                      Origen
-                                                    </TableCell>
-                                                    <TableCell>
-                                                      Destino
-                                                    </TableCell>
-                                                    <TableCell align="right">
-                                                      Maletas
-                                                    </TableCell>
-                                                  </TableRow>
-                                                </TableHead>
+                                            />
+                                          </Stack>
 
-                                                <TableBody>
-                                                  {envios.map(
-                                                      (envio) => (
-                                                          <TableRow
-                                                              key={
-                                                                envio.idPedido
-                                                              }
-                                                          >
-                                                            <TableCell>
-                                                              {
-                                                                envio.idPedido
-                                                              }
-                                                            </TableCell>
-                                                            <TableCell>
-                                                              {
-                                                                envio.origenIata
-                                                              }
-                                                            </TableCell>
-                                                            <TableCell>
-                                                              {
-                                                                envio.destinoIata
-                                                              }
-                                                            </TableCell>
-                                                            <TableCell align="right">
-                                                              {
-                                                                envio.cantidadMaletas
-                                                              }
-                                                            </TableCell>
-                                                          </TableRow>
-                                                      )
-                                                  )}
-                                                </TableBody>
-                                              </Table>
-                                          )}
+                                          <Typography
+                                              variant="body2"
+                                              className={
+                                                styles.airportLocation
+                                              }
+                                          >
+                                            {vuelo.origenIata} -{" "}
+                                            {vuelo.destinoIata}
+                                          </Typography>
+
+                                          <Stack
+                                              className={
+                                                styles.airportFooter
+                                              }
+                                          >
+                                            <Typography
+                                                variant="caption"
+                                                className={
+                                                  styles.airportCapacity
+                                                }
+                                            >
+                                              {
+                                                cantidadMaletasHeader
+                                              }
+                                              /
+                                              {
+                                                vuelo.capacidadMax
+                                              }{" "}
+                                              maletas
+                                            </Typography>
+
+                                            <Typography
+                                                variant="caption"
+                                                className={
+                                                  styles.airportOccupation
+                                                }
+                                            >
+                                              {ocupacion}%
+                                            </Typography>
+                                          </Stack>
                                         </Box>
-                                    )}
-                                  </Box>
-                              );
-                            })}
+                                      </Button>
 
-                        <Pagination
-                            className={styles.pagination}
-                            page={page}
-                            onChange={(_, value) =>
-                                setPage(value)
-                            }
-                            count={Math.ceil(
-                                vuelosFiltrados.length /
-                                rowsPerPage
-                            )}
-                        />
-                      </Stack>
-                  )}
-                </>
-            )}
-          </AccordionDetails>
-        </Accordion>
-      </Paper>
+                                      {expandido && (
+                                          <Box
+                                              className={
+                                                styles.expandedContent
+                                              }
+                                          >
+                                            {loadingPorVuelo[
+                                                codigoVuelo
+                                                ] ? (
+                                                <Box
+                                                    sx={{
+                                                      display: "flex",
+                                                      justifyContent:
+                                                          "center",
+                                                      py: 2,
+                                                    }}
+                                                >
+                                                  <CircularProgress
+                                                      size={22}
+                                                      className={styles.loadingContainer}
+                                                  />
+                                                </Box>
+                                            ) : errorPorVuelo[
+                                                codigoVuelo
+                                                ] ? (
+                                                <Typography
+                                                    variant="body2"
+                                                    color="error"
+                                                >
+                                                  {
+                                                    errorPorVuelo[
+                                                        codigoVuelo
+                                                        ]
+                                                  }
+                                                </Typography>
+                                            ) : envios.length ===
+                                            0 ? (
+                                                <Box
+                                                    className={
+                                                      styles.empty
+                                                    }
+                                                >
+                                                  Sin envios asignados
+                                                </Box>
+                                            ) : (
+                                                <Table
+                                                    size="small"
+                                                    className={
+                                                      styles.table
+                                                    }
+                                                >
+                                                  <TableHead>
+                                                    <TableRow>
+                                                      <TableCell>
+                                                        ID
+                                                      </TableCell>
+                                                      <TableCell>
+                                                        Origen
+                                                      </TableCell>
+                                                      <TableCell>
+                                                        Destino
+                                                      </TableCell>
+                                                      <TableCell align="right">
+                                                        Maletas
+                                                      </TableCell>
+                                                    </TableRow>
+                                                  </TableHead>
+
+                                                  <TableBody>
+                                                    {envios.map(
+                                                        (envio) => (
+                                                            <TableRow
+                                                                key={
+                                                                  envio.idPedido
+                                                                }
+                                                            >
+                                                              <TableCell>
+                                                                {
+                                                                  envio.idPedido
+                                                                }
+                                                              </TableCell>
+                                                              <TableCell>
+                                                                {
+                                                                  envio.origenIata
+                                                                }
+                                                              </TableCell>
+                                                              <TableCell>
+                                                                {
+                                                                  envio.destinoIata
+                                                                }
+                                                              </TableCell>
+                                                              <TableCell align="right">
+                                                                {
+                                                                  envio.cantidadMaletas
+                                                                }
+                                                              </TableCell>
+                                                            </TableRow>
+                                                        )
+                                                    )}
+                                                  </TableBody>
+                                                </Table>
+                                            )}
+                                          </Box>
+                                      )}
+                                    </Box>
+                                );
+                              })}
+
+                          <Pagination
+                              className={styles.pagination}
+                              page={page}
+                              onChange={(_, value) =>
+                                  setPage(value)
+                              }
+                              count={Math.ceil(
+                                  vuelosFiltrados.length /
+                                  rowsPerPage
+                              )}
+                          />
+                        </Stack>
+                    )}
+                  </>
+              )}
+            </AccordionDetails>
+          </Accordion>
+        </Paper>
+      </Draggable>
+
   );
 }
 
@@ -566,6 +559,17 @@ const paginationSx = {
     fontSize: 12,
   }
 }
+
+const miniButtonStyle: React.CSSProperties = {
+  border: 'none',
+  borderRadius: 6,
+  padding: '5px 9px',
+  background: '#2563eb',
+  color: '#fff',
+  fontSize: 12,
+  fontWeight: 700,
+  cursor: 'pointer',
+};
 
 const scrollListSx = {
   flex: 1,
