@@ -27,4 +27,13 @@ export const AeropuertoService = {
 
   eliminarAeropuerto: (iata: string) =>
     axiosApi.delete(`/aeropuertos/${iata}`),
+
+  cargarCsv: (archivo: File) => {
+    const fd = new FormData()
+    fd.append('archivo', archivo)
+    return axiosApi.post<{ insertados: number; errores: string[]; totalFilas: number }>(
+      '/aeropuertos/cargar-csv', fd,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    )
+  },
 }

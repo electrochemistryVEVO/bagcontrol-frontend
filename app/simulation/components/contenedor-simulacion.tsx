@@ -38,7 +38,7 @@ export function ContenedorSimulacion() {
     const handlePreparar = async () => {
         if (simulationType == null) return showToast("Tienes que seleccionar un tipo de simulación");
         if (startDate == null) return showToast("Tienes que seleccionar la fecha de inicio");
-      
+
         const _startDate = startDate;
         const _endDate = (
             simulationType === SimulationType.VENTANA_TIEMPO ? new Date(_startDate.getTime() + 1000*60*60*24*5) :
