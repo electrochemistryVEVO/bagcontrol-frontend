@@ -8,6 +8,7 @@ export type ParametrosSimulacion = {
   fechaFin?: string;   // Opcional para el escenario de colapso
   k?: number;
   algoritmo?: string;  // ej: 'TABU' o 'GRASP'
+  modo?: string;       // '0' (OPERACION_DIA), '1' (VENTANA_CINCO_DIAS), '2' (COLAPSO_OPERATIVO)
 }
 
 export const SimulacionService = {

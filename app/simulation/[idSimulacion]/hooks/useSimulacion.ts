@@ -21,6 +21,7 @@ export function useSimulacion(
   K: number,
   SaS: number,
   fechaInicio: string,
+  modo: string = '',
   onNuevoLote?: () => void
 ) {
   const [conectado, setConectado] = useState(false);
@@ -161,7 +162,11 @@ export function useSimulacion(
   useEffect(() => {
     const msSimuladosPorLote = K * 60 * 1000;   // ej: 90min → 5_400_000 ms
     const msRealesPorLote    = SaS * 1000;       // ej: 90s  →    90_000 ms
-    const factorAceleracion  = msSimuladosPorLote / msRealesPorLote; // = 60
+    // En operación día a día, el reloj debe avanzar en tiempo real (1s real = 1s sim)
+    // independientemente de K y SaS, para que un vuelo de 2h demore 2h reales
+    const factorAceleracion  = modo === '0'
+      ? 1
+      : msSimuladosPorLote / msRealesPorLote;
     let running = true;
     let ultimoFrame = Date.now();
     let tickCount = 0;

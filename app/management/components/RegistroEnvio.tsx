@@ -26,8 +26,8 @@ export function RegistroEnvio({ envioInicial, onSuccess, onCancel }: Props) {
     destinoIata: envioInicial.destinoIata,
     idCliente: envioInicial.idCliente,
     cantidadMaletas: envioInicial.cantidadMaletas,
-    fechaHora: toDateTimeLocal(envioInicial.fechaHora),
-  } : formularioVacio)
+    fechaHora: toDateTimeLocal(new Date(envioInicial.fechaHora)),
+  } : { ...formularioVacio, fechaHora: toDateTimeLocal(new Date()) })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [exito, setExito] = useState(false)
@@ -40,7 +40,7 @@ export function RegistroEnvio({ envioInicial, onSuccess, onCancel }: Props) {
 
   const handleSubmit = async () => {
     setError(null)
-    if (!form.origenIata || !form.destinoIata || !form.idCliente || !form.fechaHora) {
+    if (!form.origenIata || !form.destinoIata || !form.idCliente) {
       setError('Completa todos los campos obligatorios')
       return
     }
@@ -59,7 +59,7 @@ export function RegistroEnvio({ envioInicial, onSuccess, onCancel }: Props) {
         destinoIata: form.destinoIata,
         idCliente: form.idCliente,
         cantidadMaletas: form.cantidadMaletas,
-        fechaHora: new Date(form.fechaHora).toISOString(),
+        fechaHora: form.fechaHora ? new Date(form.fechaHora).toISOString() : new Date().toISOString(),
       }
       const respuesta = envioInicial
         ? await EnvioService.actualizarEnvio(envioInicial.idPedido, payload)
@@ -132,9 +132,18 @@ export function RegistroEnvio({ envioInicial, onSuccess, onCancel }: Props) {
 
           <div style={{ gridColumn: '1 / -1' }}>
             <label style={S.label}>Fecha y hora de ingreso</label>
-            <input type="datetime-local" style={S.input} value={form.fechaHora}
-              onChange={e => setForm(f => ({ ...f, fechaHora: e.target.value }))} />
-            <p style={S.hint}>Fecha y hora local de recepción en el aeropuerto de origen</p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input type="datetime-local" style={{ ...S.input, flex: 1 }} value={form.fechaHora}
+                onChange={e => setForm(f => ({ ...f, fechaHora: e.target.value }))} />
+              <button
+                type="button"
+                onClick={() => setForm(f => ({ ...f, fechaHora: toDateTimeLocal(new Date()) }))}
+                style={S.btnSecondary}
+              >
+                Usar hora actual
+              </button>
+            </div>
+            <p style={S.hint}>Si lo dejas vacío, se usará la hora actual al registrar.</p>
           </div>
         </div>
 
@@ -158,10 +167,16 @@ export function RegistroEnvio({ envioInicial, onSuccess, onCancel }: Props) {
   )
 }
 
-function toDateTimeLocal(fechaHora: string): string {
-  const fecha = new Date(fechaHora)
-  const offsetMs = fecha.getTimezoneOffset() * 60_000
-  return new Date(fecha.getTime() - offsetMs).toISOString().slice(0, 16)
+function toDateTimeLocal(fecha: Date): string {
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return [
+    fecha.getFullYear(),
+    pad(fecha.getMonth() + 1),
+    pad(fecha.getDate()),
+  ].join('-') + 'T' + [
+    pad(fecha.getHours()),
+    pad(fecha.getMinutes()),
+  ].join(':');
 }
 
 // ─── Shared styles object ────────────────────────────────────────────────────

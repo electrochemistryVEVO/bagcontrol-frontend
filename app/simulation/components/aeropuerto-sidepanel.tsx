@@ -68,8 +68,10 @@ function AeropuertoPanelContents({
     if (!data) return null;
 
     // Cálculo dinámico de la fecha hora local según el desfase GMT del aeropuerto seleccionado
-    const obtenerHoraLocal = () => {
-        const d = new Date();
+    // Usa el reloj simulado (tiempoSimulacionRef.current) en vez de new Date()
+    // para que la hora local coincida con la simulación, no con el wall-clock
+    const obtenerHoraLocal = (epochSimuladoMs: number) => {
+        const d = new Date(epochSimuladoMs);
         const utcMs = d.getTime() + (d.getTimezoneOffset() * 60000);
         const fechaLocal = new Date(utcMs + (3600000 * data.gmt));
         return HourFormat(fechaLocal);
@@ -122,7 +124,7 @@ function AeropuertoPanelContents({
                             <span>Hora Local</span>
                         </div>
                         <div className={styles["flight-location"]}>
-                            <div>{obtenerHoraLocal()}</div>
+                            <div>{obtenerHoraLocal(tiempoSimulacionRef.current)}</div>
                             <div>(GMT {data.gmt > 0 ? "+" : ""}{data.gmt})</div>
                         </div>
                     </div>

@@ -7,7 +7,7 @@ export default async function SimulacionPage({
   searchParams 
 }: { 
   params: Promise<{ idSimulacion: string }>;
-  searchParams: Promise<{ topic?: string, k?: string }>;
+  searchParams: Promise<{ topic?: string, k?: string, modo?: string }>;
 }) {
     const resolvedParams = await params;
     const resolvedSearchParams = await searchParams;
@@ -22,11 +22,12 @@ export default async function SimulacionPage({
 
     const k = Number(resolvedSearchParams.k ?? 300);
   return (
-    <SimulacionCliente 
+    <SimulacionCliente
       id={resolvedParams.idSimulacion}
       topic={resolvedSearchParams.topic ?? ''}
       k={Number.isFinite(k) && k > 0 ? k : 300}
-      aeropuertosIniciales={aeropuertosIniciales} 
+      modo={resolvedSearchParams.modo ?? ''}
+      aeropuertosIniciales={aeropuertosIniciales}
       errorInicial={errorInicial}
     />
   );

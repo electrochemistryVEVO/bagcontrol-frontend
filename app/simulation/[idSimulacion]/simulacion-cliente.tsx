@@ -10,17 +10,21 @@ interface Props {
   id: string;
   topic: string;
   k: number;
+  modo?: string;
   aeropuertosIniciales: Aeropuerto[];
   errorInicial?: string | null;
 }
 
-export function SimulacionCliente({ id, topic, k, aeropuertosIniciales, errorInicial }: Props) {
-  const SaS_SEGUNDOS = 90;
+export function SimulacionCliente({ id, topic, k, modo, aeropuertosIniciales, errorInicial }: Props) {
+  // En operación día a día (modo='0'), SaS = K*60 para que factorAceleracion = 1
+  // (tiempo real: 1s real = 1s sim, un vuelo de 2h tarda 2h reales)
+  // En otros modos, SaS = 90 (factor 20x con K=30)
+  const SaS_SEGUNDOS = modo === '0' ? k * 60 : 90;
   const { showToast, ToastComponent } = useToast();
 
   // 1. Extraemos la fecha que el formulario dejó guardada en el localStorage
   const fechaGuardada = typeof window !== 'undefined' ? localStorage.getItem("fechaInicio") : null;
-  
+
   // 2. Construimos la fecha de arranque de forma segura
   const obtenerFechaInicioISO = (): string => {
     if (fechaGuardada) {
@@ -31,23 +35,24 @@ export function SimulacionCliente({ id, topic, k, aeropuertosIniciales, errorIni
   };
 
   const fechaInicioReal = obtenerFechaInicioISO();
-  
+
   // El estado del ciclo de vida vive en el hook — lo recibimos directamente.
-  const { 
+  const {
     conectado,
     estadoSim,
     setEstadoSim,
-    aeropuertosRef, 
+    aeropuertosRef,
     vuelosActivosRef,
       enviosPlanificadosRef,
-    tiempoSimulacionRef 
+    tiempoSimulacionRef
   } = useSimulacion(
-    id, 
-    topic, 
-    aeropuertosIniciales, 
-    k, 
-    SaS_SEGUNDOS, 
+    id,
+    topic,
+    aeropuertosIniciales,
+    k,
+    SaS_SEGUNDOS,
     fechaInicioReal,
+    modo,
     () => {
       showToast("Nuevo lote de eventos recibido", "info");
     }
