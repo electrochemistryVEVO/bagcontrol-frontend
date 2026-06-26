@@ -14,6 +14,7 @@ class SimulacionWebSocket {
 
       onConnect: () => {
         console.log('2. Conectado al WebSocket correctamente.');
+        console.log(`[FRONT-SIM-TIME] ${new Date().toISOString()} WebSocket conectado`);
 
         this.client?.subscribe(topic, (message) => {
           if (message.body) {
@@ -21,6 +22,7 @@ class SimulacionWebSocket {
             onMessage(lote);
           }
         });
+        console.log(`[FRONT-SIM-TIME] ${new Date().toISOString()} suscrito a topic topic=${topic}`);
 
         onSuccess();
       },
@@ -35,12 +37,14 @@ class SimulacionWebSocket {
     });
 
     console.log('1. Conectando al WebSocket...');
+    console.log(`[FRONT-SIM-TIME] ${new Date().toISOString()} conectando WebSocket url=${INIT_WEB_SOCKET_URL}`);
     this.client.activate();
   }
 
   desconectar() {
-    if (this.client && this.client.connected) {
+    if (this.client) {
       this.client.deactivate();
+      this.client = null;
       console.log('WebSocket desconectado.');
     }
   }

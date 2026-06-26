@@ -4,6 +4,7 @@ export const COLOR_POR_ESTADO: Record<string, string> = {
   ROJO: '#ef4444',
   AMARILLO: '#eab308',
   VERDE: '#22c55e',
+  VACIO: '#6B7280',
 };
 
 // Estilo VACÍO (sin sources, sin tiles, sin red) para el mapa de PRIMER PLANO
@@ -31,16 +32,12 @@ export const layerStyleAeropuertos: SymbolLayerSpecification = {
   paint: { 'icon-opacity': 1 },
   layout: {
     'icon-image': [
-      'case',
-      ['==', ['get', 'tieneDatos'], true],
-      [
-        'match',
-        ['get', 'estadoCapacidad'],
-        'ROJO',     'airport-rojo',
-        'AMARILLO', 'airport-amarillo',
-        'VERDE',    'airport-verde',
-        'airport-default'
-      ],
+      'match',
+      ['get', 'estadoCapacidad'],
+      'ROJO',     'airport-rojo',
+      'AMARILLO', 'airport-amarillo',
+      'VERDE',    'airport-verde',
+      'VACIO',    'airport-vacio',
       'airport-default'
     ],
     'icon-size': 0.156,

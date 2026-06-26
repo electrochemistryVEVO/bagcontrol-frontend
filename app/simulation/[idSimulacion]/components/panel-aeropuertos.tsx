@@ -24,9 +24,9 @@ import {
 import {memo, RefObject, useMemo, useRef, useState} from 'react';
 import type { AeropuertoSimulacion } from '@/app/shared/types/Aeropuerto';
 import type { EstadoCapacidad } from '@/app/shared/types/Evento';
-import {number} from "prop-types";
 import styles from "../../../stylesheets/simpanel.module.css";
 import Draggable from 'react-draggable';
+import { calcularOcupacionAeropuerto, obtenerEstadoAeropuerto } from '@/app/shared/simulation/semaforo';
 
 type PanelAeropuertosProps = {
   aeropuertos: AeropuertoSimulacion[];
@@ -40,15 +40,17 @@ type DireccionOrden = 'asc' | 'desc';
 
 type OrderingFuncs = 'calcularOcupacion' | 'calcularProximidadSalida' | 'calcularProximidadLlegada'
 
-const colorPorEstado: Record<EstadoCapacidad, 'success' | 'warning' | 'error'> = {
+const colorPorEstado: Record<EstadoCapacidad, 'success' | 'warning' | 'error' | 'default'> = {
+  VACIO: 'default',
   VERDE: 'success',
   AMARILLO: 'warning',
   ROJO: 'error',
 };
 
-const ESTADOS_CAPACIDAD: EstadoCapacidad[] = ['VERDE', 'AMARILLO', 'ROJO'];
+const ESTADOS_CAPACIDAD: EstadoCapacidad[] = ['VACIO', 'VERDE', 'AMARILLO', 'ROJO'];
 
 const etiquetaPorEstado: Record<EstadoCapacidad, string> = {
+  VACIO: 'Vacío',
   VERDE: 'Verde',
   AMARILLO: 'Amarillo',
   ROJO: 'Rojo',
@@ -69,11 +71,7 @@ const orderFunctions : Record<OrderingFuncs, (x:AeropuertoSimulacion) => number>
 }
 
 function calcularOcupacion(aeropuerto: AeropuertoSimulacion) {
-  if (typeof aeropuerto.porcentajeOcupacion === 'number') {
-    return Math.round(aeropuerto.porcentajeOcupacion);
-  }
-  if (!aeropuerto.capacidadAlmacen) return 0;
-  return Math.round((aeropuerto.maletasActuales / aeropuerto.capacidadAlmacen) * 100);
+  return calcularOcupacionAeropuerto(aeropuerto);
 }
 
 export function PanelAeropuertos({ aeropuertos, visible, onEnfocarAeropuerto }: PanelAeropuertosProps) {
@@ -96,7 +94,7 @@ export function PanelAeropuertos({ aeropuertos, visible, onEnfocarAeropuerto }: 
                 : aeropuerto.codigoIata.toLowerCase().includes(filtro);
             const filtradoContinente = !filtroContinente ? true:
                 aeropuerto.continente.toLowerCase().includes(filtroContinente);
-            const filtradoEstado = filtroEstados.includes(aeropuerto.estadoCapacidad);
+            const filtradoEstado = filtroEstados.includes(obtenerEstadoAeropuerto(aeropuerto));
             return filtrado && filtradoContinente && filtradoEstado;
         })
         .sort((a, b) => {
@@ -211,6 +209,7 @@ export function PanelAeropuertos({ aeropuertos, visible, onEnfocarAeropuerto }: 
                               <Stack spacing={1} className={styles.scrollList}>
                                   {aeropuertosOrdenados.map((aeropuerto) => {
                                       const ocupacion = calcularOcupacion(aeropuerto);
+                                      const estado = obtenerEstadoAeropuerto(aeropuerto);
                                       const enviosProximos = aeropuerto.enviosProximosAVencer || [];
                                       const expandido = aeropuertoExpandido === aeropuerto.codigoIata;
 
@@ -244,8 +243,8 @@ export function PanelAeropuertos({ aeropuertos, visible, onEnfocarAeropuerto }: 
                                                     )}
                                                     <Chip
                                                         size="small"
-                                                        label={aeropuerto.estadoCapacidad}
-                                                        color={colorPorEstado[aeropuerto.estadoCapacidad]}
+                                                        label={estado}
+                                                        color={colorPorEstado[estado]}
                                                     />
                                                 </Stack>
                                             </Stack>

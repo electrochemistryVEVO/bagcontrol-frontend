@@ -30,6 +30,11 @@ import type { Envio } from '@/app/shared/types/Envio';
 import type { EstadoCapacidad, EventoVuelo } from '@/app/shared/types/Evento';
 import styles from '../../../stylesheets/simpanel.module.css'
 import Draggable from "react-draggable";
+import {
+  calcularOcupacionVuelo,
+  obtenerEstadoPorOcupacion,
+  obtenerEstadoVuelo,
+} from '@/app/shared/simulation/semaforo';
 
 type OrdenVuelos = 'ocupacion' | 'salida' | 'llegada' | 'origen' | 'destino';
 
@@ -45,38 +50,28 @@ type PanelVuelosProps = {
 type EnviosPorVuelo = Record<string, Envio[]>;
 type LoadingPorVuelo = Record<string, boolean>;
 
-const colorPorEstado: Record<EstadoCapacidad, 'success' | 'warning' | 'error'> = {
+const colorPorEstado: Record<EstadoCapacidad, 'success' | 'warning' | 'error' | 'default'> = {
+  VACIO: 'default',
   VERDE: 'success',
   AMARILLO: 'warning',
   ROJO: 'error',
 };
 
-const ESTADOS_CAPACIDAD: EstadoCapacidad[] = ['VERDE', 'AMARILLO', 'ROJO'];
+const ESTADOS_CAPACIDAD: EstadoCapacidad[] = ['VACIO', 'VERDE', 'AMARILLO', 'ROJO'];
 
 const etiquetaPorEstado: Record<EstadoCapacidad, string> = {
+  VACIO: 'Vacío',
   VERDE: 'Verde',
   AMARILLO: 'Amarillo',
   ROJO: 'Rojo',
 };
 
 function calcularOcupacionPorMaletas(cantidadMaletas: number, capacidadMax: number) {
-  if (!capacidadMax) return 0;
-  return Math.round((cantidadMaletas / capacidadMax) * 100);
+  return calcularOcupacionVuelo(cantidadMaletas, capacidadMax);
 }
 
 function calcularOcupacion(vuelo: EventoVuelo) {
   return calcularOcupacionPorMaletas(vuelo.cantidadMaletas, vuelo.capacidadMax);
-}
-
-function obtenerEstadoPorOcupacion(ocupacion: number): EstadoCapacidad {
-  if (ocupacion < 33) return 'VERDE';
-  if (ocupacion <= 66) return 'AMARILLO';
-  return 'ROJO';
-}
-
-function obtenerEstadoVuelo(vuelo: EventoVuelo): EstadoCapacidad {
-  if (vuelo.estado) return vuelo.estado;
-  return obtenerEstadoPorOcupacion(calcularOcupacion(vuelo));
 }
 
 function compararTexto(a: string, b: string) {
@@ -255,6 +250,22 @@ export function PanelVuelos({ idSimulacion, vuelosActivos, tiempoSimulacionRef, 
                           </MenuItem>
                         </Select>
                       </FormControl>
+                      <Stack direction="row" spacing={1}>
+                        {ESTADOS_CAPACIDAD.map((estado) => {
+                          const activo = filtroEstados.includes(estado);
+                          return (
+                            <Chip
+                              key={estado}
+                              size="small"
+                              label={etiquetaPorEstado[estado]}
+                              color={colorPorEstado[estado]}
+                              variant={activo ? 'filled' : 'outlined'}
+                              onClick={() => toggleFiltroEstado(estado)}
+                              sx={{ cursor: 'pointer', fontWeight: activo ? 700 : 400 }}
+                            />
+                          );
+                        })}
+                      </Stack>
                     </Stack>
 
                     {vuelosFiltrados.length === 0 ? (

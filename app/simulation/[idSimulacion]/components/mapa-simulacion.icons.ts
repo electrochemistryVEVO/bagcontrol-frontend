@@ -108,8 +108,12 @@ export async function cargarIconosAeropuerto(
     const salida = new ImageData(ancho, alto);
     for (let i = 0, p = 0; i < salida.data.length; i += 4, p++) {
       if (esLinea[p]) {
-        // Borde: siempre negro, fijo, sin importar el estado
-        salida.data[i] = 0; salida.data[i + 1] = 0; salida.data[i + 2] = 0; salida.data[i + 3] = 255;
+        if (sufijo === 'vacio') {
+          salida.data[i] = r; salida.data[i + 1] = g; salida.data[i + 2] = b; salida.data[i + 3] = 255;
+        } else {
+          // Borde: negro fijo para estados con carga.
+          salida.data[i] = 0; salida.data[i + 1] = 0; salida.data[i + 2] = 0; salida.data[i + 3] = 255;
+        }
       } else if (!esExterior[p]) {
         // Interior encerrado por el contorno: coloreado según el estado
         salida.data[i] = r; salida.data[i + 1] = g; salida.data[i + 2] = b; salida.data[i + 3] = 255;

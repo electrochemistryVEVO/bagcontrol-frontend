@@ -4,6 +4,9 @@ import { RegistroEnvio } from './RegistroEnvio'
 import { CargaCsvModal } from './CargaCsvModal'
 import { EnvioService, FiltrosEnvios } from '@/app/services/envio.service'
 import { Envio } from '@/app/shared/types/Envio'
+import { Aeropuerto } from '@/app/shared/types/Aeropuerto'
+import { AeropuertoService } from '@/app/services/aeropuerto.service'
+import { formatAirportLocalDisplay } from '@/app/shared/dateTime'
 
 const POR_PAGINA = 15
 
@@ -17,6 +20,7 @@ export function GestionEnvios() {
   const [pagina, setPagina] = useState(0)
   const [totalPaginas, setTotalPaginas] = useState(1)
   const [totalElementos, setTotalElementos] = useState(0)
+  const [aeropuertosPorIata, setAeropuertosPorIata] = useState<Record<string, Aeropuerto>>({})
 
   const [filtros, setFiltros] = useState<FiltrosEnvios>({})
   const [filtroOrigen, setFiltroOrigen] = useState('')
@@ -48,6 +52,14 @@ export function GestionEnvios() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     cargarEnvios(0)
   }, [cargarEnvios])
+
+  useEffect(() => {
+    AeropuertoService.listarAeropuertos()
+      .then(({ data }) => {
+        setAeropuertosPorIata(Object.fromEntries(data.map((a: Aeropuerto) => [a.codigoIata, a])))
+      })
+      .catch(() => undefined)
+  }, [])
 
   const aplicarFiltros = () => {
     const nuevosFiltros: FiltrosEnvios = {}
@@ -262,7 +274,7 @@ export function GestionEnvios() {
                 <td style={{ padding: '10px 14px', borderBottom: '1px solid #f1f5f9', color: '#000' }}>{e.origenIata}</td>
                 <td style={{ padding: '10px 14px', borderBottom: '1px solid #f1f5f9', color: '#000' }}>{e.destinoIata}</td>
                 <td style={{ padding: '10px 14px', borderBottom: '1px solid #f1f5f9', color: '#000' }}>
-                  {e.fechaHora ? new Date(e.fechaHora).toLocaleString('es-PE') : '—'}
+                  {formatAirportLocalDisplay(e.fechaHora, aeropuertosPorIata[e.origenIata])}
                 </td>
                 <td style={{ padding: '10px 14px', borderBottom: '1px solid #f1f5f9', color: '#000' }}>{e.cantidadMaletas}</td>
                 <td style={{ padding: '10px 14px', borderBottom: '1px solid #f1f5f9', color: '#000' }}>{e.idCliente}</td>

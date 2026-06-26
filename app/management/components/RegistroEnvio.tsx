@@ -4,6 +4,7 @@ import { AeropuertoService } from '@/app/services/aeropuerto.service'
 import { EnvioService, NuevoEnvioDTO } from '@/app/services/envio.service'
 import { Aeropuerto } from '@/app/shared/types/Aeropuerto'
 import { Envio } from '@/app/shared/types/Envio'
+import { nowDateTimeLocalInput, toDateTimeLocalInput } from '@/app/shared/dateTime'
 
 type Props = {
   envioInicial?: Envio | null
@@ -26,8 +27,8 @@ export function RegistroEnvio({ envioInicial, onSuccess, onCancel }: Props) {
     destinoIata: envioInicial.destinoIata,
     idCliente: envioInicial.idCliente,
     cantidadMaletas: envioInicial.cantidadMaletas,
-    fechaHora: toDateTimeLocal(new Date(envioInicial.fechaHora)),
-  } : { ...formularioVacio, fechaHora: toDateTimeLocal(new Date()) })
+    fechaHora: toDateTimeLocalInput(envioInicial.fechaHora),
+  } : { ...formularioVacio, fechaHora: nowDateTimeLocalInput() })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [exito, setExito] = useState(false)
@@ -59,7 +60,7 @@ export function RegistroEnvio({ envioInicial, onSuccess, onCancel }: Props) {
         destinoIata: form.destinoIata,
         idCliente: form.idCliente,
         cantidadMaletas: form.cantidadMaletas,
-        fechaHora: form.fechaHora ? new Date(form.fechaHora).toISOString() : new Date().toISOString(),
+        fechaHora: form.fechaHora || nowDateTimeLocalInput(),
       }
       const respuesta = envioInicial
         ? await EnvioService.actualizarEnvio(envioInicial.idPedido, payload)
@@ -137,13 +138,13 @@ export function RegistroEnvio({ envioInicial, onSuccess, onCancel }: Props) {
                 onChange={e => setForm(f => ({ ...f, fechaHora: e.target.value }))} />
               <button
                 type="button"
-                onClick={() => setForm(f => ({ ...f, fechaHora: toDateTimeLocal(new Date()) }))}
+                onClick={() => setForm(f => ({ ...f, fechaHora: nowDateTimeLocalInput() }))}
                 style={S.btnSecondary}
               >
                 Usar hora actual
               </button>
             </div>
-            <p style={S.hint}>Si lo dejas vacío, se usará la hora actual al registrar.</p>
+            <p style={S.hint}>Se interpreta como hora local del aeropuerto origen.</p>
           </div>
         </div>
 
@@ -165,18 +166,6 @@ export function RegistroEnvio({ envioInicial, onSuccess, onCancel }: Props) {
       </div>
     </div>
   )
-}
-
-function toDateTimeLocal(fecha: Date): string {
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  return [
-    fecha.getFullYear(),
-    pad(fecha.getMonth() + 1),
-    pad(fecha.getDate()),
-  ].join('-') + 'T' + [
-    pad(fecha.getHours()),
-    pad(fecha.getMinutes()),
-  ].join(':');
 }
 
 // ─── Shared styles object ────────────────────────────────────────────────────

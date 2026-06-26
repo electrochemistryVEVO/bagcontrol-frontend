@@ -19,9 +19,10 @@ import * as syncMaps from '@mapbox/mapbox-gl-sync-move';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import { AeropuertoSimulacion, Aeropuerto } from '@/app/shared/types/Aeropuerto';
-import { EventoVuelo } from '@/app/shared/types/Evento';
+import { EventoColapso, EventoVuelo } from '@/app/shared/types/Evento';
 import { Envio, EnvioRuta } from '@/app/shared/types/Envio';
 import { SimulacionService } from '@/app/services/simulation.service';
+import { formatUtcDisplay } from '@/app/shared/dateTime';
 import { AeropuertoPopupContent } from './pop-up-aeropuerto';
 import { RelojSimulacionOverlay } from './reloj-simulacion';
 import { PanelVuelos } from './panel-vuelos';
@@ -48,6 +49,7 @@ import {
   calcularBearing,
   obtenerCoordenadasFeature,
 } from './mapa-simulacion.utils';
+import { obtenerEstadoAeropuerto, obtenerEstadoVuelo } from '@/app/shared/simulation/semaforo';
 
 interface Props {
   aeropuertosIniciales: Aeropuerto[];
@@ -57,6 +59,9 @@ interface Props {
   enviosPlanificadosRef: RefObject<Record<string, Envio>>;
   idSimulacion: string;
   conectado: boolean;
+  fechaInicio: string;
+  modo?: string;
+  colapso?: EventoColapso | null;
 }
 
 type VueloAnimado = EventoVuelo & { _salidaEpoch?: number; _llegadaEpoch?: number };
@@ -69,6 +74,9 @@ export function MapaSimulacion({
   tiempoSimulacionRef,
   idSimulacion,
   conectado,
+  fechaInicio,
+  modo,
+  colapso,
 }: Props) {
   const mapRef = useRef<MapRef>(null);
   const backgroundMapRef = useRef<MapRef>(null);
@@ -204,6 +212,36 @@ export function MapaSimulacion({
     ) / vuelosActivosSnapshot.length;
   }, [vuelosActivosSnapshot]);
 
+  const metricasGlobales = useMemo(() => {
+    const ocupacionAeropuertos = aeropuertosSnapshot.filter(a => a.tieneDatos);
+    const ocupacionPromedioAeropuertos = ocupacionAeropuertos.length === 0 ? 0 :
+      ocupacionAeropuertos.reduce((acc, a) => acc + (a.porcentajeOcupacion || 0), 0) / ocupacionAeropuertos.length;
+    const enviosEntregados = enviosSnapshot.filter(e => (e as any)._estado === 'ENTREGADO').length;
+    const enviosTransito = enviosSnapshot.filter(e => (e as any)._estado === 'EN_CURSO').length;
+    const enviosPendientes = enviosSnapshot.filter(e => (e as any)._estado === 'PLANIFICADO').length;
+    return {
+      ocupacionPromedioAeropuertos,
+      enviosEntregados,
+      enviosTransito,
+      enviosPendientes,
+      aeropuertosVacio: aeropuertosSnapshot.filter(a => obtenerEstadoAeropuerto(a) === 'VACIO').length,
+      aeropuertosRojo: aeropuertosSnapshot.filter(a => obtenerEstadoAeropuerto(a) === 'ROJO').length,
+      aeropuertosAmbar: aeropuertosSnapshot.filter(a => obtenerEstadoAeropuerto(a) === 'AMARILLO').length,
+      aeropuertosVerde: aeropuertosSnapshot.filter(a => obtenerEstadoAeropuerto(a) === 'VERDE').length,
+      vuelosVacio: vuelosActivosSnapshot.filter(v => obtenerEstadoVuelo(v) === 'VACIO').length,
+      vuelosRojo: vuelosActivosSnapshot.filter(v => obtenerEstadoVuelo(v) === 'ROJO').length,
+      vuelosAmbar: vuelosActivosSnapshot.filter(v => obtenerEstadoVuelo(v) === 'AMARILLO').length,
+      vuelosVerde: vuelosActivosSnapshot.filter(v => obtenerEstadoVuelo(v) === 'VERDE').length,
+    };
+  }, [aeropuertosSnapshot, enviosSnapshot, vuelosActivosSnapshot]);
+
+  const aeropuertoSeleccionado = useMemo(() => {
+    const codigo = selAirport?.properties?.codigoIata;
+    return typeof codigo === 'string'
+      ? aeropuertosIniciales.find(a => a.codigoIata === codigo) ?? null
+      : null;
+  }, [aeropuertosIniciales, selAirport]);
+
   // Motor gráfico a 60fps. Aviones/rutas cada frame, aeropuertos cada 30 frames.
   useEffect(() => {
     let rafId: number;
@@ -301,6 +339,7 @@ export function MapaSimulacion({
       verde:    '#22c55e',
       amarillo: '#eab308',
       rojo:     '#ef4444',
+      vacio:    COLOR_POR_ESTADO.VACIO,
       default:  '#ffffff',
     })
       .catch((err) => console.error('Error al cargar íconos de aeropuerto:', err))
@@ -371,6 +410,20 @@ export function MapaSimulacion({
         visible={conectado}
         onEnfocarAeropuerto={enfocarAeropuerto}
       />
+
+      <PanelMetricasGlobales
+        ocupacionFlota={ocupacionPromedioFlota}
+        ocupacionAeropuertos={metricasGlobales.ocupacionPromedioAeropuertos}
+        vuelosEnAire={vuelosActivosSnapshot.length}
+        enviosTransito={metricasGlobales.enviosTransito}
+        enviosEntregados={metricasGlobales.enviosEntregados}
+        enviosPendientes={metricasGlobales.enviosPendientes}
+        aeropuertos={{ rojo: metricasGlobales.aeropuertosRojo, ambar: metricasGlobales.aeropuertosAmbar, verde: metricasGlobales.aeropuertosVerde, vacio: metricasGlobales.aeropuertosVacio }}
+        vuelos={{ rojo: metricasGlobales.vuelosRojo, ambar: metricasGlobales.vuelosAmbar, verde: metricasGlobales.vuelosVerde, vacio: metricasGlobales.vuelosVacio }}
+        visible={conectado}
+      />
+
+      {colapso && <PanelColapso colapso={colapso} />}
 
       <div style={{
         position: 'absolute',
@@ -501,7 +554,97 @@ export function MapaSimulacion({
         )}
       </MapLibre>
 
-      <RelojSimulacionOverlay tiempoRef={tiempoSimulacionRef} ocupacionFlota={ocupacionPromedioFlota} />
+      <RelojSimulacionOverlay
+        tiempoRef={tiempoSimulacionRef}
+        ocupacionFlota={ocupacionPromedioFlota}
+        fechaInicio={fechaInicio}
+        modo={modo}
+        aeropuertoSeleccionado={aeropuertoSeleccionado}
+      />
+    </div>
+  );
+}
+
+function PanelMetricasGlobales({
+  visible,
+  ocupacionFlota,
+  ocupacionAeropuertos,
+  vuelosEnAire,
+  enviosTransito,
+  enviosEntregados,
+  enviosPendientes,
+  aeropuertos,
+  vuelos,
+}: {
+  visible: boolean;
+  ocupacionFlota: number;
+  ocupacionAeropuertos: number;
+  vuelosEnAire: number;
+  enviosTransito: number;
+  enviosEntregados: number;
+  enviosPendientes: number;
+  aeropuertos: { rojo: number; ambar: number; verde: number; vacio: number };
+  vuelos: { rojo: number; ambar: number; verde: number; vacio: number };
+}) {
+  if (!visible) return null;
+  const semaforo = Math.max(ocupacionFlota, ocupacionAeropuertos);
+  const color = semaforo >= 85 ? '#ef4444' : semaforo >= 60 ? '#eab308' : '#22c55e';
+  const item = (label: string, value: string | number) => (
+    <div>
+      <div style={{ fontSize: 11, color: '#94a3b8' }}>{label}</div>
+      <div style={{ fontWeight: 800 }}>{value}</div>
+    </div>
+  );
+  return (
+    <div style={{
+      position: 'absolute', top: 16, right: 16, zIndex: 24,
+      background: 'rgba(15, 23, 42, 0.92)', color: '#fff',
+      border: '1px solid rgba(148, 163, 184, 0.35)', borderRadius: 8,
+      padding: 12, width: 340, boxShadow: '0 8px 20px rgba(0,0,0,0.25)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <span style={{ width: 10, height: 10, borderRadius: 999, background: color, display: 'inline-block' }} />
+        <strong>Metricas globales</strong>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, fontSize: 13 }}>
+        {item('Flota', `${Math.round(ocupacionFlota)}%`)}
+        {item('Aeropuertos', `${Math.round(ocupacionAeropuertos)}%`)}
+        {item('Vuelos aire', vuelosEnAire)}
+        {item('En transito', enviosTransito)}
+        {item('Entregados', enviosEntregados)}
+        {item('Pendientes', enviosPendientes)}
+        {item('Aeropuertos vacíos', aeropuertos.vacio)}
+        {item('Vuelos vacíos', vuelos.vacio)}
+      </div>
+      <div style={{ marginTop: 10, fontSize: 12, color: '#cbd5e1' }}>
+        Aeropuertos R/A/V: {aeropuertos.rojo}/{aeropuertos.ambar}/{aeropuertos.verde} · Vuelos R/A/V: {vuelos.rojo}/{vuelos.ambar}/{vuelos.verde}
+      </div>
+    </div>
+  );
+}
+
+function PanelColapso({ colapso }: { colapso: EventoColapso }) {
+  const d = colapso.detalle;
+  return (
+    <div style={{
+      position: 'absolute', left: '50%', top: 24, transform: 'translateX(-50%)',
+      zIndex: 30, width: 420, maxWidth: 'calc(100% - 32px)',
+      background: '#fff7ed', color: '#7c2d12', border: '1px solid #fdba74',
+      borderRadius: 8, padding: 16, boxShadow: '0 18px 40px rgba(0,0,0,0.28)',
+    }}>
+      <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>Colapso logistico detectado</div>
+      <div style={{ fontWeight: 700 }}>Causa: Incumplimiento de SLA</div>
+      <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.55 }}>
+        <div><strong>Envio/maleta responsable:</strong> {d?.idPedido ?? 'No disponible'}</div>
+        <div><strong>Ruta:</strong> {d?.origenIata ?? '-'} - {d?.destinoIata ?? '-'} · {d?.cantidadMaletas ?? '-'} maletas</div>
+        <div><strong>Registro:</strong> {formatUtcDisplay(d?.fechaHoraRegistro)}</div>
+        <div><strong>Deadline:</strong> {formatUtcDisplay(d?.deadlineSla)}</div>
+        <div><strong>Hora exacta de colapso:</strong> {formatUtcDisplay(d?.horaColapso ?? colapso.fechaHoraEvento)}</div>
+        <div><strong>Tipo SLA:</strong> {d?.tipoSla ?? 'No disponible'}</div>
+        <div><strong>Estado:</strong> {d?.estadoEnvio ?? 'No disponible'}</div>
+        <div><strong>Ultimo aeropuerto:</strong> {d?.aeropuertoActual ?? 'No disponible'}</div>
+        <div><strong>Vuelo/ruta:</strong> {d?.vueloAfectado ?? d?.itinerarioAfectado ?? 'No disponible'}</div>
+      </div>
     </div>
   );
 }

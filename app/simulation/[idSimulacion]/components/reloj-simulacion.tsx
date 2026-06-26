@@ -1,4 +1,6 @@
 import {RefObject, useEffect, useMemo, useState} from 'react';
+import { Aeropuerto } from '@/app/shared/types/Aeropuerto';
+import { formatAirportLocalDisplay, formatDuration, formatUtcDisplay } from '@/app/shared/dateTime';
 
 function obtenerColorFlota(ocupacion: number) {
   if (ocupacion < 33) return '#22c55e';
@@ -9,29 +11,44 @@ function obtenerColorFlota(ocupacion: number) {
 export function RelojSimulacionOverlay({
   tiempoRef,
   ocupacionFlota,
+  fechaInicio,
+  modo,
+  aeropuertoSeleccionado,
 }: {
   tiempoRef: RefObject<number>;
   ocupacionFlota?: number;
+  fechaInicio: string;
+  modo?: string;
+  aeropuertoSeleccionado?: Aeropuerto | null;
 }) {
   const [hora, setHora] = useState<string>('');
-  const [segsElapsados,setSegsElapsados] = useState<number>(0);
+  const [epoch, setEpoch] = useState<number>(0);
 
   useEffect(() => {
     const timer = setInterval(() => {
       if (tiempoRef.current) {
-        const d = new Date(tiempoRef.current);
-        setHora(d.toLocaleString('es-PE', { timeZone: 'UTC' }));
-        setSegsElapsados(segsElapsados+0.1)
+        setEpoch(tiempoRef.current);
+        setHora(formatUtcDisplay(tiempoRef.current));
       }
     }, 100);
     return () => clearInterval(timer);
-  }, [segsElapsados,tiempoRef]);
+  }, [tiempoRef]);
 
-  const textElapsado : string = useMemo(()=>
-          (segsElapsados>=3600?`${Math.floor(segsElapsados/3600)}h`.toString().padStart(2,'0'):'')+
-          (segsElapsados>=60?`${Math.floor(segsElapsados/60)}m`.toString().padStart(2,'0'):'')
-          +`${Math.floor(segsElapsados%60).toString().padStart(2,'0')}s`,
-      [segsElapsados])
+  const inicioEpoch = useMemo(() => {
+    const normalizada = /[zZ]|[+-]\d{2}:?\d{2}$/.test(fechaInicio) ? fechaInicio : `${fechaInicio}Z`;
+    const parsed = new Date(normalizada).getTime();
+    return Number.isFinite(parsed) ? parsed : epoch;
+  }, [epoch, fechaInicio]);
+
+  const textElapsado = useMemo(() => formatDuration(epoch - inicioEpoch), [epoch, inicioEpoch]);
+  const restanteSim5D = useMemo(() => {
+    if (modo !== '1') return null;
+    return formatDuration(inicioEpoch + 5 * 24 * 60 * 60 * 1000 - epoch);
+  }, [epoch, inicioEpoch, modo]);
+  const horaLocal = useMemo(
+    () => aeropuertoSeleccionado ? formatAirportLocalDisplay(epoch, aeropuertoSeleccionado) : null,
+    [aeropuertoSeleccionado, epoch],
+  );
 
   if (!hora) return null;
 
@@ -72,7 +89,8 @@ export function RelojSimulacionOverlay({
           Flota: {ocupacionNormalizada}%
         </span>
             )}
-            <span>{hora} UTC</span>
+            <span>{hora}</span>
+            {horaLocal && <span style={{ color: '#e2e8f0' }}>Local: {horaLocal}</span>}
         </div>
         <div style={{
             position: 'absolute',
@@ -93,7 +111,8 @@ export function RelojSimulacionOverlay({
             pointerEvents: 'none',
             boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
         }}>
-            <span>Tiempo elapsado: {textElapsado}</span>
+            <span>Transcurrido: {textElapsado}</span>
+            {restanteSim5D && <span>Restante Sim5D: {restanteSim5D}</span>}
         </div>
     </>
   );
