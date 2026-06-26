@@ -19,7 +19,7 @@ import * as syncMaps from '@mapbox/mapbox-gl-sync-move';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import { AeropuertoSimulacion, Aeropuerto } from '@/app/shared/types/Aeropuerto';
-import { EventoColapso, EventoVuelo } from '@/app/shared/types/Evento';
+import { EventoColapso, EventoReplanificacionEnvio, EventoVuelo } from '@/app/shared/types/Evento';
 import { Envio, EnvioRuta } from '@/app/shared/types/Envio';
 import { SimulacionService } from '@/app/services/simulation.service';
 import { formatUtcDisplay } from '@/app/shared/dateTime';
@@ -62,6 +62,7 @@ interface Props {
   fechaInicio: string;
   modo?: string;
   colapso?: EventoColapso | null;
+  replanificaciones: EventoReplanificacionEnvio[];
 }
 
 type VueloAnimado = EventoVuelo & { _salidaEpoch?: number; _llegadaEpoch?: number };
@@ -77,6 +78,7 @@ export function MapaSimulacion({
   fechaInicio,
   modo,
   colapso,
+  replanificaciones,
 }: Props) {
   const mapRef = useRef<MapRef>(null);
   const backgroundMapRef = useRef<MapRef>(null);
@@ -104,6 +106,7 @@ export function MapaSimulacion({
   const [idEnvioBusqueda, setIdEnvioBusqueda] = useState('');
   const [rutaEnvio, setRutaEnvio] = useState<EnvioRuta | null>(null);
   const [rutaError, setRutaError] = useState<string | null>(null);
+  const [replanificacionSeleccionada, setReplanificacionSeleccionada] = useState<EventoReplanificacionEnvio | null>(null);
 
   const coordsAeropuertos = useMemo(() => {
     const dict: Record<string, number[]> = {};
@@ -160,16 +163,64 @@ export function MapaSimulacion({
   }, [coordsAeropuertos, rutaEnvio]);
 
   const seleccionarVuelo = useCallback(async (codigoVuelo: string) => {
-    const map = mapRef.current?.getMap();
-    if (!map) return;
-    const sourceAviones = map.getSource('aviones-data') as GeoJSONSource;
-    const feature = ((await sourceAviones.getData()) as FeatureCollection)
-      .features.find(e => e.properties?.codigoVuelo === codigoVuelo) as MapGeoJSONFeature;
-    setSelFlight(feature ?? null);
-    setPanelOpen(true);
-    const coords = obtenerCoordenadasFeature(feature ?? null);
-    if (coords) enfocarCoordenadas(coords, 6.5);
-  }, [enfocarCoordenadas]);
+    try {
+      const crearFeatureDesdeVuelo = (vuelo: EventoVuelo): MapGeoJSONFeature => {
+        const o = coordsAeropuertos[vuelo.origenIata];
+        const d = coordsAeropuertos[vuelo.destinoIata];
+        let coords: [number, number] = o && d ? [o[0], o[1]] : [0, 0];
+
+        if (o && d) {
+          const ini = (vuelo as VueloAnimado)._salidaEpoch ?? Date.parse(vuelo.horaSalidaUtc);
+          const fin = (vuelo as VueloAnimado)._llegadaEpoch ?? Date.parse(vuelo.horaLlegadaUtc);
+          if (Number.isFinite(ini) && Number.isFinite(fin) && fin > ini) {
+            const p = Math.max(0, Math.min(1, (tiempoSimulacionRef.current - ini) / (fin - ini)));
+            coords = interpolar(o, d, p);
+          }
+        }
+
+        return ({
+          type: 'Feature',
+          properties: { ...vuelo, codigoVuelo: String(vuelo.codigoVuelo), isAirplane: true },
+          geometry: { type: 'Point', coordinates: coords },
+        } as unknown) as MapGeoJSONFeature;
+      };
+
+      const map = mapRef.current?.getMap();
+      let feature: MapGeoJSONFeature | null = null;
+
+      if (!map) {
+        console.warn('[MAPA-VUELOS] Mapa no disponible al seleccionar vuelo', codigoVuelo);
+      } else {
+        const sourceAviones = map.getSource('aviones-data') as (GeoJSONSource & { getData?: () => Promise<FeatureCollection> | FeatureCollection }) | undefined;
+        if (!sourceAviones || typeof sourceAviones.getData !== 'function') {
+          console.warn('[MAPA-VUELOS] Source aviones-data no disponible al seleccionar vuelo', codigoVuelo);
+        } else {
+          const data = await sourceAviones.getData();
+          const featureCollection = data as Partial<FeatureCollection>;
+          const features = Array.isArray(featureCollection.features) ? featureCollection.features : [];
+          feature = (features.find(e => e.properties?.codigoVuelo === codigoVuelo) as MapGeoJSONFeature | undefined) ?? null;
+        }
+      }
+
+      const vueloFallback = vuelosActivosSnapshot.find(v => String(v.codigoVuelo) === codigoVuelo);
+      if (!feature && vueloFallback) {
+        feature = crearFeatureDesdeVuelo(vueloFallback);
+      }
+
+      if (!feature) {
+        console.warn('[MAPA-VUELOS] Vuelo no encontrado para seleccionar', codigoVuelo);
+        return;
+      }
+
+      setSelFlight(feature);
+      setPanelOpen(true);
+
+      const coords = obtenerCoordenadasFeature(feature);
+      if (coords && (coords[0] !== 0 || coords[1] !== 0)) enfocarCoordenadas(coords, 6.5);
+    } catch (error) {
+      console.warn('[MAPA-VUELOS] No se pudo seleccionar vuelo', error);
+    }
+  }, [coordsAeropuertos, enfocarCoordenadas, tiempoSimulacionRef, vuelosActivosSnapshot]);
 
   const enfocarRutaEnvio = useCallback(() => {
     const coords = featuresRutaEnvio.flatMap(f =>
@@ -190,9 +241,46 @@ export function MapaSimulacion({
     );
   }, [enfocarAeropuerto, featuresRutaEnvio, rutaEnvio]);
 
+  const enfocarReplanificacion = useCallback((replanificacion: EventoReplanificacionEnvio) => {
+    setReplanificacionSeleccionada(replanificacion);
+    const origen = coordsAeropuertos[replanificacion.origenIata];
+    const destino = coordsAeropuertos[replanificacion.destinoIata];
+    const map = mapRef.current?.getMap();
+    if (!map || !origen || !destino) return;
+    map.fitBounds(
+      [[Math.min(origen[0], destino[0]), Math.min(origen[1], destino[1])], [Math.max(origen[0], destino[0]), Math.max(origen[1], destino[1])]],
+      { padding: 100, duration: 700, maxZoom: 5.8 }
+    );
+  }, [coordsAeropuertos]);
+
   useEffect(() => {
     if (rutaEnvio) enfocarRutaEnvio();
   }, [rutaEnvio]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (replanificaciones.length > 0) {
+      setReplanificacionSeleccionada(replanificaciones[0]);
+    }
+  }, [replanificaciones]);
+
+  const featuresReplanificacion = useMemo<Feature[]>(() => {
+    const r = replanificacionSeleccionada;
+    if (!r) return [];
+    const origen = coordsAeropuertos[r.origenIata];
+    const destino = coordsAeropuertos[r.destinoIata];
+    if (!origen || !destino) return [];
+    return [
+      {
+        type: 'Feature',
+        properties: {
+          idPedido: r.idPedido,
+          motivo: r.motivo,
+          tipoRuta: 'nueva',
+        },
+        geometry: { type: 'LineString', coordinates: [origen, destino] },
+      },
+    ];
+  }, [coordsAeropuertos, replanificacionSeleccionada]);
 
   // Snapshot cada 500ms para los paneles (vuelos, aeropuertos, envíos)
   useEffect(() => {
@@ -315,6 +403,15 @@ export function MapaSimulacion({
     });
   }, [featuresRutaEnvio]);
 
+  useEffect(() => {
+    const map = mapRef.current?.getMap();
+    if (!map || !map.isStyleLoaded()) return;
+    (map.getSource('replanificacion-ruta-data') as GeoJSONSource)?.setData({
+      type: 'FeatureCollection',
+      features: featuresReplanificacion,
+    });
+  }, [featuresReplanificacion]);
+
   // Sincronizar cámara entre mapa de datos y mapa de fondo. Polling liviano
   // (intervalo corto) hasta detectar que ambas instancias existen, sin depender
   // del evento 'load' de ninguno (que dispara hasta terminar de bajar el basemap).
@@ -425,6 +522,13 @@ export function MapaSimulacion({
 
       {colapso && <PanelColapso colapso={colapso} />}
 
+      <PanelReplanificaciones
+        replanificaciones={replanificaciones}
+        seleccionada={replanificacionSeleccionada}
+        visible={conectado}
+        onSeleccionar={enfocarReplanificacion}
+      />
+
       <div style={{
         position: 'absolute',
         top: 16,
@@ -524,6 +628,18 @@ export function MapaSimulacion({
         <Source id="envio-ruta-data" type="geojson" data={{ type: 'FeatureCollection', features: [] }}>
           <Layer {...layerStyleRutaEnvio} />
         </Source>
+        <Source id="replanificacion-ruta-data" type="geojson" data={{ type: 'FeatureCollection', features: [] }}>
+          <Layer
+            id="replanificacion-ruta-line"
+            type="line"
+            paint={{
+              'line-color': '#f97316',
+              'line-width': 4,
+              'line-opacity': 0.9,
+              'line-dasharray': [1, 1.2],
+            }}
+          />
+        </Source>
 
         {iconosAeropuertoListos && (
           <Source id="aeropuertos-data" type="geojson" data={{ type: 'FeatureCollection', features: featuresAeropuertosIniciales }}>
@@ -619,6 +735,68 @@ function PanelMetricasGlobales({
       <div style={{ marginTop: 10, fontSize: 12, color: '#cbd5e1' }}>
         Aeropuertos R/A/V: {aeropuertos.rojo}/{aeropuertos.ambar}/{aeropuertos.verde} · Vuelos R/A/V: {vuelos.rojo}/{vuelos.ambar}/{vuelos.verde}
       </div>
+    </div>
+  );
+}
+
+function PanelReplanificaciones({
+  visible,
+  replanificaciones,
+  seleccionada,
+  onSeleccionar,
+}: {
+  visible: boolean;
+  replanificaciones: EventoReplanificacionEnvio[];
+  seleccionada: EventoReplanificacionEnvio | null;
+  onSeleccionar: (replanificacion: EventoReplanificacionEnvio) => void;
+}) {
+  if (!visible) return null;
+  const lista = replanificaciones.slice(0, 10);
+  return (
+    <div style={{
+      position: 'absolute', right: 16, top: 212, zIndex: 24,
+      width: 340, maxHeight: 300, overflowY: 'auto',
+      background: 'rgba(15, 23, 42, 0.92)', color: '#fff',
+      border: '1px solid rgba(251, 146, 60, 0.45)', borderRadius: 8,
+      padding: 12, boxShadow: '0 8px 20px rgba(0,0,0,0.25)',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <strong>Replanificaciones</strong>
+        <span style={{ fontSize: 12, color: '#fed7aa' }}>{replanificaciones.length}</span>
+      </div>
+      {lista.length === 0 ? (
+        <div style={{ fontSize: 12, color: '#cbd5e1' }}>Sin replanificaciones recientes.</div>
+      ) : lista.map((r) => {
+        const activa = seleccionada?.idPedido === r.idPedido && seleccionada?.fechaHoraEvento === r.fechaHoraEvento;
+        return (
+          <button
+            key={`${r.idPedido}-${r.fechaHoraEvento}-${r.itinerarioNuevo ?? 'sin-ruta'}`}
+            onClick={() => onSeleccionar(r)}
+            style={{
+              width: '100%', textAlign: 'left', display: 'block',
+              border: activa ? '1px solid #fb923c' : '1px solid rgba(148, 163, 184, 0.25)',
+              background: activa ? 'rgba(251, 146, 60, 0.16)' : 'rgba(30, 41, 59, 0.82)',
+              color: '#fff', borderRadius: 6, padding: 8, marginBottom: 8,
+              cursor: 'pointer',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+              <strong style={{ fontSize: 12 }}>{r.idPedido}</strong>
+              <span style={{ fontSize: 11, color: '#fed7aa' }}>{r.motivo}</span>
+            </div>
+            <div style={{ fontSize: 12, color: '#e2e8f0', marginTop: 4 }}>{r.origenIata} - {r.destinoIata}</div>
+            <div style={{ fontSize: 11, color: '#cbd5e1', marginTop: 4 }}>
+              Estado: {r.estadoAnterior ?? '-'} - {r.estadoNuevo ?? '-'}
+            </div>
+            <div style={{ fontSize: 11, color: '#cbd5e1' }}>
+              Vuelo: {r.vueloAnterior ?? 'Sin ruta'} - {r.vueloNuevo ?? 'Sin ruta'}
+            </div>
+            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
+              {formatUtcDisplay(r.horaSimulada ?? r.fechaHoraEvento)}
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }

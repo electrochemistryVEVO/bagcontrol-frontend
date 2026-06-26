@@ -8,6 +8,7 @@ import {
   EventoAeropuerto,
   EventoBatch,
   EventoColapso,
+  EventoReplanificacionEnvio,
 } from "@/app/shared/types/Evento";
 import axios from 'axios';
 import {Envio} from "@/app/shared/types/Envio";
@@ -43,6 +44,7 @@ export function useSimulacion(
   const tiempoSimulacion = useRef<number>(parseFechaInicio(fechaInicio));
   const lotesRecibidosRef = useRef<number>(0);
   const [colapso, setColapso] = useState<EventoColapso | null>(null);
+  const [replanificaciones, setReplanificaciones] = useState<EventoReplanificacionEnvio[]>([]);
   const primerEventoRecibidoRef = useRef(false);
   const primerLoteRecibidoRef = useRef(false);
 
@@ -106,6 +108,9 @@ export function useSimulacion(
           setColapso(e as EventoColapso);
           setEstadoSim('colapsada');
           break;
+        case 'REPLANIFICACION_ENVIO':
+          setReplanificaciones(actuales => [e as EventoReplanificacionEnvio, ...actuales].slice(0, 20));
+          break;
         case 'SIMULACION_DETENIDA':
           setEstadoSim('detenida');
           break;
@@ -119,7 +124,7 @@ export function useSimulacion(
     const TIPOS_IGNORADOS = [
       'SIMULACION_INICIADA', 'SIMULACION_PAUSADA', 'SIMULACION_EN_PAUSA',
       'SIMULACION_REANUDADA', 'SIMULACION_FINALIZADA', 'COLAPSO_DETECTADO',
-      'SIMULACION_DETENIDA', 'ERROR',
+      'REPLANIFICACION_ENVIO', 'SIMULACION_DETENIDA', 'ERROR',
     ];
 
     const eventosFiltrados = lote.eventos.filter((e: Evento) => {
@@ -349,5 +354,6 @@ export function useSimulacion(
     enviosPlanificadosRef : enviosPlanificados,
     tiempoSimulacionRef: tiempoSimulacion,
     colapso,
+    replanificaciones,
   };
 }

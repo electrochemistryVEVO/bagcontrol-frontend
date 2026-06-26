@@ -83,7 +83,23 @@ export interface EventoColapso extends EventoBase {
     detalle?: DetalleColapso;
 }
 
-export type Evento = EventoAeropuerto | EventoVuelo | EventoColapso | EventoBase;
+export interface EventoReplanificacionEnvio extends EventoBase {
+    tipo: 'REPLANIFICACION_ENVIO';
+    idPedido: string;
+    motivo: string;
+    origenIata: string;
+    destinoIata: string;
+    itinerarioAnterior?: string | null;
+    itinerarioNuevo?: string | null;
+    vueloAnterior?: string | null;
+    vueloNuevo?: string | null;
+    estadoAnterior?: string | null;
+    estadoNuevo?: string | null;
+    horaSimulada?: string | null;
+    detalle?: string | null;
+}
+
+export type Evento = EventoAeropuerto | EventoVuelo | EventoColapso | EventoReplanificacionEnvio | EventoBase;
 
 export interface EventoBatch {
     simulacionId: string;

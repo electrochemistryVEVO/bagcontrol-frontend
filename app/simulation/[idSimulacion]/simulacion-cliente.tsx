@@ -35,6 +35,7 @@ export function SimulacionCliente({ id, topic, k, modo, aeropuertosIniciales, er
     enviosPlanificadosRef,
     tiempoSimulacionRef,
     colapso,
+    replanificaciones,
   } = useSimulacion(
     id,
     topic,
@@ -165,6 +166,7 @@ export function SimulacionCliente({ id, topic, k, modo, aeropuertosIniciales, er
           fechaInicio={fechaInicioReal}
           modo={modo}
           colapso={colapso}
+          replanificaciones={replanificaciones}
         />
         {ToastComponent}
       </div>
