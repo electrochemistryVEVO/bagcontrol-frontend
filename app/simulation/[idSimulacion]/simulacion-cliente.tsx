@@ -36,6 +36,7 @@ export function SimulacionCliente({ id, topic, k, modo, aeropuertosIniciales, er
     tiempoSimulacionRef,
     colapso,
     replanificaciones,
+    mensajeErrorSimulacion,
   } = useSimulacion(
     id,
     topic,
@@ -151,6 +152,11 @@ export function SimulacionCliente({ id, topic, k, modo, aeropuertosIniciales, er
       {errorInicial && (
         <div style={{ padding: '8px 16px', background: '#fef2f2', color: '#b91c1c', fontSize: 13 }}>
           {errorInicial}
+        </div>
+      )}
+      {mensajeErrorSimulacion && (
+        <div style={{ padding: '8px 16px', background: '#fef2f2', color: '#b91c1c', fontSize: 13 }}>
+          {mensajeErrorSimulacion}
         </div>
       )}
 

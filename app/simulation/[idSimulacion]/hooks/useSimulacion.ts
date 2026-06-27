@@ -45,6 +45,7 @@ export function useSimulacion(
   const lotesRecibidosRef = useRef<number>(0);
   const [colapso, setColapso] = useState<EventoColapso | null>(null);
   const [replanificaciones, setReplanificaciones] = useState<EventoReplanificacionEnvio[]>([]);
+  const [mensajeErrorSimulacion, setMensajeErrorSimulacion] = useState<string | null>(null);
   const primerEventoRecibidoRef = useRef(false);
   const primerLoteRecibidoRef = useRef(false);
 
@@ -170,6 +171,7 @@ export function useSimulacion(
         if (!arrancadoRef.current) {
           arrancadoRef.current = true;
           try {
+            setMensajeErrorSimulacion(null);
             simTime('solicitando estado/snapshot');
             const { data: estado } = await SimulacionService.obtenerEstado(id);
             if (estado.tiempoSimuladoActual) {
@@ -188,6 +190,18 @@ export function useSimulacion(
               await SimulacionService.iniciar(id);
             }
           } catch (error: unknown) {
+            if (axios.isAxiosError(error) && error.response?.status === 404) {
+              const mensaje = 'La simulacion no existe o el backend fue reiniciado. Vuelve a preparar una simulacion.';
+              console.warn('[WS] Simulacion no encontrada al iniciar visualizador:', {
+                idSimulacion: id,
+                status: error.response.status,
+                url: error.config?.url,
+              });
+              setMensajeErrorSimulacion(mensaje);
+              setEstadoSim('error');
+              setConectado(false);
+              return;
+            }
             if (!axios.isAxiosError(error) || error.response?.status !== 409) {
               console.error('[WS] Error al iniciar la simulación:', error);
               arrancadoRef.current = false;
@@ -355,5 +369,6 @@ export function useSimulacion(
     tiempoSimulacionRef: tiempoSimulacion,
     colapso,
     replanificaciones,
+    mensajeErrorSimulacion,
   };
 }
