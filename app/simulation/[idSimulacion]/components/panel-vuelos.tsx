@@ -24,7 +24,7 @@ import {
   Typography,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
-import {useMemo, useState, RefObject, useRef} from 'react';
+import {useMemo, useState, RefObject, useRef, useEffect} from 'react';
 import { SimulacionService } from '@/app/services/simulation.service';
 import type { Envio } from '@/app/shared/types/Envio';
 import type { EstadoCapacidad, EventoVuelo } from '@/app/shared/types/Evento';
@@ -45,6 +45,7 @@ type PanelVuelosProps = {
   seleccionarVuelo:(codigoVuelo: string) => void;
   visible: boolean;
   onEnfocarVuelo: (codigoVuelo: string | number) => void;
+  onFiltradoCambiado?: (codigos: string[] | null) => void;
 };
 
 type EnviosPorVuelo = Record<string, Envio[]>;
@@ -78,7 +79,7 @@ function compararTexto(a: string, b: string) {
   return a.localeCompare(b, 'es', { sensitivity: 'base' });
 }
 
-export function PanelVuelos({ idSimulacion, vuelosActivos, tiempoSimulacionRef, visible,seleccionarVuelo, onEnfocarVuelo }: PanelVuelosProps) {
+export function PanelVuelos({ idSimulacion, vuelosActivos, tiempoSimulacionRef, visible, seleccionarVuelo, onEnfocarVuelo, onFiltradoCambiado }: PanelVuelosProps) {
 
   const [panelAbierto, setPanelAbierto] = useState(false);
   const [busqueda, setBusqueda] = useState('');
@@ -124,6 +125,17 @@ export function PanelVuelos({ idSimulacion, vuelosActivos, tiempoSimulacionRef, 
         }
       });
   }, [busqueda, orden, filtroEstados, vuelosActivos]);
+
+  // Notificar al mapa la lista filtrada
+  const hayFiltroActivo = busqueda.trim() !== '' || filtroEstados.length < ESTADOS_CAPACIDAD.length;
+  useEffect(() => {
+    if (!onFiltradoCambiado) return;
+    if (hayFiltroActivo) {
+      onFiltradoCambiado(vuelosFiltrados.map(v => String(v.codigoVuelo)));
+    } else {
+      onFiltradoCambiado(null);
+    }
+  }, [vuelosFiltrados, hayFiltroActivo, onFiltradoCambiado]);
 
   const toggleFiltroEstado = (estado: EstadoCapacidad) => {
     setFiltroEstados((actual) =>
@@ -261,7 +273,17 @@ export function PanelVuelos({ idSimulacion, vuelosActivos, tiempoSimulacionRef, 
                               color={colorPorEstado[estado]}
                               variant={activo ? 'filled' : 'outlined'}
                               onClick={() => toggleFiltroEstado(estado)}
-                              sx={{ cursor: 'pointer', fontWeight: activo ? 700 : 400 }}
+                              sx={{
+                                  cursor: 'pointer',
+                                fontWeight: activo ? 700 : 400,
+                                ...(estado === 'VACIO' && {
+                                  borderColor: '#4b5563',
+                                  color: '#ffffff',
+                                  '&.MuiChip-colorDefault': { color: '#ffffff' },
+                                  '&.MuiChip-filledDefault': { backgroundColor: '#374151', color: '#ffffff' },
+                                  '&.MuiChip-outlinedDefault': { borderColor: '#4b5563', color: '#ffffff' },
+                                }),
+                              }}
                             />
                           );
                         })}

@@ -21,7 +21,7 @@ import {
     Typography,
     SelectChangeEvent,
 } from '@mui/material';
-import {memo, RefObject, useMemo, useRef, useState} from 'react';
+import {memo, RefObject, useEffect, useMemo, useRef, useState} from 'react';
 import type { AeropuertoSimulacion } from '@/app/shared/types/Aeropuerto';
 import type { EstadoCapacidad } from '@/app/shared/types/Evento';
 import styles from "../../../stylesheets/simpanel.module.css";
@@ -32,6 +32,7 @@ type PanelAeropuertosProps = {
   aeropuertos: AeropuertoSimulacion[];
   visible: boolean;
   onEnfocarAeropuerto: (codigoIata: string) => void;
+  onFiltradoCambiado?: (iatas: string[] | null) => void;
 };
 
 type Continente = 'america' | 'asia' | 'europa' | 'oceania' | 'africa';
@@ -74,7 +75,7 @@ function calcularOcupacion(aeropuerto: AeropuertoSimulacion) {
   return calcularOcupacionAeropuerto(aeropuerto);
 }
 
-export function PanelAeropuertos({ aeropuertos, visible, onEnfocarAeropuerto }: PanelAeropuertosProps) {
+export function PanelAeropuertos({ aeropuertos, visible, onEnfocarAeropuerto, onFiltradoCambiado }: PanelAeropuertosProps) {
   const [panelAbierto, setPanelAbierto] = useState(false);
   const [direccionOrden, setDireccionOrden] = useState<DireccionOrden>('desc');
   const [busqueda, setBusqueda] = useState('');
@@ -85,6 +86,17 @@ export function PanelAeropuertos({ aeropuertos, visible, onEnfocarAeropuerto }: 
 
   const nodeRef = useRef<HTMLDivElement>(null);
 
+
+  // Notificar al mapa cuando cambia el filtro activo
+  const hayFiltroActivo = busqueda.trim() !== '' || filtroContinente !== '' || filtroEstados.length < ESTADOS_CAPACIDAD.length;
+  useEffect(() => {
+    if (!onFiltradoCambiado) return;
+    if (hayFiltroActivo) {
+      // Se notifica después de calcular aeropuertosOrdenados, ver el useEffect de abajo
+    } else {
+      onFiltradoCambiado(null); // sin filtro → mostrar todos en el mapa
+    }
+  }, [hayFiltroActivo, onFiltradoCambiado]);
 
   const aeropuertosOrdenados = useMemo(() => {
     return [...aeropuertos]
@@ -103,6 +115,12 @@ export function PanelAeropuertos({ aeropuertos, visible, onEnfocarAeropuerto }: 
             return direccionOrden === 'asc' ? diferencia : -diferencia;
     });
   }, [aeropuertos, direccionOrden,tipoOrden,busqueda,filtroContinente,filtroEstados]);
+
+  // Notificar la lista filtrada al mapa
+  useEffect(() => {
+    if (!onFiltradoCambiado || !hayFiltroActivo) return;
+    onFiltradoCambiado(aeropuertosOrdenados.map(a => a.codigoIata));
+  }, [aeropuertosOrdenados, hayFiltroActivo, onFiltradoCambiado]);
 
   const toggleFiltroEstado = (estado: EstadoCapacidad) => {
     setFiltroEstados((actual) =>
@@ -173,7 +191,17 @@ export function PanelAeropuertos({ aeropuertos, visible, onEnfocarAeropuerto }: 
                                     color={colorPorEstado[estado]}
                                     variant={activo ? 'filled' : 'outlined'}
                                     onClick={() => toggleFiltroEstado(estado)}
-                                    sx={{ cursor: 'pointer', fontWeight: activo ? 700 : 400 }}
+                                    sx={{
+                                      cursor: 'pointer',
+                                      fontWeight: activo ? 700 : 400,
+                                      ...(estado === 'VACIO' && {
+                                        borderColor: '#4b5563',
+                                        color: '#ffffff',
+                                        '&.MuiChip-colorDefault': { color: '#ffffff' },
+                                        '&.MuiChip-filledDefault': { backgroundColor: '#374151', color: '#ffffff' },
+                                        '&.MuiChip-outlinedDefault': { borderColor: '#4b5563', color: '#ffffff' },
+                                      }),
+                                    }}
                                 />
                             );
                         })}

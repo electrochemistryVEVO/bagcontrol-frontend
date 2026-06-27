@@ -17,6 +17,7 @@ function SidePanelContents({
     tiempoSimulacionRef,
     onMostrarRutaEnvio,
     onEnfocarVuelo,
+    onClose,
 } : {
     flight: EventoVuelo,
     isOpen: boolean,
@@ -25,6 +26,7 @@ function SidePanelContents({
     tiempoSimulacionRef: RefObject<number>,
     onMostrarRutaEnvio: (idPedido: string) => void,
     onEnfocarVuelo: () => void,
+    onClose?: () => void,
 }){
     //Envios
     const [enviosAsignados,setEnviosAsignados] = useState<Envio[]>([]);
@@ -62,7 +64,7 @@ function SidePanelContents({
     return flight && (<Box sx={{width: 500}} className={styles.panel} role="presentation">
         <div className={styles.header}>
             <h1>Vuelo {flight.codigoVuelo}</h1>
-            <button className={styles.close}>×</button>
+            <button className={styles.close} onClick={onClose}>×</button>
         </div>
 
         <div className={styles.card}>
@@ -197,6 +199,7 @@ type AvionSidePanelProps = {
     tiempoSimulacionRef: RefObject<number>,
     onMostrarRutaEnvio: (idPedido: string) => void,
     onEnfocarVuelo: () => void,
+    onClose?: () => void,
 }
 
 export function useOpenPanel(): OpenSimulationPanel {
@@ -235,6 +238,7 @@ export default memo(function AvionSidePanel(props: AvionSidePanelProps) {
                 tiempoSimulacionRef={props.tiempoSimulacionRef}
                 onMostrarRutaEnvio={props.onMostrarRutaEnvio}
                 onEnfocarVuelo={props.onEnfocarVuelo}
+                onClose={props.onClose}
             />
         </div>
     )})

@@ -25,11 +25,9 @@ import { SimulacionService } from '@/app/services/simulation.service';
 import { formatUtcDisplay } from '@/app/shared/dateTime';
 import { AeropuertoPopupContent } from './pop-up-aeropuerto';
 import { RelojSimulacionOverlay } from './reloj-simulacion';
-import { PanelVuelos } from './panel-vuelos';
-import { PanelAeropuertos } from './panel-aeropuertos';
-import AvionSidePanel from '@/app/simulation/components/avion-sidepanel';
+import { PanelLateral } from './panel-lateral';
 import AeropuertoSidePanel from '@/app/simulation/components/aeropuerto-sidepanel';
-import { PanelEnvios } from '@/app/simulation/[idSimulacion]/components/panel-envios';
+import AvionSidePanel from '@/app/simulation/components/avion-sidepanel';
 import { Drawer } from '@mui/material';
 
 import {
@@ -113,6 +111,18 @@ export function MapaSimulacion({
     aeropuertosIniciales.forEach(a => { dict[a.codigoIata] = [a.longitud, a.latitud]; });
     return dict;
   }, [aeropuertosIniciales]);
+
+  // Refs para los filtros de los paneles (actualizados sin re-render para uso en el RAF)
+  const filtroAeropuertosRef = useRef<Set<string> | null>(null);
+  const filtroVuelosRef = useRef<Set<string> | null>(null);
+
+  const handleFiltradoAeropuertosCambiado = useCallback((iatas: string[] | null) => {
+    filtroAeropuertosRef.current = iatas ? new Set(iatas) : null;
+  }, []);
+
+  const handleFiltradoVuelosCambiado = useCallback((codigos: string[] | null) => {
+    filtroVuelosRef.current = codigos ? new Set(codigos) : null;
+  }, []);
 
   const featuresAeropuertosIniciales = useMemo<Feature[]>(
     () => aeropuertosIniciales.map(normalizarAeropuertoInicial).map(crearFeatureAeropuerto),
@@ -344,6 +354,7 @@ export function MapaSimulacion({
       const featuresRutas: Feature[] = [];
 
       vuelosActivosRef.current.forEach((vuelo) => {
+        if (filtroVuelosRef.current && !filtroVuelosRef.current.has(String(vuelo.codigoVuelo))) return;
         const o = coordsAeropuertos[vuelo.origenIata];
         const d = coordsAeropuertos[vuelo.destinoIata];
         if (!o || !d) return;
@@ -380,9 +391,13 @@ export function MapaSimulacion({
       (map.getSource('rutas-data') as GeoJSONSource)?.setData({ type: 'FeatureCollection', features: featuresRutas });
 
       if (++frame % 30 === 0) {
+        const todasFeatures = crearFeaturesAeropuerto(aeropuertosRef.current);
+        const featuresFiltradas = filtroAeropuertosRef.current
+          ? todasFeatures.filter(f => filtroAeropuertosRef.current!.has(f.properties?.codigoIata as string))
+          : todasFeatures;
         (map.getSource('aeropuertos-data') as GeoJSONSource)?.setData({
           type: 'FeatureCollection',
-          features: crearFeaturesAeropuerto(aeropuertosRef.current),
+          features: featuresFiltradas,
         });
       }
 
@@ -474,6 +489,7 @@ export function MapaSimulacion({
           tiempoSimulacionRef={tiempoSimulacionRef}
           onMostrarRutaEnvio={mostrarRutaEnvio}
           onEnfocarVuelo={enfocarVueloSeleccionado}
+          onClose={() => setPanelOpen(false)}
         />
       </Drawer>
       <Drawer open={airportPanelOpen} onClose={() => setAirportPanelOpen(false)}>
@@ -485,27 +501,23 @@ export function MapaSimulacion({
           tiempoSimulacionRef={tiempoSimulacionRef}
           onMostrarRutaEnvio={mostrarRutaEnvio}
           onEnfocarAeropuerto={enfocarAeropuerto}
+          onClose={() => setAirportPanelOpen(false)}
         />
       </Drawer>
 
-      <PanelVuelos
+      <PanelLateral
+        visible={conectado}
         idSimulacion={idSimulacion}
         vuelosActivos={vuelosActivosSnapshot}
         tiempoSimulacionRef={tiempoSimulacionRef}
         seleccionarVuelo={seleccionarVuelo}
-        visible={conectado}
         onEnfocarVuelo={enfocarVueloSeleccionado}
-      />
-      <PanelEnvios
+        onFiltradoVuelosCambiado={handleFiltradoVuelosCambiado}
         aeropuertos={aeropuertosSnapshot}
-        envios={enviosSnapshot}
-        visible={conectado}
-        onMostrarRutaEnvio={mostrarRutaEnvio}
-      />
-      <PanelAeropuertos
-        aeropuertos={aeropuertosSnapshot}
-        visible={conectado}
         onEnfocarAeropuerto={enfocarAeropuerto}
+        onFiltradoAeropuertosCambiado={handleFiltradoAeropuertosCambiado}
+        envios={enviosSnapshot}
+        onMostrarRutaEnvio={mostrarRutaEnvio}
       />
 
       <PanelMetricasGlobales

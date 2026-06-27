@@ -17,6 +17,7 @@ function AeropuertoPanelContents({
     tiempoSimulacionRef,
     onMostrarRutaEnvio,
     onEnfocarAeropuerto,
+    onClose,
 }: {
     codigoIata: string;
     isOpen: boolean;
@@ -25,6 +26,7 @@ function AeropuertoPanelContents({
     tiempoSimulacionRef: RefObject<number>;
     onMostrarRutaEnvio: (idPedido: string) => void;
     onEnfocarAeropuerto: (codigoIata: string) => void;
+    onClose?: () => void;
 }) {
     // 1. Inicializamos con los datos reactivos del Snapshot de simulación
     const [data, setData] = useState<AeropuertoSimulacion | undefined>();
@@ -94,7 +96,7 @@ function AeropuertoPanelContents({
         <Box sx={{ width: 500 }} className={styles.panel} role="presentation">
             <div className={styles.header}>
                 <h1>Aeropuerto {data.codigoIata}</h1>
-                <button className={styles.close}>×</button>
+                <button className={styles.close} onClick={onClose}>×</button>
             </div>
 
             {/* CARD 1: INFORMACIÓN GEOGRÁFICA Y HORARIA */}
@@ -275,6 +277,7 @@ type AeropuertoSidePanelProps = {
     tiempoSimulacionRef: RefObject<number>;
     onMostrarRutaEnvio: (idPedido: string) => void;
     onEnfocarAeropuerto: (codigoIata: string) => void;
+    onClose?: () => void;
 };
 
 export default memo(function AeropuertoSidePanel({
@@ -285,20 +288,22 @@ export default memo(function AeropuertoSidePanel({
     tiempoSimulacionRef,
     onMostrarRutaEnvio,
     onEnfocarAeropuerto,
+    onClose,
 }: AeropuertoSidePanelProps) {
     const properties = selAirport?.properties;
     if (!properties || !properties.isAirport) return null;
 
     return (
         <div>
-            <AeropuertoPanelContents 
-                codigoIata={properties.codigoIata} 
-                isOpen={openPanel} 
-                aeropuertosRef={aeropuertosRef} 
+            <AeropuertoPanelContents
+                codigoIata={properties.codigoIata}
+                isOpen={openPanel}
+                aeropuertosRef={aeropuertosRef}
                 idSimulacion={idSimulacion}
                 tiempoSimulacionRef={tiempoSimulacionRef}
                 onMostrarRutaEnvio={onMostrarRutaEnvio}
                 onEnfocarAeropuerto={onEnfocarAeropuerto}
+                onClose={onClose}
             />
         </div>
     );
