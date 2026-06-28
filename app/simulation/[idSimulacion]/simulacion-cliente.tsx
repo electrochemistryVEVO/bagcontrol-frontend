@@ -5,6 +5,7 @@ import { Aeropuerto } from '@/app/shared/types/Aeropuerto';
 import { MapaSimulacion } from './components/mapa-simulacion';
 import { useToast } from '@/app/shared/hooks/useToast';
 import { SimulacionService } from '@/app/services/simulation.service';
+import {router} from "next/client";
 
 interface Props {
   id: string;
@@ -85,6 +86,7 @@ export function SimulacionCliente({ id, topic, k, modo, aeropuertosIniciales, er
       await SimulacionService.detener(id);
       setEstadoSim('detenida');
       showToast('Simulación detenida', 'info');
+      await router.push("/simulacion");
     } catch {
       showToast('Error al detener la simulación', 'error');
     }
@@ -132,24 +134,6 @@ export function SimulacionCliente({ id, topic, k, modo, aeropuertosIniciales, er
 
         {/* Botones de control */}
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            style={{ ...btnBase, borderColor: '#0891b2', background: '#22d3ee',
-              opacity: estaActiva ? 1 : 0.35,
-              cursor: estaActiva ? 'pointer' : 'not-allowed' }}
-            onClick={handlePausar}
-            disabled={!estaActiva}
-          >
-            ⏸ Pausar
-          </button>
-          <button
-            style={{ ...btnBase, borderColor: '#94a3b8', background: '#e2e8f0',
-              opacity: estaPausada ? 1 : 0.35,
-              cursor: estaPausada ? 'pointer' : 'not-allowed' }}
-            onClick={handleReanudar}
-            disabled={!estaPausada}
-          >
-            ▶ Reanudar
-          </button>
           <button
             style={{ ...btnBase, borderColor: '#dc2626', background: '#f87171',
               opacity: (estaActiva || estaPausada) ? 1 : 0.35,
