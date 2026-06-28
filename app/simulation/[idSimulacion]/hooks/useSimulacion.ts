@@ -7,12 +7,19 @@ import {
   EventoVuelo,
   EventoAeropuerto,
   EventoBatch,
+  EventoColapso,
+  EventoReplanificacionEnvio,
 } from "@/app/shared/types/Evento";
 import axios from 'axios';
 import {Envio} from "@/app/shared/types/Envio";
+import { obtenerEstadoAeropuerto } from '@/app/shared/simulation/semaforo';
 
-export type EstadoSimulacion = 'sincronizando' | 'en_vivo' | 'pausada' | 'detenida' | 'finalizada' | 'error';
+export type EstadoSimulacion = 'conectando' | 'conectado' | 'preparando' | 'en_vivo' | 'pausada' | 'detenida' | 'finalizada' | 'colapsada' | 'error';
 type EventoConTipoAlternativo = Evento & { tipoEvento?: string };
+
+const simTime = (mensaje: string, extra = '') => {
+  console.log(`[FRONT-SIM-TIME] ${new Date().toISOString()} ${mensaje}${extra ? ` ${extra}` : ''}`);
+};
 
 export function useSimulacion(
   id: string,
@@ -29,8 +36,18 @@ export function useSimulacion(
   const vuelosActivos = useRef<Map<string, EventoVuelo>>(new Map());
   const enviosPlanificados = useRef<Record<string,Envio>>({});
   const colaEventos = useRef<Evento[]>([]);
-  const tiempoSimulacion = useRef<number>(new Date(fechaInicio + 'Z').getTime());
+  const parseFechaInicio = (value: string) => {
+    const normalizada = /[zZ]|[+-]\d{2}:?\d{2}$/.test(value) ? value : `${value}Z`;
+    const epoch = new Date(normalizada).getTime();
+    return Number.isFinite(epoch) ? epoch : Date.now();
+  };
+  const tiempoSimulacion = useRef<number>(parseFechaInicio(fechaInicio));
   const lotesRecibidosRef = useRef<number>(0);
+  const [colapso, setColapso] = useState<EventoColapso | null>(null);
+  const [replanificaciones, setReplanificaciones] = useState<EventoReplanificacionEnvio[]>([]);
+  const [mensajeErrorSimulacion, setMensajeErrorSimulacion] = useState<string | null>(null);
+  const primerEventoRecibidoRef = useRef(false);
+  const primerLoteRecibidoRef = useRef(false);
 
   const onNuevoLoteRef = useRef(onNuevoLote);
   useEffect(() => { onNuevoLoteRef.current = onNuevoLote; }, [onNuevoLote]);
@@ -39,16 +56,19 @@ export function useSimulacion(
     Object.fromEntries(
       aeropuertosIniciales.map(a => [
         a.codigoIata?.trim().toUpperCase(),
-        { ...a, maletasActuales: 0, porcentajeOcupacion: 0, estadoCapacidad: 'VERDE', enviosProximosAVencer: [], tieneDatos: false }
+        { ...a, maletasActuales: 0, porcentajeOcupacion: 0, estadoCapacidad: 'VACIO', enviosProximosAVencer: [], tieneDatos: false }
       ])
     )
   );
 
   // ─── Estado dual: ref para el motor (sin closure stale), state para la UI ───
-  const estadoSimRef = useRef<EstadoSimulacion>('sincronizando');
-  const [estadoSim, setEstadoSimInterno] = useState<EstadoSimulacion>('sincronizando');
+  const estadoSimRef = useRef<EstadoSimulacion>('conectando');
+  const [estadoSim, setEstadoSimInterno] = useState<EstadoSimulacion>('conectando');
 
   const setEstadoSim = useCallback((nuevoEstado: EstadoSimulacion) => {
+    if (estadoSimRef.current !== nuevoEstado) {
+      simTime(`estado cambia de ${estadoSimRef.current.toUpperCase()} a ${nuevoEstado.toUpperCase()}`);
+    }
     estadoSimRef.current = nuevoEstado;
     setEstadoSimInterno(nuevoEstado);
   }, []);
@@ -58,6 +78,14 @@ export function useSimulacion(
   // ============================================================================
   const encolarEventos = useCallback((lote: EventoBatch) => {
     if (!lote.eventos || !Array.isArray(lote.eventos)) return;
+    if (!primerLoteRecibidoRef.current) {
+      primerLoteRecibidoRef.current = true;
+      simTime('primer lote recibido', `numero=${lote.numeroLote} eventos=${lote.eventos.length}`);
+    }
+    if (!primerEventoRecibidoRef.current && lote.eventos.length > 0) {
+      primerEventoRecibidoRef.current = true;
+      simTime('primer evento recibido', `tipo=${lote.eventos[0].tipo}`);
+    }
 
     // 1. Procesar eventos de control (ciclo de vida)
     for (const e of lote.eventos) {
@@ -65,6 +93,7 @@ export function useSimulacion(
       switch (tipo) {
         case 'SIMULACION_INICIADA':
           setConectado(true);
+          setEstadoSim('preparando');
           break;
         case 'SIMULACION_PAUSADA':
         case 'SIMULACION_EN_PAUSA':
@@ -74,8 +103,14 @@ export function useSimulacion(
           setEstadoSim('en_vivo');
           break;
         case 'SIMULACION_FINALIZADA':
-        case 'COLAPSO_DETECTADO':
           setEstadoSim('finalizada');
+          break;
+        case 'COLAPSO_DETECTADO':
+          setColapso(e as EventoColapso);
+          setEstadoSim('colapsada');
+          break;
+        case 'REPLANIFICACION_ENVIO':
+          setReplanificaciones(actuales => [e as EventoReplanificacionEnvio, ...actuales].slice(0, 20));
           break;
         case 'SIMULACION_DETENIDA':
           setEstadoSim('detenida');
@@ -90,7 +125,7 @@ export function useSimulacion(
     const TIPOS_IGNORADOS = [
       'SIMULACION_INICIADA', 'SIMULACION_PAUSADA', 'SIMULACION_EN_PAUSA',
       'SIMULACION_REANUDADA', 'SIMULACION_FINALIZADA', 'COLAPSO_DETECTADO',
-      'SIMULACION_DETENIDA', 'ERROR',
+      'REPLANIFICACION_ENVIO', 'SIMULACION_DETENIDA', 'ERROR',
     ];
 
     const eventosFiltrados = lote.eventos.filter((e: Evento) => {
@@ -105,15 +140,15 @@ export function useSimulacion(
     lotesRecibidosRef.current += 1;
 
     // 4. Arrancar el motor solo cuando tenemos ≥2 lotes (colchón de seguridad)
-    if (lotesRecibidosRef.current >= 2 && estadoSimRef.current === 'sincronizando') {
+    if (['conectando', 'conectado', 'preparando'].includes(estadoSimRef.current)) {
       tiempoSimulacion.current = new Date(colaEventos.current[0].fechaHoraEvento).getTime();
-      console.log('[MOTOR ARRANCA] reloj sincronizado a:', colaEventos.current[0].fechaHoraEvento);
+      simTime('estado cambia de SINCRONIZANDO a EN_EJECUCION', `primerEvento=${colaEventos.current[0].fechaHoraEvento}`);
       setEstadoSim('en_vivo');
     }
 
     // 5. Agregar eventos planificados
     enviosPlanificados.current = {...enviosPlanificados.current,
-    ...lote.envios.reduce((acum:Record<string, Envio>,val)=>{
+    ...(lote.envios || []).reduce((acum:Record<string, Envio>,val)=>{
       (val as any)._estado = "PLANIFICADO"
       acum[val.idPedido] = val;
       return acum;},{})};
@@ -126,6 +161,8 @@ export function useSimulacion(
   // ============================================================================
   useEffect(() => {
     if (!topic || !id) return;
+    simTime('page mounted', `id=${id}`);
+    simTime('conectando WebSocket', `topic=${topic}`);
 
     simulacionWS.conectar(
       topic,
@@ -134,8 +171,37 @@ export function useSimulacion(
         if (!arrancadoRef.current) {
           arrancadoRef.current = true;
           try {
-            await SimulacionService.iniciar(id);
+            setMensajeErrorSimulacion(null);
+            simTime('solicitando estado/snapshot');
+            const { data: estado } = await SimulacionService.obtenerEstado(id);
+            if (estado.tiempoSimuladoActual) {
+              tiempoSimulacion.current = parseFechaInicio(estado.tiempoSimuladoActual);
+            }
+            if (estado.estado && estado.estado !== 'CREADA') {
+              setEstadoSim(estado.pausada ? 'pausada' : estado.detenida ? 'detenida' : 'preparando');
+              try {
+                const { data: snapshot } = await SimulacionService.obtenerSnapshot(id);
+                simTime('snapshot recibido', `numero=${snapshot?.numeroLote ?? 'n/a'} eventos=${snapshot?.eventos?.length ?? 0}`);
+                if (snapshot?.eventos?.length) encolarEventos(snapshot);
+              } catch (snapshotError) {
+                console.warn('[WS] No se pudo cargar snapshot inicial:', snapshotError);
+              }
+            } else {
+              await SimulacionService.iniciar(id);
+            }
           } catch (error: unknown) {
+            if (axios.isAxiosError(error) && error.response?.status === 404) {
+              const mensaje = 'La simulacion no existe o el backend fue reiniciado. Vuelve a preparar una simulacion.';
+              console.warn('[WS] Simulacion no encontrada al iniciar visualizador:', {
+                idSimulacion: id,
+                status: error.response.status,
+                url: error.config?.url,
+              });
+              setMensajeErrorSimulacion(mensaje);
+              setEstadoSim('error');
+              setConectado(false);
+              return;
+            }
             if (!axios.isAxiosError(error) || error.response?.status !== 409) {
               console.error('[WS] Error al iniciar la simulación:', error);
               arrancadoRef.current = false;
@@ -144,6 +210,7 @@ export function useSimulacion(
             // 409 = ya estaba corriendo, ignorar
           }
           setConectado(true);
+          if (estadoSimRef.current === 'conectando') setEstadoSim('conectado');
         }
       }
     );
@@ -153,6 +220,8 @@ export function useSimulacion(
       colaEventos.current = [];
       lotesRecibidosRef.current = 0;
       arrancadoRef.current = false;
+      primerEventoRecibidoRef.current = false;
+      primerLoteRecibidoRef.current = false;
     };
   }, [id, topic, encolarEventos]);
 
@@ -264,7 +333,12 @@ export function useSimulacion(
           if (aeropuertosSimulacion.current[codigo]) {
             aeropuertosSimulacion.current[codigo].maletasActuales     = evAero.maletasActuales;
             aeropuertosSimulacion.current[codigo].porcentajeOcupacion = evAero.porcentajeOcupacion;
-            aeropuertosSimulacion.current[codigo].estadoCapacidad     = evAero.estadoCapacidad;
+            aeropuertosSimulacion.current[codigo].estadoCapacidad     = obtenerEstadoAeropuerto({
+              ...aeropuertosSimulacion.current[codigo],
+              maletasActuales: evAero.maletasActuales,
+              porcentajeOcupacion: evAero.porcentajeOcupacion,
+              estadoCapacidad: evAero.estadoCapacidad,
+            });
             aeropuertosSimulacion.current[codigo].enviosProximosAVencer = evAero.enviosProximosAVencer || [];
             aeropuertosSimulacion.current[codigo].tieneDatos = true;
           }
@@ -293,5 +367,8 @@ export function useSimulacion(
     vuelosActivosRef: vuelosActivos,
     enviosPlanificadosRef : enviosPlanificados,
     tiempoSimulacionRef: tiempoSimulacion,
+    colapso,
+    replanificaciones,
+    mensajeErrorSimulacion,
   };
 }

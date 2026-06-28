@@ -13,15 +13,17 @@ import {
 import { useMemo, useRef, useState, useEffect, useCallback, RefObject } from 'react';
 import { Feature, FeatureCollection } from 'geojson';
 import { MapLibreEvent } from 'maplibre-gl';
-import type { GeoJSONSource } from 'maplibre-gl';
+import type { GeoJSONSource, Map as MapLibreNative, LayerSpecification } from 'maplibre-gl';
+import Draggable from 'react-draggable';
 // @ts-ignore
 import * as syncMaps from '@mapbox/mapbox-gl-sync-move';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import { AeropuertoSimulacion, Aeropuerto } from '@/app/shared/types/Aeropuerto';
-import { EventoVuelo } from '@/app/shared/types/Evento';
+import { EventoColapso, EventoReplanificacionEnvio, EventoVuelo } from '@/app/shared/types/Evento';
 import { Envio, EnvioRuta } from '@/app/shared/types/Envio';
 import { SimulacionService } from '@/app/services/simulation.service';
+import { formatUtcDisplay } from '@/app/shared/dateTime';
 import { AeropuertoPopupContent } from './pop-up-aeropuerto';
 import { RelojSimulacionOverlay } from './reloj-simulacion';
 import { PanelVuelos } from './panel-vuelos';
@@ -42,12 +44,13 @@ import {
 import { cargarIconosColoreados, cargarIconosAeropuerto } from './mapa-simulacion.icons';
 import {
   normalizarAeropuertoInicial,
-  crearFeatureAeropuerto,
-  crearFeaturesAeropuerto,
+  crearAeropuertosSimulacionEstables,
+  crearFeaturesAeropuertoEstables,
   interpolar,
   calcularBearing,
   obtenerCoordenadasFeature,
 } from './mapa-simulacion.utils';
+import { obtenerEstadoAeropuerto, obtenerEstadoVuelo } from '@/app/shared/simulation/semaforo';
 
 interface Props {
   aeropuertosIniciales: Aeropuerto[];
@@ -57,9 +60,47 @@ interface Props {
   enviosPlanificadosRef: RefObject<Record<string, Envio>>;
   idSimulacion: string;
   conectado: boolean;
+  fechaInicio: string;
+  modo?: string;
+  colapso?: EventoColapso | null;
+  replanificaciones: EventoReplanificacionEnvio[];
 }
 
 type VueloAnimado = EventoVuelo & { _salidaEpoch?: number; _llegadaEpoch?: number };
+
+function crearFeatureCollection(features: Feature[]): FeatureCollection {
+  return { type: 'FeatureCollection', features };
+}
+
+function actualizarSourceGeoJson(map: MapLibreNative, id: string, data: FeatureCollection) {
+  const source = map.getSource(id) as GeoJSONSource | undefined;
+  source?.setData(data);
+}
+
+function asegurarLayer(map: MapLibreNative, layer: LayerSpecification) {
+  if (!map.getLayer(layer.id)) {
+    map.addLayer(layer);
+  }
+}
+
+function quitarLayer(map: MapLibreNative, layerId: string) {
+  if (map.getLayer(layerId)) {
+    map.removeLayer(layerId);
+  }
+}
+
+function reordenarCapasDatos(map: MapLibreNative) {
+  ['routes', 'envio-ruta', 'replanificacion-ruta-line', 'point', 'plane'].forEach((layerId) => {
+    if (map.getLayer(layerId)) map.moveLayer(layerId);
+  });
+}
+
+function coordenadaValida(coords: number[] | undefined): coords is [number, number] {
+  return Array.isArray(coords)
+    && coords.length >= 2
+    && Number.isFinite(coords[0])
+    && Number.isFinite(coords[1]);
+}
 
 export function MapaSimulacion({
   aeropuertosIniciales,
@@ -69,11 +110,17 @@ export function MapaSimulacion({
   tiempoSimulacionRef,
   idSimulacion,
   conectado,
+  fechaInicio,
+  modo,
+  colapso,
+  replanificaciones,
 }: Props) {
   const mapRef = useRef<MapRef>(null);
   const backgroundMapRef = useRef<MapRef>(null);
   const popupRef = useRef<PopupInstance | null>(null);
   const syncRegistradoRef = useRef(false);
+  const vuelosConCoordenadasInvalidasRef = useRef<Set<string>>(new Set());
+  const ultimoDiagnosticoAeropuertosRef = useRef('');
 
   const [showPopup, setShowPopup] = useState(false);
   const [selFeature, setSelFeature] = useState<MapGeoJSONFeature | null>(null);
@@ -96,6 +143,7 @@ export function MapaSimulacion({
   const [idEnvioBusqueda, setIdEnvioBusqueda] = useState('');
   const [rutaEnvio, setRutaEnvio] = useState<EnvioRuta | null>(null);
   const [rutaError, setRutaError] = useState<string | null>(null);
+  const [replanificacionSeleccionada, setReplanificacionSeleccionada] = useState<EventoReplanificacionEnvio | null>(null);
 
   const coordsAeropuertos = useMemo(() => {
     const dict: Record<string, number[]> = {};
@@ -103,10 +151,133 @@ export function MapaSimulacion({
     return dict;
   }, [aeropuertosIniciales]);
 
+  const crearFeaturesAeropuertosMapa = useCallback(() => (
+    crearFeaturesAeropuertoEstables(aeropuertosIniciales, aeropuertosRef.current)
+  ), [aeropuertosIniciales, aeropuertosRef]);
+
   const featuresAeropuertosIniciales = useMemo<Feature[]>(
-    () => aeropuertosIniciales.map(normalizarAeropuertoInicial).map(crearFeatureAeropuerto),
-    [aeropuertosIniciales]
+    () => crearFeaturesAeropuertoEstables(aeropuertosIniciales, aeropuertosRef.current),
+    [aeropuertosIniciales, aeropuertosRef]
   );
+
+  const logDiagnosticoAeropuertos = useCallback((
+    map: MapLibreNative,
+    features: Feature[],
+    motivo: string
+  ) => {
+    const invalidos = features.filter((feature) => (
+      feature.geometry.type !== 'Point'
+      || !coordenadaValida(feature.geometry.coordinates as number[])
+      || Math.abs((feature.geometry.coordinates as number[])[0]) > 180
+      || Math.abs((feature.geometry.coordinates as number[])[1]) > 90
+    ));
+    const sourceExiste = Boolean(map.getSource('aeropuertos-data'));
+    const layerIconoExiste = Boolean(map.getLayer('point'));
+    const styleLoaded = map.isStyleLoaded();
+    const key = [
+      motivo,
+      aeropuertosIniciales.length,
+      Object.keys(aeropuertosRef.current || {}).length,
+      features.length,
+      invalidos.length,
+      sourceExiste,
+      layerIconoExiste,
+      styleLoaded,
+      iconosAeropuertoListos,
+    ].join('|');
+
+    if (ultimoDiagnosticoAeropuertosRef.current === key) return;
+    ultimoDiagnosticoAeropuertosRef.current = key;
+    console.log('[MAPA-AEROPUERTOS] aeropuertosEstado=', {
+      motivo,
+      base: aeropuertosIniciales.length,
+      estado: Object.keys(aeropuertosRef.current || {}).length,
+      iconosAeropuertoListos,
+    });
+    console.log('[MAPA-AEROPUERTOS] features=', {
+      total: features.length,
+      invalidos: invalidos.length,
+      muestra: features.slice(0, 3).map((feature) => ({
+        codigoIata: feature.properties?.codigoIata,
+        coordinates: feature.geometry.type === 'Point' ? feature.geometry.coordinates : null,
+        estadoCapacidad: feature.properties?.estadoCapacidad,
+      })),
+    });
+    console.log('[MAPA-AEROPUERTOS] sourceExiste=', sourceExiste);
+    console.log('[MAPA-AEROPUERTOS] layerExiste=', {
+      icono: layerIconoExiste,
+    });
+    console.log('[MAPA-AEROPUERTOS] styleLoaded=', styleLoaded);
+  }, [aeropuertosIniciales, aeropuertosRef, iconosAeropuertoListos]);
+
+  const crearFeaturesVuelosMapa = useCallback(() => {
+    const t = tiempoSimulacionRef.current;
+    const featuresAviones: Feature[] = [];
+    const featuresRutas: Feature[] = [];
+
+    vuelosActivosRef.current.forEach((vuelo) => {
+      const codigoVuelo = String(vuelo.codigoVuelo);
+      const o = coordsAeropuertos[vuelo.origenIata];
+      const d = coordsAeropuertos[vuelo.destinoIata];
+      if (!coordenadaValida(o) || !coordenadaValida(d)) {
+        if (!vuelosConCoordenadasInvalidasRef.current.has(codigoVuelo)) {
+          vuelosConCoordenadasInvalidasRef.current.add(codigoVuelo);
+          console.warn('[MAPA-VUELOS] Vuelo omitido por coordenadas invalidas', {
+            codigoVuelo,
+            origenIata: vuelo.origenIata,
+            destinoIata: vuelo.destinoIata,
+          });
+        }
+        return;
+      }
+      const v = vuelo as VueloAnimado;
+      const ini = v._salidaEpoch ?? Date.parse(vuelo.horaSalidaUtc);
+      const fin = v._llegadaEpoch ?? Date.parse(vuelo.horaLlegadaUtc);
+      if (!Number.isFinite(ini) || !Number.isFinite(fin)) {
+        if (!vuelosConCoordenadasInvalidasRef.current.has(codigoVuelo)) {
+          vuelosConCoordenadasInvalidasRef.current.add(codigoVuelo);
+          console.warn('[MAPA-VUELOS] Vuelo omitido por tiempos invalidos', {
+            codigoVuelo,
+            horaSalidaUtc: vuelo.horaSalidaUtc,
+            horaLlegadaUtc: vuelo.horaLlegadaUtc,
+          });
+        }
+        return;
+      }
+      let p = (fin - ini) > 0 ? (t - ini) / (fin - ini) : 1;
+      p = Math.max(0, Math.min(1, p));
+      const pos = interpolar(o, d, p);
+      if (!coordenadaValida(pos)) {
+        if (!vuelosConCoordenadasInvalidasRef.current.has(codigoVuelo)) {
+          vuelosConCoordenadasInvalidasRef.current.add(codigoVuelo);
+          console.warn('[MAPA-VUELOS] Vuelo omitido por posicion interpolada invalida', { codigoVuelo });
+        }
+        return;
+      }
+      const bearing = calcularBearing(o, d);
+      featuresAviones.push({
+        type: 'Feature',
+        properties: {
+          ...vuelo,
+          codigoVuelo,
+          bearing,
+          color: COLOR_POR_ESTADO[vuelo.estado] ?? '#ffffff',
+          iconColor: vuelo.cantidadMaletas === 0 ? 'GRIS' : (vuelo.estado ?? 'VERDE'),
+          isAirplane: true,
+        },
+        geometry: { type: 'Point', coordinates: pos },
+      });
+      if (p < 0.999) {
+        featuresRutas.push({
+          type: 'Feature',
+          properties: { estado: vuelo.estado },
+          geometry: { type: 'LineString', coordinates: [pos, d] },
+        });
+      }
+    });
+
+    return { featuresAviones, featuresRutas };
+  }, [coordsAeropuertos, tiempoSimulacionRef, vuelosActivosRef]);
 
   const enfocarCoordenadas = useCallback((coords: [number, number], zoom = 6) => {
     mapRef.current?.getMap().flyTo({ center: coords, zoom, duration: 700, essential: true });
@@ -152,16 +323,63 @@ export function MapaSimulacion({
   }, [coordsAeropuertos, rutaEnvio]);
 
   const seleccionarVuelo = useCallback(async (codigoVuelo: string) => {
-    const map = mapRef.current?.getMap();
-    if (!map) return;
-    const sourceAviones = map.getSource('aviones-data') as GeoJSONSource;
-    const feature = ((await sourceAviones.getData()) as FeatureCollection)
-      .features.find(e => e.properties?.codigoVuelo === codigoVuelo) as MapGeoJSONFeature;
-    setSelFlight(feature ?? null);
-    setPanelOpen(true);
-    const coords = obtenerCoordenadasFeature(feature ?? null);
-    if (coords) enfocarCoordenadas(coords, 6.5);
-  }, [enfocarCoordenadas]);
+    try {
+      const crearFeatureDesdeVuelo = (vuelo: EventoVuelo): MapGeoJSONFeature => {
+        const o = coordsAeropuertos[vuelo.origenIata];
+        const d = coordsAeropuertos[vuelo.destinoIata];
+        let coords: [number, number] = o && d ? [o[0], o[1]] : [0, 0];
+
+        if (o && d) {
+          const ini = (vuelo as VueloAnimado)._salidaEpoch ?? Date.parse(vuelo.horaSalidaUtc);
+          const fin = (vuelo as VueloAnimado)._llegadaEpoch ?? Date.parse(vuelo.horaLlegadaUtc);
+          if (Number.isFinite(ini) && Number.isFinite(fin) && fin > ini) {
+            const p = Math.max(0, Math.min(1, (tiempoSimulacionRef.current - ini) / (fin - ini)));
+            coords = interpolar(o, d, p);
+          }
+        }
+
+        return ({
+          type: 'Feature',
+          properties: { ...vuelo, codigoVuelo: String(vuelo.codigoVuelo), isAirplane: true },
+          geometry: { type: 'Point', coordinates: coords },
+        } as unknown) as MapGeoJSONFeature;
+      };
+
+      const map = mapRef.current?.getMap();
+      let feature: MapGeoJSONFeature | null = null;
+
+      if (!map) {
+        console.warn('[MAPA-VUELOS] Mapa no disponible al seleccionar vuelo', codigoVuelo);
+      } else {
+        const sourceAviones = map.getSource('aviones-data') as (GeoJSONSource & { getData?: () => Promise<FeatureCollection> | FeatureCollection }) | undefined;
+        if (sourceAviones && typeof sourceAviones.getData === 'function') {
+          const data = await sourceAviones.getData();
+          const featureCollection = data as Partial<FeatureCollection>;
+          const features = Array.isArray(featureCollection.features) ? featureCollection.features : [];
+          feature = (features.find(e => e.properties?.codigoVuelo === codigoVuelo) as MapGeoJSONFeature | undefined) ?? null;
+        }
+      }
+
+      const vueloFallback = vuelosActivosRef.current.get(codigoVuelo)
+        ?? vuelosActivosSnapshot.find(v => String(v.codigoVuelo) === codigoVuelo);
+      if (!feature && vueloFallback) {
+        feature = crearFeatureDesdeVuelo(vueloFallback);
+      }
+
+      if (!feature) {
+        console.warn('[MAPA-VUELOS] Vuelo no encontrado para seleccionar', codigoVuelo);
+        return;
+      }
+
+      setSelFlight(feature);
+      setPanelOpen(true);
+
+      const coords = obtenerCoordenadasFeature(feature);
+      if (coords && (coords[0] !== 0 || coords[1] !== 0)) enfocarCoordenadas(coords, 6.5);
+    } catch (error) {
+      console.warn('[MAPA-VUELOS] No se pudo seleccionar vuelo', error);
+    }
+  }, [coordsAeropuertos, enfocarCoordenadas, tiempoSimulacionRef, vuelosActivosRef, vuelosActivosSnapshot]);
 
   const enfocarRutaEnvio = useCallback(() => {
     const coords = featuresRutaEnvio.flatMap(f =>
@@ -182,20 +400,112 @@ export function MapaSimulacion({
     );
   }, [enfocarAeropuerto, featuresRutaEnvio, rutaEnvio]);
 
+  const enfocarReplanificacion = useCallback((replanificacion: EventoReplanificacionEnvio) => {
+    setReplanificacionSeleccionada(replanificacion);
+    const origen = coordsAeropuertos[replanificacion.origenIata];
+    const destino = coordsAeropuertos[replanificacion.destinoIata];
+    const map = mapRef.current?.getMap();
+    if (!map || !origen || !destino) return;
+    map.fitBounds(
+      [[Math.min(origen[0], destino[0]), Math.min(origen[1], destino[1])], [Math.max(origen[0], destino[0]), Math.max(origen[1], destino[1])]],
+      { padding: 100, duration: 700, maxZoom: 5.8 }
+    );
+  }, [coordsAeropuertos]);
+
   useEffect(() => {
     if (rutaEnvio) enfocarRutaEnvio();
   }, [rutaEnvio]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (replanificaciones.length > 0) {
+      setReplanificacionSeleccionada(replanificaciones[0]);
+    }
+  }, [replanificaciones]);
+
+  const featuresReplanificacion = useMemo<Feature[]>(() => {
+    const r = replanificacionSeleccionada;
+    if (!r) return [];
+    const origen = coordsAeropuertos[r.origenIata];
+    const destino = coordsAeropuertos[r.destinoIata];
+    if (!origen || !destino) return [];
+    return [
+      {
+        type: 'Feature',
+        properties: {
+          idPedido: r.idPedido,
+          motivo: r.motivo,
+          tipoRuta: 'nueva',
+        },
+        geometry: { type: 'LineString', coordinates: [origen, destino] },
+      },
+    ];
+  }, [coordsAeropuertos, replanificacionSeleccionada]);
+
+  const asegurarSourcesYLayers = useCallback((map: MapLibreNative) => {
+    if (!map.isStyleLoaded()) return;
+    const { featuresAviones, featuresRutas } = crearFeaturesVuelosMapa();
+    const featuresAeropuertos = crearFeaturesAeropuertosMapa();
+    const sourcesListos = Boolean(
+      map.getSource('rutas-data')
+      && map.getSource('envio-ruta-data')
+      && map.getSource('replanificacion-ruta-data')
+      && map.getSource('aeropuertos-data')
+      && map.getSource('aviones-data')
+    );
+    if (!sourcesListos) return;
+
+    actualizarSourceGeoJson(map, 'rutas-data', crearFeatureCollection(featuresRutas));
+    actualizarSourceGeoJson(map, 'envio-ruta-data', crearFeatureCollection(featuresRutaEnvio));
+    actualizarSourceGeoJson(map, 'replanificacion-ruta-data', crearFeatureCollection(featuresReplanificacion));
+    actualizarSourceGeoJson(map, 'aeropuertos-data', crearFeatureCollection(featuresAeropuertos));
+    actualizarSourceGeoJson(map, 'aviones-data', crearFeatureCollection(featuresAviones));
+
+    asegurarLayer(map, layerStyleLine as LayerSpecification);
+    asegurarLayer(map, layerStyleRutaEnvio as LayerSpecification);
+    asegurarLayer(map, {
+      id: 'replanificacion-ruta-line',
+      type: 'line',
+      source: 'replanificacion-ruta-data',
+      paint: {
+        'line-color': '#f97316',
+        'line-width': 4,
+        'line-opacity': 0.9,
+        'line-dasharray': [1, 1.2],
+      },
+    });
+    if (iconosAeropuertoListos) {
+      asegurarLayer(map, layerStyleAeropuertos as LayerSpecification);
+    } else {
+      quitarLayer(map, 'point');
+    }
+
+    if (iconosAvionListos) {
+      asegurarLayer(map, layerStyleAirplane as LayerSpecification);
+    } else {
+      quitarLayer(map, 'plane');
+    }
+    reordenarCapasDatos(map);
+    logDiagnosticoAeropuertos(map, featuresAeropuertos, 'asegurarSourcesYLayers');
+  }, [
+    crearFeaturesAeropuertosMapa,
+    crearFeaturesVuelosMapa,
+    featuresReplanificacion,
+    featuresRutaEnvio,
+    iconosAeropuertoListos,
+    iconosAvionListos,
+    logDiagnosticoAeropuertos,
+  ]);
 
   // Snapshot cada 500ms para los paneles (vuelos, aeropuertos, envíos)
   useEffect(() => {
     if (!conectado) return;
     const timer = setInterval(() => {
       setVuelosActivosSnapshot(Array.from(vuelosActivosRef.current.values()));
-      setAeropuertosSnapshot(Object.values(aeropuertosRef.current || {}));
+      setAeropuertosSnapshot(crearAeropuertosSimulacionEstables(aeropuertosIniciales, aeropuertosRef.current));
       setEnviosSnapshot(Object.values(enviosPlanificadosRef.current || {}));
     }, 500);
     return () => clearInterval(timer);
-  }, [aeropuertosRef, conectado, enviosPlanificadosRef, vuelosActivosRef]);
+  }, [aeropuertosIniciales, aeropuertosRef, conectado, enviosPlanificadosRef, vuelosActivosRef]);
 
   const ocupacionPromedioFlota = useMemo(() => {
     if (vuelosActivosSnapshot.length === 0) return 0;
@@ -203,6 +513,36 @@ export function MapaSimulacion({
       (acc, v) => acc + (v.capacidadMax ? (v.cantidadMaletas / v.capacidadMax) * 100 : 0), 0
     ) / vuelosActivosSnapshot.length;
   }, [vuelosActivosSnapshot]);
+
+  const metricasGlobales = useMemo(() => {
+    const ocupacionAeropuertos = aeropuertosSnapshot.filter(a => a.tieneDatos);
+    const ocupacionPromedioAeropuertos = ocupacionAeropuertos.length === 0 ? 0 :
+      ocupacionAeropuertos.reduce((acc, a) => acc + (a.porcentajeOcupacion || 0), 0) / ocupacionAeropuertos.length;
+    const enviosEntregados = enviosSnapshot.filter(e => (e as any)._estado === 'ENTREGADO').length;
+    const enviosTransito = enviosSnapshot.filter(e => (e as any)._estado === 'EN_CURSO').length;
+    const enviosPendientes = enviosSnapshot.filter(e => (e as any)._estado === 'PLANIFICADO').length;
+    return {
+      ocupacionPromedioAeropuertos,
+      enviosEntregados,
+      enviosTransito,
+      enviosPendientes,
+      aeropuertosVacio: aeropuertosSnapshot.filter(a => obtenerEstadoAeropuerto(a) === 'VACIO').length,
+      aeropuertosRojo: aeropuertosSnapshot.filter(a => obtenerEstadoAeropuerto(a) === 'ROJO').length,
+      aeropuertosAmbar: aeropuertosSnapshot.filter(a => obtenerEstadoAeropuerto(a) === 'AMARILLO').length,
+      aeropuertosVerde: aeropuertosSnapshot.filter(a => obtenerEstadoAeropuerto(a) === 'VERDE').length,
+      vuelosVacio: vuelosActivosSnapshot.filter(v => obtenerEstadoVuelo(v) === 'VACIO').length,
+      vuelosRojo: vuelosActivosSnapshot.filter(v => obtenerEstadoVuelo(v) === 'ROJO').length,
+      vuelosAmbar: vuelosActivosSnapshot.filter(v => obtenerEstadoVuelo(v) === 'AMARILLO').length,
+      vuelosVerde: vuelosActivosSnapshot.filter(v => obtenerEstadoVuelo(v) === 'VERDE').length,
+    };
+  }, [aeropuertosSnapshot, enviosSnapshot, vuelosActivosSnapshot]);
+
+  const aeropuertoSeleccionado = useMemo(() => {
+    const codigo = selAirport?.properties?.codigoIata;
+    return typeof codigo === 'string'
+      ? aeropuertosIniciales.find(a => a.codigoIata === codigo) ?? null
+      : null;
+  }, [aeropuertosIniciales, selAirport]);
 
   // Motor gráfico a 60fps. Aviones/rutas cada frame, aeropuertos cada 30 frames.
   useEffect(() => {
@@ -213,51 +553,21 @@ export function MapaSimulacion({
       const map = mapRef.current?.getMap();
       if (!map || !map.isStyleLoaded()) { rafId = requestAnimationFrame(animar); return; }
 
-      const t = tiempoSimulacionRef.current;
-      const featuresAviones: Feature[] = [];
-      const featuresRutas: Feature[] = [];
+      const { featuresAviones, featuresRutas } = crearFeaturesVuelosMapa();
 
-      vuelosActivosRef.current.forEach((vuelo) => {
-        const o = coordsAeropuertos[vuelo.origenIata];
-        const d = coordsAeropuertos[vuelo.destinoIata];
-        if (!o || !d) return;
-        const v = vuelo as VueloAnimado;
-        const ini = v._salidaEpoch ?? Date.parse(vuelo.horaSalidaUtc);
-        const fin = v._llegadaEpoch ?? Date.parse(vuelo.horaLlegadaUtc);
-        if (!Number.isFinite(ini) || !Number.isFinite(fin)) return;
-        let p = (fin - ini) > 0 ? (t - ini) / (fin - ini) : 1;
-        p = Math.max(0, Math.min(1, p));
-        const pos = interpolar(o, d, p);
-        const bearing = calcularBearing(o, d);
-        featuresAviones.push({
-          type: 'Feature',
-          properties: {
-            ...vuelo,
-            codigoVuelo: String(vuelo.codigoVuelo),
-            bearing,
-            color: COLOR_POR_ESTADO[vuelo.estado] ?? '#ffffff',
-            iconColor: vuelo.cantidadMaletas === 0 ? 'GRIS' : (vuelo.estado ?? 'VERDE'),
-            isAirplane: true,
-          },
-          geometry: { type: 'Point', coordinates: pos },
-        });
-        if (p < 0.999) {
-          featuresRutas.push({
-            type: 'Feature',
-            properties: { estado: vuelo.estado },
-            geometry: { type: 'LineString', coordinates: [pos, d] },
-          });
-        }
-      });
+      if (!map.getSource('aviones-data') || !map.getSource('rutas-data') || !map.getSource('aeropuertos-data')) {
+        asegurarSourcesYLayers(map);
+      }
 
-      (map.getSource('aviones-data') as GeoJSONSource)?.setData({ type: 'FeatureCollection', features: featuresAviones });
-      (map.getSource('rutas-data') as GeoJSONSource)?.setData({ type: 'FeatureCollection', features: featuresRutas });
+      (map.getSource('aviones-data') as GeoJSONSource | undefined)?.setData(crearFeatureCollection(featuresAviones));
+      (map.getSource('rutas-data') as GeoJSONSource | undefined)?.setData(crearFeatureCollection(featuresRutas));
 
       if (++frame % 30 === 0) {
-        (map.getSource('aeropuertos-data') as GeoJSONSource)?.setData({
-          type: 'FeatureCollection',
-          features: crearFeaturesAeropuerto(aeropuertosRef.current),
-        });
+        const featuresAeropuertos = crearFeaturesAeropuertosMapa();
+        (map.getSource('aeropuertos-data') as GeoJSONSource | undefined)?.setData(
+          crearFeatureCollection(featuresAeropuertos)
+        );
+        logDiagnosticoAeropuertos(map, featuresAeropuertos, 'animacion');
       }
 
       rafId = requestAnimationFrame(animar);
@@ -265,17 +575,35 @@ export function MapaSimulacion({
 
     animar();
     return () => cancelAnimationFrame(rafId);
-  }, [aeropuertosRef, coordsAeropuertos, tiempoSimulacionRef, vuelosActivosRef]);
+  }, [asegurarSourcesYLayers, crearFeaturesAeropuertosMapa, crearFeaturesVuelosMapa, logDiagnosticoAeropuertos]);
 
   // Capa de ruta de envío: se actualiza solo cuando cambia la ruta buscada
   useEffect(() => {
     const map = mapRef.current?.getMap();
     if (!map || !map.isStyleLoaded()) return;
-    (map.getSource('envio-ruta-data') as GeoJSONSource)?.setData({
-      type: 'FeatureCollection',
-      features: featuresRutaEnvio,
-    });
-  }, [featuresRutaEnvio]);
+    if (!map.getSource('envio-ruta-data')) asegurarSourcesYLayers(map);
+    (map.getSource('envio-ruta-data') as GeoJSONSource | undefined)?.setData(crearFeatureCollection(featuresRutaEnvio));
+  }, [asegurarSourcesYLayers, featuresRutaEnvio]);
+
+  useEffect(() => {
+    const map = mapRef.current?.getMap();
+    if (!map || !map.isStyleLoaded()) return;
+    if (!map.getSource('replanificacion-ruta-data')) asegurarSourcesYLayers(map);
+    (map.getSource('replanificacion-ruta-data') as GeoJSONSource | undefined)?.setData(crearFeatureCollection(featuresReplanificacion));
+  }, [asegurarSourcesYLayers, featuresReplanificacion]);
+
+  useEffect(() => {
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+    const asegurar = () => asegurarSourcesYLayers(map);
+    if (map.isStyleLoaded()) asegurar();
+    map.on('load', asegurar);
+    map.on('styledata', asegurar);
+    return () => {
+      map.off('load', asegurar);
+      map.off('styledata', asegurar);
+    };
+  }, [asegurarSourcesYLayers]);
 
   // Sincronizar cámara entre mapa de datos y mapa de fondo. Polling liviano
   // (intervalo corto) hasta detectar que ambas instancias existen, sin depender
@@ -296,22 +624,36 @@ export function MapaSimulacion({
 
   const handleMapLoad = useCallback((e: MapLibreEvent) => {
     const map = e.target;
+    asegurarSourcesYLayers(map);
 
     cargarIconosAeropuerto(map, '/aeropuerto.png', 'airport', {
       verde:    '#22c55e',
       amarillo: '#eab308',
       rojo:     '#ef4444',
+      vacio:    COLOR_POR_ESTADO.VACIO,
       default:  '#ffffff',
     })
-      .catch((err) => console.error('Error al cargar íconos de aeropuerto:', err))
-      .finally(() => setIconosAeropuertoListos(true));
+      .then(() => {
+        if (!map.hasImage('airport-vacio')) throw new Error('airport-vacio no registrado');
+        setIconosAeropuertoListos(true);
+      })
+      .catch((err) => {
+        console.error('Error al cargar íconos de aeropuerto:', err);
+        setIconosAeropuertoListos(false);
+      });
 
     cargarIconosColoreados(map, '/avion.png', 'airplane', {
       verde: '#22c55e', amarillo: '#eab308', rojo: '#ef4444', gris: '#94a3b8',
     })
-      .catch((err) => console.error('Error al cargar íconos de avión:', err))
-      .finally(() => setIconosAvionListos(true));
-  }, []);
+      .then(() => {
+        if (!map.hasImage('airplane-gris')) throw new Error('airplane-gris no registrado');
+        setIconosAvionListos(true);
+      })
+      .catch((err) => {
+        console.error('Error al cargar íconos de avión:', err);
+        setIconosAvionListos(false);
+      });
+  }, [asegurarSourcesYLayers]);
 
   const handleMouseEnter = (event: MapLayerMouseEvent) => {
     setSelFeature(event.features?.[0] ?? null);
@@ -371,6 +713,23 @@ export function MapaSimulacion({
         visible={conectado}
         onEnfocarAeropuerto={enfocarAeropuerto}
       />
+
+      <PanelResumenDerecho
+        ocupacionFlota={ocupacionPromedioFlota}
+        ocupacionAeropuertos={metricasGlobales.ocupacionPromedioAeropuertos}
+        vuelosEnAire={vuelosActivosSnapshot.length}
+        enviosTransito={metricasGlobales.enviosTransito}
+        enviosEntregados={metricasGlobales.enviosEntregados}
+        enviosPendientes={metricasGlobales.enviosPendientes}
+        aeropuertos={{ rojo: metricasGlobales.aeropuertosRojo, ambar: metricasGlobales.aeropuertosAmbar, verde: metricasGlobales.aeropuertosVerde, vacio: metricasGlobales.aeropuertosVacio }}
+        vuelos={{ rojo: metricasGlobales.vuelosRojo, ambar: metricasGlobales.vuelosAmbar, verde: metricasGlobales.vuelosVerde, vacio: metricasGlobales.vuelosVacio }}
+        replanificaciones={replanificaciones}
+        replanificacionSeleccionada={replanificacionSeleccionada}
+        onSeleccionarReplanificacion={enfocarReplanificacion}
+        visible={conectado}
+      />
+
+      {colapso && <PanelColapso colapso={colapso} />}
 
       <div style={{
         position: 'absolute',
@@ -465,23 +824,30 @@ export function MapaSimulacion({
         interactiveLayerIds={['point', 'plane']}
         onLoad={handleMapLoad}
       >
-        <Source id="rutas-data" type="geojson" data={{ type: 'FeatureCollection', features: [] }}>
+        <Source id="rutas-data" type="geojson" data={crearFeatureCollection([])}>
           <Layer {...layerStyleLine} />
         </Source>
-        <Source id="envio-ruta-data" type="geojson" data={{ type: 'FeatureCollection', features: [] }}>
+        <Source id="envio-ruta-data" type="geojson" data={crearFeatureCollection(featuresRutaEnvio)}>
           <Layer {...layerStyleRutaEnvio} />
         </Source>
-
-        {iconosAeropuertoListos && (
-          <Source id="aeropuertos-data" type="geojson" data={{ type: 'FeatureCollection', features: featuresAeropuertosIniciales }}>
-            <Layer {...layerStyleAeropuertos} />
-          </Source>
-        )}
-        {iconosAvionListos && (
-          <Source id="aviones-data" type="geojson" data={{ type: 'FeatureCollection', features: [] }}>
-            <Layer {...layerStyleAirplane} />
-          </Source>
-        )}
+        <Source id="replanificacion-ruta-data" type="geojson" data={crearFeatureCollection(featuresReplanificacion)}>
+          <Layer
+            id="replanificacion-ruta-line"
+            type="line"
+            paint={{
+              'line-color': '#f97316',
+              'line-width': 4,
+              'line-opacity': 0.9,
+              'line-dasharray': [1, 1.2],
+            }}
+          />
+        </Source>
+        <Source id="aeropuertos-data" type="geojson" data={crearFeatureCollection(featuresAeropuertosIniciales)}>
+          {iconosAeropuertoListos && <Layer {...layerStyleAeropuertos} />}
+        </Source>
+        <Source id="aviones-data" type="geojson" data={crearFeatureCollection([])}>
+          {iconosAvionListos && <Layer {...layerStyleAirplane} />}
+        </Source>
 
         {showPopup && selFeature && (
           <Popup
@@ -501,7 +867,207 @@ export function MapaSimulacion({
         )}
       </MapLibre>
 
-      <RelojSimulacionOverlay tiempoRef={tiempoSimulacionRef} ocupacionFlota={ocupacionPromedioFlota} />
+      <RelojSimulacionOverlay
+        tiempoRef={tiempoSimulacionRef}
+        ocupacionFlota={ocupacionPromedioFlota}
+        fechaInicio={fechaInicio}
+        modo={modo}
+        aeropuertoSeleccionado={aeropuertoSeleccionado}
+      />
+    </div>
+  );
+}
+
+function PanelResumenDerecho({
+  visible,
+  replanificaciones,
+  replanificacionSeleccionada,
+  onSeleccionarReplanificacion,
+  ...metricas
+}: {
+  visible: boolean;
+  ocupacionFlota: number;
+  ocupacionAeropuertos: number;
+  vuelosEnAire: number;
+  enviosTransito: number;
+  enviosEntregados: number;
+  enviosPendientes: number;
+  aeropuertos: { rojo: number; ambar: number; verde: number; vacio: number };
+  vuelos: { rojo: number; ambar: number; verde: number; vacio: number };
+  replanificaciones: EventoReplanificacionEnvio[];
+  replanificacionSeleccionada: EventoReplanificacionEnvio | null;
+  onSeleccionarReplanificacion: (replanificacion: EventoReplanificacionEnvio) => void;
+}) {
+  const nodeRef = useRef<HTMLDivElement>(null);
+  if (!visible) return null;
+  return (
+    <Draggable nodeRef={nodeRef as RefObject<HTMLDivElement>} handle=".metricas-drag-handle">
+      <div
+        ref={nodeRef}
+        style={{
+          position: 'absolute',
+          top: 16,
+          right: 16,
+          zIndex: 24,
+          width: 340,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+        }}
+      >
+        <PanelMetricasGlobales {...metricas} visible={visible} />
+        <PanelReplanificaciones
+          replanificaciones={replanificaciones}
+          seleccionada={replanificacionSeleccionada}
+          visible={visible}
+          onSeleccionar={onSeleccionarReplanificacion}
+        />
+      </div>
+    </Draggable>
+  );
+}
+
+function PanelMetricasGlobales({
+  visible,
+  ocupacionFlota,
+  ocupacionAeropuertos,
+  vuelosEnAire,
+  enviosTransito,
+  enviosEntregados,
+  enviosPendientes,
+  aeropuertos,
+  vuelos,
+}: {
+  visible: boolean;
+  ocupacionFlota: number;
+  ocupacionAeropuertos: number;
+  vuelosEnAire: number;
+  enviosTransito: number;
+  enviosEntregados: number;
+  enviosPendientes: number;
+  aeropuertos: { rojo: number; ambar: number; verde: number; vacio: number };
+  vuelos: { rojo: number; ambar: number; verde: number; vacio: number };
+}) {
+  const nodeRef = useRef<HTMLDivElement>(null);
+  if (!visible) return null;
+  const semaforo = Math.max(ocupacionFlota, ocupacionAeropuertos);
+  const color = semaforo >= 85 ? '#ef4444' : semaforo >= 60 ? '#eab308' : '#22c55e';
+  const item = (label: string, value: string | number) => (
+    <div>
+      <div style={{ fontSize: 11, color: '#94a3b8' }}>{label}</div>
+      <div style={{ fontWeight: 800 }}>{value}</div>
+    </div>
+  );
+  return (
+    <div style={{
+      background: 'rgba(15, 23, 42, 0.92)', color: '#fff',
+      border: '1px solid rgba(148, 163, 184, 0.35)', borderRadius: 8,
+      padding: 12, width: 340, boxShadow: '0 8px 20px rgba(0,0,0,0.25)',
+    }}>
+      <div className="metricas-drag-handle" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, cursor: 'move' }}>
+        <span style={{ width: 10, height: 10, borderRadius: 999, background: color, display: 'inline-block' }} />
+        <strong>Metricas globales</strong>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, fontSize: 13 }}>
+        {item('Flota', `${Math.round(ocupacionFlota)}%`)}
+        {item('Aeropuertos', `${Math.round(ocupacionAeropuertos)}%`)}
+        {item('Vuelos aire', vuelosEnAire)}
+        {item('En transito', enviosTransito)}
+        {item('Entregados', enviosEntregados)}
+        {item('Pendientes', enviosPendientes)}
+        {item('Aeropuertos vacíos', aeropuertos.vacio)}
+        {item('Vuelos vacíos', vuelos.vacio)}
+      </div>
+      <div style={{ marginTop: 10, fontSize: 12, color: '#cbd5e1' }}>
+        Aeropuertos R/A/V: {aeropuertos.rojo}/{aeropuertos.ambar}/{aeropuertos.verde} · Vuelos R/A/V: {vuelos.rojo}/{vuelos.ambar}/{vuelos.verde}
+      </div>
+    </div>
+  );
+}
+
+function PanelReplanificaciones({
+  visible,
+  replanificaciones,
+  seleccionada,
+  onSeleccionar,
+}: {
+  visible: boolean;
+  replanificaciones: EventoReplanificacionEnvio[];
+  seleccionada: EventoReplanificacionEnvio | null;
+  onSeleccionar: (replanificacion: EventoReplanificacionEnvio) => void;
+}) {
+  if (!visible) return null;
+  const lista = replanificaciones.slice(0, 10);
+  return (
+    <div style={{
+      width: 340, maxHeight: 300, overflowY: 'auto',
+      background: 'rgba(15, 23, 42, 0.92)', color: '#fff',
+      border: '1px solid rgba(251, 146, 60, 0.45)', borderRadius: 8,
+      padding: 12, boxShadow: '0 8px 20px rgba(0,0,0,0.25)',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <strong>Replanificaciones</strong>
+        <span style={{ fontSize: 12, color: '#fed7aa' }}>{replanificaciones.length}</span>
+      </div>
+      {lista.length === 0 ? (
+        <div style={{ fontSize: 12, color: '#cbd5e1' }}>Sin replanificaciones recientes.</div>
+      ) : lista.map((r) => {
+        const activa = seleccionada?.idPedido === r.idPedido && seleccionada?.fechaHoraEvento === r.fechaHoraEvento;
+        return (
+          <button
+            key={`${r.idPedido}-${r.fechaHoraEvento}-${r.itinerarioNuevo ?? 'sin-ruta'}`}
+            onClick={() => onSeleccionar(r)}
+            style={{
+              width: '100%', textAlign: 'left', display: 'block',
+              border: activa ? '1px solid #fb923c' : '1px solid rgba(148, 163, 184, 0.25)',
+              background: activa ? 'rgba(251, 146, 60, 0.16)' : 'rgba(30, 41, 59, 0.82)',
+              color: '#fff', borderRadius: 6, padding: 8, marginBottom: 8,
+              cursor: 'pointer',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+              <strong style={{ fontSize: 12 }}>{r.idPedido}</strong>
+              <span style={{ fontSize: 11, color: '#fed7aa' }}>{r.motivo}</span>
+            </div>
+            <div style={{ fontSize: 12, color: '#e2e8f0', marginTop: 4 }}>{r.origenIata} - {r.destinoIata}</div>
+            <div style={{ fontSize: 11, color: '#cbd5e1', marginTop: 4 }}>
+              Estado: {r.estadoAnterior ?? '-'} - {r.estadoNuevo ?? '-'}
+            </div>
+            <div style={{ fontSize: 11, color: '#cbd5e1' }}>
+              Vuelo: {r.vueloAnterior ?? 'Sin ruta'} - {r.vueloNuevo ?? 'Sin ruta'}
+            </div>
+            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
+              {formatUtcDisplay(r.horaSimulada ?? r.fechaHoraEvento)}
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function PanelColapso({ colapso }: { colapso: EventoColapso }) {
+  const d = colapso.detalle;
+  return (
+    <div style={{
+      position: 'absolute', left: '50%', top: 24, transform: 'translateX(-50%)',
+      zIndex: 30, width: 420, maxWidth: 'calc(100% - 32px)',
+      background: '#fff7ed', color: '#7c2d12', border: '1px solid #fdba74',
+      borderRadius: 8, padding: 16, boxShadow: '0 18px 40px rgba(0,0,0,0.28)',
+    }}>
+      <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>Colapso logistico detectado</div>
+      <div style={{ fontWeight: 700 }}>Causa: Incumplimiento de SLA</div>
+      <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.55 }}>
+        <div><strong>Envio/maleta responsable:</strong> {d?.idPedido ?? 'No disponible'}</div>
+        <div><strong>Ruta:</strong> {d?.origenIata ?? '-'} - {d?.destinoIata ?? '-'} · {d?.cantidadMaletas ?? '-'} maletas</div>
+        <div><strong>Registro:</strong> {formatUtcDisplay(d?.fechaHoraRegistro)}</div>
+        <div><strong>Deadline:</strong> {formatUtcDisplay(d?.deadlineSla)}</div>
+        <div><strong>Hora exacta de colapso:</strong> {formatUtcDisplay(d?.horaColapso ?? colapso.fechaHoraEvento)}</div>
+        <div><strong>Tipo SLA:</strong> {d?.tipoSla ?? 'No disponible'}</div>
+        <div><strong>Estado:</strong> {d?.estadoEnvio ?? 'No disponible'}</div>
+        <div><strong>Ultimo aeropuerto:</strong> {d?.aeropuertoActual ?? 'No disponible'}</div>
+        <div><strong>Vuelo/ruta:</strong> {d?.vueloAfectado ?? d?.itinerarioAfectado ?? 'No disponible'}</div>
+      </div>
     </div>
   );
 }
