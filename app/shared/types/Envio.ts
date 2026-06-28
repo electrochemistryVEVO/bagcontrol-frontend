@@ -41,3 +41,13 @@ export type EnvioAeropuerto = {
     fechaHoraSalidaUtc : Date;
     fechaHoraLlegadaUtc : Date;
 }
+
+export type MaletaSimulacion = {
+    codigoMaleta: string;        // {idPedido}-M1, -M2, ...
+    idPedido: string;            // envío padre (para ver ruta)
+    origenIata: string;
+    destinoIata: string;
+    tipoAlmacen: 'DESTINO_FINAL' | 'TRANSITO' | string;
+    estadoEnvio: string;
+    cantidadMaletasEnvio: number;
+}

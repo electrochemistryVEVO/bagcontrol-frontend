@@ -1,4 +1,4 @@
-import {Box, Table, TableBody, TableCell, TablePagination, TableRow} from "@mui/material";
+import {Box, Table, TableBody, TableCell, TableHead, TablePagination, TableRow} from "@mui/material";
 import {memo, useEffect, useMemo, useState, RefObject} from "react";
 import styles from "../../stylesheets/sidepanel.module.css";
 import {EventoVuelo} from "@/app/shared/types/Evento";
@@ -141,35 +141,50 @@ function SidePanelContents({
             </div>
 
             <div className={styles["packages-header"]}>
-                <span>Envios asignados a esta UT:</span>
-                <span className={styles["view-all"]}>{enviosAsignados.length} registros</span>
-            </div>
-
-            <div className={styles["subtitle"]}>
-                Mostrando 5 resultados próximos
+                <span>Maletas asignadas a esta UT:</span>
+                <span className={styles["view-all"]}>
+                    {enviosAsignados.reduce((s, e) => s + e.cantidadMaletas, 0)} maletas · {enviosAsignados.length} envíos
+                </span>
             </div>
 
             <Table className={styles["package-list"]}>
-
+                <TableHead>
+                    <TableRow className={styles["package-item"]}>
+                        <TableCell className={styles["package-code"]} style={{ fontWeight: 700, fontSize: 11, color: '#64748b' }}>Código maleta</TableCell>
+                        <TableCell style={{ fontWeight: 700, fontSize: 11, color: '#64748b' }}>Origen → Destino</TableCell>
+                        <TableCell style={{ fontWeight: 700, fontSize: 11, color: '#64748b' }}>Hora</TableCell>
+                        <TableCell />
+                    </TableRow>
+                </TableHead>
                 <TableBody>
                     {
                         enviosAsignados
+                            .flatMap((envio: Envio) =>
+                                Array.from({ length: envio.cantidadMaletas }, (_, i) => ({
+                                    codigoMaleta: `${envio.idPedido}-M${i + 1}`,
+                                    idPedido: envio.idPedido,
+                                    origenIata: envio.origenIata,
+                                    destinoIata: envio.destinoIata,
+                                    fechaHora: envio.fechaHora,
+                                }))
+                            )
                             .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                            .map((envio:Envio)=>(<TableRow key={envio.idPedido} className={styles["package-item"]}>
-                                <TableCell className={styles["package-code"]}>{envio.idPedido}</TableCell>
-                                <TableCell>{envio.origenIata} - {envio.destinoIata}</TableCell>
-                                <TableCell>{envio.cantidadMaletas} maletas</TableCell>
-                                <TableCell className={styles["package-time red"]}>{HourFormat(new Date(envio.fechaHora))}</TableCell>
-                                <TableCell>
-                                    <button
-                                        type="button"
-                                        onClick={() => onMostrarRutaEnvio(envio.idPedido)}
-                                        style={miniButtonStyle}
-                                    >
-                                        Ruta
-                                    </button>
-                                </TableCell>
-                            </TableRow>))
+                            .map((maleta) => (
+                                <TableRow key={maleta.codigoMaleta} className={styles["package-item"]}>
+                                    <TableCell className={styles["package-code"]}>{maleta.codigoMaleta}</TableCell>
+                                    <TableCell>{maleta.origenIata} → {maleta.destinoIata}</TableCell>
+                                    <TableCell className={styles["package-time red"]}>{HourFormat(new Date(maleta.fechaHora))}</TableCell>
+                                    <TableCell>
+                                        <button
+                                            type="button"
+                                            onClick={() => onMostrarRutaEnvio(maleta.idPedido)}
+                                            style={miniButtonStyle}
+                                        >
+                                            Ruta
+                                        </button>
+                                    </TableCell>
+                                </TableRow>
+                            ))
                     }
                 </TableBody>
             </Table>
@@ -179,7 +194,7 @@ function SidePanelContents({
                              page={page}
                              onPageChange={(_,_value)=>setPage(_value)}
                              onRowsPerPageChange={(_value)=>setRowsPerPage(Number(_value.target.value))}
-                             count={enviosAsignados.length} />
+                             count={enviosAsignados.reduce((s, e) => s + e.cantidadMaletas, 0)} />
         </div>
     </Box>)
 }

@@ -8,6 +8,7 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Collapse,
   FormControl,
   InputLabel,
   MenuItem,
@@ -30,7 +31,7 @@ import Draggable from 'react-draggable';
 
 import type { AeropuertoSimulacion } from '@/app/shared/types/Aeropuerto';
 import type { EstadoCapacidad, EventoVuelo } from '@/app/shared/types/Evento';
-import type { Envio } from '@/app/shared/types/Envio';
+import type { Envio, MaletaSimulacion } from '@/app/shared/types/Envio';
 import { SimulacionService } from '@/app/services/simulation.service';
 import {
   calcularOcupacionAeropuerto,
@@ -69,10 +70,10 @@ const etiquetaPorEstado: Record<EstadoCapacidad, string> = {
 type PanelLateralProps = {
   // comunes
   visible: boolean;
-  // vuelos
   idSimulacion: string;
-  vuelosActivos: EventoVuelo[];
   tiempoSimulacionRef: RefObject<number>;
+  // vuelos
+  vuelosActivos: EventoVuelo[];
   seleccionarVuelo: (codigoVuelo: string) => void;
   onEnfocarVuelo: (codigoVuelo: string | number) => void;
   onFiltradoVuelosCambiado?: (codigos: string[] | null) => void;
@@ -169,11 +170,15 @@ export function PanelLateral({
             seleccionarVuelo={seleccionarVuelo}
             onEnfocarVuelo={onEnfocarVuelo}
             onFiltradoCambiado={onFiltradoVuelosCambiado}
+            onMostrarRutaEnvio={onMostrarRutaEnvio}
           />
           <SeccionAeropuertos
+            idSimulacion={idSimulacion}
+            tiempoSimulacionRef={tiempoSimulacionRef}
             aeropuertos={aeropuertos}
             onEnfocarAeropuerto={onEnfocarAeropuerto}
             onFiltradoCambiado={onFiltradoAeropuertosCambiado}
+            onMostrarRutaEnvio={onMostrarRutaEnvio}
           />
           <SeccionEnvios
             envios={envios}
@@ -196,6 +201,7 @@ function SeccionVuelos({
   seleccionarVuelo,
   onEnfocarVuelo,
   onFiltradoCambiado,
+  onMostrarRutaEnvio,
 }: {
   idSimulacion: string;
   vuelosActivos: EventoVuelo[];
@@ -203,6 +209,7 @@ function SeccionVuelos({
   seleccionarVuelo: (codigoVuelo: string) => void;
   onEnfocarVuelo: (codigoVuelo: string | number) => void;
   onFiltradoCambiado?: (codigos: string[] | null) => void;
+  onMostrarRutaEnvio: (idPedido: string) => void;
 }) {
   const [abierto, setAbierto] = useState(false);
   const [busqueda, setBusqueda] = useState('');
@@ -336,12 +343,50 @@ function SeccionVuelos({
                             <Typography variant="body2" color="error">{errorPorVuelo[codigo]}</Typography>
                           ) : envios.length === 0 ? (
                             <Box className={styles.empty}>Sin envíos asignados</Box>
-                          ) : (
-                            <Table size="small" className={styles.table}>
-                              <TableHead><TableRow><TableCell>ID</TableCell><TableCell>Origen</TableCell><TableCell>Destino</TableCell><TableCell align="right">Maletas</TableCell></TableRow></TableHead>
-                              <TableBody>{envios.map((e) => <TableRow key={e.idPedido}><TableCell>{e.idPedido}</TableCell><TableCell>{e.origenIata}</TableCell><TableCell>{e.destinoIata}</TableCell><TableCell align="right">{e.cantidadMaletas}</TableCell></TableRow>)}</TableBody>
-                            </Table>
-                          )}
+                          ) : (() => {
+                            const maletasVuelo = envios.flatMap(e =>
+                              Array.from({ length: e.cantidadMaletas }, (_, i) => ({
+                                codigoMaleta: `${e.idPedido}-M${i + 1}`,
+                                idPedido: e.idPedido,
+                                origenIata: e.origenIata,
+                                destinoIata: e.destinoIata,
+                              }))
+                            );
+                            return (
+                              <>
+                                <Typography variant="caption" sx={{ color: '#94a3b8', px: 1, pb: 0.5, display: 'block' }}>
+                                  {maletasVuelo.length} maletas · {envios.length} envíos
+                                </Typography>
+                                <Table size="small" className={styles.table}>
+                                  <TableHead>
+                                    <TableRow>
+                                      <TableCell>Código</TableCell>
+                                      <TableCell>Origen</TableCell>
+                                      <TableCell>Destino</TableCell>
+                                      <TableCell></TableCell>
+                                    </TableRow>
+                                  </TableHead>
+                                  <TableBody>
+                                    {maletasVuelo.map((m) => (
+                                      <TableRow key={m.codigoMaleta}>
+                                        <TableCell sx={{ fontSize: 11 }}>{m.codigoMaleta}</TableCell>
+                                        <TableCell>{m.origenIata}</TableCell>
+                                        <TableCell>{m.destinoIata}</TableCell>
+                                        <TableCell>
+                                          <button
+                                            onClick={() => onMostrarRutaEnvio(m.idPedido)}
+                                            style={{ border: 'none', borderRadius: 4, padding: '3px 8px', background: '#2563eb', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                                          >
+                                            Ruta
+                                          </button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </>
+                            );
+                          })()}
                         </Box>
                       )}
                     </Box>
@@ -374,13 +419,19 @@ const ordenAeropuertoFns: Record<OrdenAeropuertos, (a: AeropuertoSimulacion) => 
 };
 
 function SeccionAeropuertos({
+  idSimulacion,
+  tiempoSimulacionRef,
   aeropuertos,
   onEnfocarAeropuerto,
   onFiltradoCambiado,
+  onMostrarRutaEnvio,
 }: {
+  idSimulacion: string;
+  tiempoSimulacionRef: RefObject<number>;
   aeropuertos: AeropuertoSimulacion[];
   onEnfocarAeropuerto: (iata: string) => void;
   onFiltradoCambiado?: (iatas: string[] | null) => void;
+  onMostrarRutaEnvio: (idPedido: string) => void;
 }) {
   const [abierto, setAbierto] = useState(false);
   const [busqueda, setBusqueda] = useState('');
@@ -389,6 +440,35 @@ function SeccionAeropuertos({
   const [tipoOrden, setTipoOrden] = useState<OrdenAeropuertos>('calcularOcupacion');
   const [direccionOrden, setDireccionOrden] = useState<DireccionOrden>('desc');
   const [expandido, setExpandido] = useState<string | null>(null);
+  const [maletasPorAeropuerto, setMaletasPorAeropuerto] = useState<Record<string, MaletaSimulacion[]>>({});
+  const [loadingMaletas, setLoadingMaletas] = useState<Record<string, boolean>>({});
+  const [errorMaletas, setErrorMaletas] = useState<Record<string, string>>({});
+  const [paginaMaletas, setPaginaMaletas] = useState<Record<string, number>>({});
+  const MALETAS_POR_PAGINA = 10;
+
+  const cargarMaletas = async (iata: string) => {
+    if (maletasPorAeropuerto[iata] || loadingMaletas[iata]) return;
+    setLoadingMaletas(p => ({ ...p, [iata]: true }));
+    try {
+      const ts = new Date(tiempoSimulacionRef.current).toISOString();
+      const { data } = await SimulacionService.obtenerMaletasPorAeropuerto(idSimulacion, iata, ts);
+      setMaletasPorAeropuerto(p => ({ ...p, [iata]: data }));
+    } catch {
+      setErrorMaletas(p => ({ ...p, [iata]: 'No se pudieron cargar las maletas.' }));
+    } finally {
+      setLoadingMaletas(p => ({ ...p, [iata]: false }));
+    }
+  };
+
+  const toggleExpandido = (iata: string) => {
+    onEnfocarAeropuerto(iata);
+    if (expandido === iata) {
+      setExpandido(null);
+    } else {
+      setExpandido(iata);
+      cargarMaletas(iata);
+    }
+  };
 
   const aeropuertosOrdenados = useMemo(() => {
     return [...aeropuertos]
@@ -479,7 +559,7 @@ function SeccionAeropuertos({
                   const estaExpandido = expandido === aeropuerto.codigoIata;
                   return (
                     <Box key={aeropuerto.codigoIata} className={styles.airportBoxList}>
-                      <Button fullWidth onClick={() => { onEnfocarAeropuerto(aeropuerto.codigoIata); setExpandido((cur) => cur === aeropuerto.codigoIata ? null : aeropuerto.codigoIata); }} className={styles.airportButton}>
+                      <Button fullWidth onClick={() => toggleExpandido(aeropuerto.codigoIata)} className={styles.airportButton}>
                         <Box className={styles.airportContent}>
                           <Stack className={styles.airportHeader}>
                             <Typography className={styles.airportCode}>{aeropuerto.codigoIata}</Typography>
@@ -495,12 +575,66 @@ function SeccionAeropuertos({
                           </Stack>
                         </Box>
                       </Button>
-                      {estaExpandido && proximosSLA.length > 0 && (
+                      {estaExpandido && (
                         <Box className={styles.expandedContent}>
-                          <Table size="small" className={styles.table}>
-                            <TableHead><TableRow><TableCell>ID</TableCell><TableCell>Origen</TableCell><TableCell>Destino</TableCell><TableCell align="right">Maletas</TableCell></TableRow></TableHead>
-                            <TableBody>{proximosSLA.map((e) => <TableRow key={e.envio.idPedido}><TableCell>{e.envio.idPedido}</TableCell><TableCell>{e.envio.origenIata}</TableCell><TableCell>{e.envio.destinoIata}</TableCell><TableCell align="right">{e.envio.cantidadMaletas}</TableCell></TableRow>)}</TableBody>
-                          </Table>
+                          {loadingMaletas[aeropuerto.codigoIata] ? (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}><CircularProgress size={22} /></Box>
+                          ) : errorMaletas[aeropuerto.codigoIata] ? (
+                            <Typography variant="body2" color="error">{errorMaletas[aeropuerto.codigoIata]}</Typography>
+                          ) : !maletasPorAeropuerto[aeropuerto.codigoIata]?.length ? (
+                            <Box className={styles.empty}>Sin maletas en este aeropuerto</Box>
+                          ) : (() => {
+                            const maletas = maletasPorAeropuerto[aeropuerto.codigoIata];
+                            const pagina = paginaMaletas[aeropuerto.codigoIata] ?? 0;
+                            const totalPags = Math.ceil(maletas.length / MALETAS_POR_PAGINA);
+                            const paginadas = maletas.slice(pagina * MALETAS_POR_PAGINA, (pagina + 1) * MALETAS_POR_PAGINA);
+                            return (
+                              <>
+                                <Typography variant="caption" sx={{ color: '#94a3b8', px: 1, pb: 0.5, display: 'block' }}>
+                                  {maletas.length} maletas en almacén
+                                </Typography>
+                                <Table size="small" className={styles.table}>
+                                  <TableHead>
+                                    <TableRow>
+                                      <TableCell>Código</TableCell>
+                                      <TableCell>Origen</TableCell>
+                                      <TableCell>Destino</TableCell>
+                                      <TableCell>Tipo</TableCell>
+                                      <TableCell></TableCell>
+                                    </TableRow>
+                                  </TableHead>
+                                  <TableBody>
+                                    {paginadas.map((m) => (
+                                      <TableRow key={m.codigoMaleta}>
+                                        <TableCell sx={{ fontSize: 11 }}>{m.codigoMaleta}</TableCell>
+                                        <TableCell>{m.origenIata}</TableCell>
+                                        <TableCell>{m.destinoIata}</TableCell>
+                                        <TableCell sx={{ fontSize: 11 }}>{m.tipoAlmacen === 'DESTINO_FINAL' ? 'Destino' : 'Tránsito'}</TableCell>
+                                        <TableCell>
+                                          <button
+                                            onClick={() => onMostrarRutaEnvio(m.idPedido)}
+                                            style={{ border: 'none', borderRadius: 4, padding: '3px 8px', background: '#2563eb', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                                          >
+                                            Ruta
+                                          </button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                                {totalPags > 1 && (
+                                  <Stack direction="row" justifyContent="center" pt={0.5}>
+                                    <Pagination
+                                      size="small"
+                                      page={pagina + 1}
+                                      count={totalPags}
+                                      onChange={(_, v) => setPaginaMaletas(p => ({ ...p, [aeropuerto.codigoIata]: v - 1 }))}
+                                    />
+                                  </Stack>
+                                )}
+                              </>
+                            );
+                          })()}
                         </Box>
                       )}
                     </Box>
@@ -532,6 +666,7 @@ function SeccionEnvios({
   const [filtroEstado, setFiltroEstado] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [expandidoEnvio, setExpandidoEnvio] = useState<string | null>(null);
 
   const enviosFiltrados = useMemo(() => {
     return envios.filter((e) => {
@@ -578,15 +713,54 @@ function SeccionEnvios({
               <Stack className={styles.scrollList}>
                 <Box sx={{ border: '1px solid rgba(148,163,184,0.2)', borderRadius: 1, overflow: 'hidden', bgcolor: 'rgba(30,41,59,0.82)' }}>
                   <Table size="small" className={styles.table}>
-                    <TableHead><TableRow><TableCell>ID</TableCell><TableCell>Origen</TableCell><TableCell>Destino</TableCell><TableCell align="right">Maletas</TableCell></TableRow></TableHead>
+                    <TableHead><TableRow><TableCell>ID</TableCell><TableCell>Origen</TableCell><TableCell>Destino</TableCell><TableCell align="right">Maletas</TableCell><TableCell /></TableRow></TableHead>
                     <TableBody>
                       {enviosFiltrados.slice(page * rowsPerPage, (page + 1) * rowsPerPage).map((e) => (
-                        <TableRow key={e.idPedido} onClick={() => onMostrarRutaEnvio(e.idPedido)} sx={{ cursor: 'pointer', '&:hover': { bgcolor: 'rgba(56,189,248,0.12)' } }}>
-                          <TableCell>{e.idPedido}</TableCell>
-                          <TableCell>{e.origenIata}</TableCell>
-                          <TableCell>{e.destinoIata}</TableCell>
-                          <TableCell align="right">{e.cantidadMaletas}</TableCell>
-                        </TableRow>
+                        <>
+                          <TableRow
+                            key={e.idPedido}
+                            onClick={() => setExpandidoEnvio(cur => cur === e.idPedido ? null : e.idPedido)}
+                            sx={{ cursor: 'pointer', '&:hover': { bgcolor: 'rgba(56,189,248,0.08)' }, bgcolor: expandidoEnvio === e.idPedido ? 'rgba(56,189,248,0.1)' : 'transparent' }}
+                          >
+                            <TableCell sx={{ fontSize: 11 }}>{e.idPedido}</TableCell>
+                            <TableCell>{e.origenIata}</TableCell>
+                            <TableCell>{e.destinoIata}</TableCell>
+                            <TableCell align="right">{e.cantidadMaletas}</TableCell>
+                            <TableCell align="right" sx={{ color: '#64748b', fontSize: 10 }}>
+                              {expandidoEnvio === e.idPedido ? '▲' : '▼'}
+                            </TableCell>
+                          </TableRow>
+                          <TableRow key={`${e.idPedido}-maletas`}>
+                            <TableCell colSpan={5} sx={{ p: 0, border: 0 }}>
+                              <Collapse in={expandidoEnvio === e.idPedido} unmountOnExit>
+                                <Box sx={{ bgcolor: 'rgba(15,23,42,0.6)', px: 1.5, py: 1 }}>
+                                  <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block', mb: 0.5 }}>
+                                    {e.cantidadMaletas} maleta{e.cantidadMaletas !== 1 ? 's' : ''}
+                                  </Typography>
+                                  <Table size="small">
+                                    <TableBody>
+                                      {Array.from({ length: e.cantidadMaletas }, (_, i) => (
+                                        <TableRow key={`${e.idPedido}-M${i + 1}`}>
+                                          <TableCell sx={{ fontSize: 10, color: '#cbd5e1', border: 0 }}>{e.idPedido}-M{i + 1}</TableCell>
+                                          <TableCell sx={{ fontSize: 10, border: 0 }}>{e.origenIata}</TableCell>
+                                          <TableCell sx={{ fontSize: 10, border: 0 }}>{e.destinoIata}</TableCell>
+                                          <TableCell sx={{ border: 0 }}>
+                                            <button
+                                              onClick={(ev) => { ev.stopPropagation(); onMostrarRutaEnvio(e.idPedido); }}
+                                              style={{ border: 'none', borderRadius: 4, padding: '2px 7px', background: '#2563eb', color: '#fff', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}
+                                            >
+                                              Ruta
+                                            </button>
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </Box>
+                              </Collapse>
+                            </TableCell>
+                          </TableRow>
+                        </>
                       ))}
                       <TableRow>
                         <TablePagination
