@@ -347,7 +347,7 @@ export function PanelVuelos({ idSimulacion, vuelosActivos, tiempoSimulacionRef, 
                                               Vuelo {codigoVuelo}
                                             </Typography>
 
-                                            <Chip
+                                            {/*<Chip
                                                 size="small"
                                                 label={estado}
                                                 color={
@@ -355,7 +355,7 @@ export function PanelVuelos({ idSimulacion, vuelosActivos, tiempoSimulacionRef, 
                                                       estado
                                                       ]
                                                 }
-                                            />
+                                            />*/}
                                           </Stack>
 
                                           <Typography

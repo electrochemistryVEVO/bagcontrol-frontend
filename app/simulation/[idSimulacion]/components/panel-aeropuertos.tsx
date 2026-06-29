@@ -241,11 +241,11 @@ export function PanelAeropuertos({ aeropuertos, visible, onEnfocarAeropuerto }: 
                                                             variant="outlined"
                                                         />
                                                     )}
-                                                    <Chip
+                                                    {/*<Chip
                                                         size="small"
                                                         label={estado}
                                                         color={colorPorEstado[estado]}
-                                                    />
+                                                    />*/}
                                                 </Stack>
                                             </Stack>
 

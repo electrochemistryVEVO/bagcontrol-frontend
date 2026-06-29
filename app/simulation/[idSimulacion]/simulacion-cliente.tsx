@@ -9,6 +9,7 @@ import { useToast } from '@/app/shared/hooks/useToast';
 import { SimulacionService } from '@/app/services/simulation.service';
 import { simulacionWS } from '@/app/services/config/webSocket';
 import {router} from "next/client";
+import {PopUpResumen} from "@/app/simulation/[idSimulacion]/components/pop-up-resumen";
 
 interface Props {
   id: string;
@@ -36,6 +37,7 @@ export function SimulacionCliente({ id, topic, k, modo, aeropuertosIniciales, er
     enviosPlanificadosRef,
     tiempoSimulacionRef,
     colapso,
+    resumenFinal,
     replanificaciones,
     mensajeErrorSimulacion,
   } = useSimulacion(
@@ -59,8 +61,8 @@ export function SimulacionCliente({ id, topic, k, modo, aeropuertosIniciales, er
       showToast('No se pudo detener en backend; saliendo del visualizador', 'error');
     } finally {
       simulacionWS.desconectar();
-      router.back();
-      setTimeout(() => router.push('/simulation'), 500);
+      //router.back();
+      //setTimeout(() => router.push('/simulation'), 500);
     }
   };
 
@@ -176,6 +178,10 @@ export function SimulacionCliente({ id, topic, k, modo, aeropuertosIniciales, er
           colapso={colapso}
           replanificaciones={replanificaciones}
         />
+        <PopUpResumen openDialog={resumenFinal!=null}
+                      idSimulacion={id}
+                      tiempoSimulacionRef={tiempoSimulacionRef}
+                      ultimoVuelo={resumenFinal?.vueloFinal}/>
         {ToastComponent}
       </div>
     </div>

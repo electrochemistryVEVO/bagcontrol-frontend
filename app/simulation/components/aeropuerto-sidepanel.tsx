@@ -238,7 +238,7 @@ function AeropuertoPanelContents({
                                             Pedido #{envio.envio.idPedido}
                                         </TableCell>
                                         <TableCell className={`${styles["package-time"]} ${styles.red}`}>
-                                            Plazo: {envio.envio.fechaHora ? HourFormat(new Date(envio.envio.fechaHora)) : 'No disponible'}
+                                            Fec. Límite: {envio.envio.fechaHora ? HourFormat(new Date(envio.envio.fechaHora)) : 'No disponible'}
                                         </TableCell>
                                         <TableCell style={{ width: 40 }}>
                                             <svg className={styles["external"]} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
