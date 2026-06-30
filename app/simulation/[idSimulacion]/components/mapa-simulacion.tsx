@@ -149,6 +149,18 @@ export function MapaSimulacion({
     return dict;
   }, [aeropuertosIniciales]);
 
+  // Refs para los filtros de los paneles (sin re-render, leídos por el RAF)
+  const filtroAeropuertosRef = useRef<Set<string> | null>(null);
+  const filtroVuelosRef = useRef<Set<string> | null>(null);
+
+  const handleFiltradoAeropuertosCambiado = useCallback((iatas: string[] | null) => {
+    filtroAeropuertosRef.current = iatas ? new Set(iatas) : null;
+  }, []);
+
+  const handleFiltradoVuelosCambiado = useCallback((codigos: string[] | null) => {
+    filtroVuelosRef.current = codigos ? new Set(codigos) : null;
+  }, []);
+
   const crearFeaturesAeropuertosMapa = useCallback(() => (
     crearFeaturesAeropuertoEstables(aeropuertosIniciales, aeropuertosRef.current)
   ), [aeropuertosIniciales, aeropuertosRef]);
@@ -556,6 +568,7 @@ export function MapaSimulacion({
       const featuresRutas: Feature[] = [];
 
       vuelosActivosRef.current.forEach((vuelo) => {
+        if (filtroVuelosRef.current && !filtroVuelosRef.current.has(String(vuelo.codigoVuelo))) return;
         const o = coordsAeropuertos[vuelo.origenIata];
         const d = coordsAeropuertos[vuelo.destinoIata];
         if (!o || !d) return;
@@ -592,9 +605,13 @@ export function MapaSimulacion({
       (map.getSource('rutas-data') as GeoJSONSource | undefined)?.setData(crearFeatureCollection(featuresRutas));
 
       if (++frame % 30 === 0) {
+        const todasFeatures = crearFeaturesAeropuertosMapa();
+        const featuresFiltradas = filtroAeropuertosRef.current
+          ? todasFeatures.filter(f => filtroAeropuertosRef.current!.has(f.properties?.codigoIata as string))
+          : todasFeatures;
         (map.getSource('aeropuertos-data') as GeoJSONSource)?.setData({
           type: 'FeatureCollection',
-          features: crearFeaturesAeropuerto(aeropuertosRef.current),
+          features: featuresFiltradas,
         });
       }
 

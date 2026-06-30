@@ -87,8 +87,8 @@ export function LoginModal({
     const p = password.trim();
     const n = nombre.trim();
 
-    if (!e || !p || (tab === 1 && !n)) { setError('Completá todos los campos.'); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) { setError('Ingresá un correo válido.'); return; }
+    if (!e || !p || (tab === 1 && !n)) { setError('Completa todos los campos.'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) { setError('Ingresa un correo válido.'); return; }
     if (p.length < 6) { setError('La contraseña debe tener al menos 6 caracteres.'); return; }
 
     setLoading(true);
