@@ -4,19 +4,42 @@ import { BASE_URL } from './constants';
 const axiosApi = axios.create({
   baseURL: BASE_URL,
   timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// Instancia con timeout extendido para operaciones de simulación
-// que pueden tardar más (carga de datos, primer ciclo del planificador, etc.)
 export const axiosSimulacion = axios.create({
   baseURL: BASE_URL,
-  timeout: 120000, // 2 minutos
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  timeout: 120000,
+  headers: { 'Content-Type': 'application/json' },
 });
+
+// Adjunta JWT en cada request
+const attachToken = (config: any) => {
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('bagcontrol_token');
+    if (token) {
+      config.headers = config.headers ?? {};
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
+  return config;
+};
+
+// Si el backend devuelve 401, limpiar sesión y redirigir a /login
+const handleUnauthorized = (error: any) => {
+  if (error?.response?.status === 401 && typeof window !== 'undefined') {
+    sessionStorage.removeItem('bagcontrol_token');
+    sessionStorage.removeItem('bagcontrol_user');
+    document.cookie = 'bagcontrol_token=; path=/; max-age=0';
+    window.location.href = '/login?session=expired';
+  }
+  return Promise.reject(error);
+};
+
+axiosApi.interceptors.request.use(attachToken);
+axiosApi.interceptors.response.use(r => r, handleUnauthorized);
+
+axiosSimulacion.interceptors.request.use(attachToken);
+axiosSimulacion.interceptors.response.use(r => r, handleUnauthorized);
 
 export default axiosApi;

@@ -1,3 +1,5 @@
+import {EventoVuelo} from "@/app/shared/types/Evento";
+
 export type RespuestaInicioSimulacionDTO = {
     simulacionId: string;
     websocketTopic: string;
@@ -16,4 +18,8 @@ export type RespuestaEstadoSimulacionDTO = {
     fechaInicio : string;
     fechaCreacion : string;
     tiempoSimuladoActual : string;
+}
+
+export type ResumenFinalSimulacion = {
+    vueloFinal : EventoVuelo | null
 }

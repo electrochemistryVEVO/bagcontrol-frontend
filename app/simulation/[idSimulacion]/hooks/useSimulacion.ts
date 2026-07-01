@@ -13,6 +13,7 @@ import {
 import axios from 'axios';
 import {Envio} from "@/app/shared/types/Envio";
 import { obtenerEstadoAeropuerto } from '@/app/shared/simulation/semaforo';
+import {ResumenFinalSimulacion} from "@/app/shared/types/Simulacion";
 
 export type EstadoSimulacion = 'conectando' | 'conectado' | 'preparando' | 'en_vivo' | 'pausada' | 'detenida' | 'finalizada' | 'colapsada' | 'error';
 type EventoConTipoAlternativo = Evento & { tipoEvento?: string };
@@ -45,6 +46,7 @@ export function useSimulacion(
   const lotesRecibidosRef = useRef<number>(0);
   const [colapso, setColapso] = useState<EventoColapso | null>(null);
   const [replanificaciones, setReplanificaciones] = useState<EventoReplanificacionEnvio[]>([]);
+  const [mensajeErrorSimulacion, setMensajeErrorSimulacion] = useState<string | null>(null);
   const primerEventoRecibidoRef = useRef(false);
   const primerLoteRecibidoRef = useRef(false);
 
@@ -63,6 +65,11 @@ export function useSimulacion(
   // ─── Estado dual: ref para el motor (sin closure stale), state para la UI ───
   const estadoSimRef = useRef<EstadoSimulacion>('conectando');
   const [estadoSim, setEstadoSimInterno] = useState<EstadoSimulacion>('conectando');
+
+  // Resumen final, y referencias necesarias
+  const [resumenFinal,setResumenFinal] = useState<ResumenFinalSimulacion | null>(null);
+  const vueloFinalRef = useRef<EventoVuelo | null>(null);
+
 
   const setEstadoSim = useCallback((nuevoEstado: EstadoSimulacion) => {
     if (estadoSimRef.current !== nuevoEstado) {
@@ -101,17 +108,20 @@ export function useSimulacion(
         case 'SIMULACION_REANUDADA':
           setEstadoSim('en_vivo');
           break;
+          /*
         case 'SIMULACION_FINALIZADA':
+          setResumenFinal({vueloFinal:vueloFinalRef.current});
           setEstadoSim('finalizada');
           break;
         case 'COLAPSO_DETECTADO':
           setColapso(e as EventoColapso);
           setEstadoSim('colapsada');
-          break;
+          break;*/
         case 'REPLANIFICACION_ENVIO':
           setReplanificaciones(actuales => [e as EventoReplanificacionEnvio, ...actuales].slice(0, 20));
           break;
         case 'SIMULACION_DETENIDA':
+          //setResumenFinal({vueloFinal:vueloFinalRef.current});
           setEstadoSim('detenida');
           break;
         case 'ERROR':
@@ -123,7 +133,8 @@ export function useSimulacion(
     // 2. Filtrar eventos de física (vuelos, aeropuertos)
     const TIPOS_IGNORADOS = [
       'SIMULACION_INICIADA', 'SIMULACION_PAUSADA', 'SIMULACION_EN_PAUSA',
-      'SIMULACION_REANUDADA', 'SIMULACION_FINALIZADA', 'COLAPSO_DETECTADO',
+      'SIMULACION_REANUDADA',
+      //'SIMULACION_FINALIZADA', 'COLAPSO_DETECTADO',
       'REPLANIFICACION_ENVIO', 'SIMULACION_DETENIDA', 'ERROR',
     ];
 
@@ -170,6 +181,7 @@ export function useSimulacion(
         if (!arrancadoRef.current) {
           arrancadoRef.current = true;
           try {
+            setMensajeErrorSimulacion(null);
             simTime('solicitando estado/snapshot');
             const { data: estado } = await SimulacionService.obtenerEstado(id);
             if (estado.tiempoSimuladoActual) {
@@ -188,6 +200,18 @@ export function useSimulacion(
               await SimulacionService.iniciar(id);
             }
           } catch (error: unknown) {
+            if (axios.isAxiosError(error) && error.response?.status === 404) {
+              const mensaje = 'La simulacion no existe o el backend fue reiniciado. Vuelve a preparar una simulacion.';
+              console.warn('[WS] Simulacion no encontrada al iniciar visualizador:', {
+                idSimulacion: id,
+                status: error.response.status,
+                url: error.config?.url,
+              });
+              setMensajeErrorSimulacion(mensaje);
+              setEstadoSim('error');
+              setConectado(false);
+              return;
+            }
             if (!axios.isAxiosError(error) || error.response?.status !== 409) {
               console.error('[WS] Error al iniciar la simulación:', error);
               arrancadoRef.current = false;
@@ -249,6 +273,7 @@ export function useSimulacion(
         ultimoFrame = Date.now();
         return;
       }
+      //vueloFinalRef.current = (colaEventos.current.filter((e)=>e.tipo==="VUELO_ATERRIZA").pop() as EventoVuelo);
 
       if (colaEstabaVacia) {
         loteStartTime = Date.now();
@@ -303,6 +328,7 @@ export function useSimulacion(
           }
         } else if (tipo === 'VUELO_ATERRIZA') {
           const evVuelo = ev as EventoVuelo;
+          vueloFinalRef.current = evVuelo;
           vuelosActivos.current.delete(evVuelo.codigoVuelo.toString());
           //Modificar estado de envios
           for(let env of evVuelo.codigoEnvios){
@@ -329,6 +355,18 @@ export function useSimulacion(
             aeropuertosSimulacion.current[codigo].tieneDatos = true;
           }
         }
+        else if (tipo === "SIMULACION_FINALIZADA"){
+          setResumenFinal({vueloFinal:vueloFinalRef.current});
+          setEstadoSim('finalizada');
+          procesados++;
+          break;
+        }
+        else if (tipo === "COLAPSO_DETECTADO"){
+          setColapso(ev as EventoColapso);
+          setEstadoSim('colapsada');
+          procesados++;
+          break;
+        }
         procesados++;
       }
 
@@ -354,6 +392,8 @@ export function useSimulacion(
     enviosPlanificadosRef : enviosPlanificados,
     tiempoSimulacionRef: tiempoSimulacion,
     colapso,
+    resumenFinal,
     replanificaciones,
+    mensajeErrorSimulacion,
   };
 }

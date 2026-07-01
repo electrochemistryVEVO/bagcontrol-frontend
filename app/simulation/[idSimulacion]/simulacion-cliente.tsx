@@ -8,6 +8,8 @@ import { MapaSimulacion } from './components/mapa-simulacion';
 import { useToast } from '@/app/shared/hooks/useToast';
 import { SimulacionService } from '@/app/services/simulation.service';
 import { simulacionWS } from '@/app/services/config/webSocket';
+import {router} from "next/client";
+import {PopUpResumen} from "@/app/simulation/[idSimulacion]/components/pop-up-resumen";
 
 interface Props {
   id: string;
@@ -35,7 +37,9 @@ export function SimulacionCliente({ id, topic, k, modo, aeropuertosIniciales, er
     enviosPlanificadosRef,
     tiempoSimulacionRef,
     colapso,
+    resumenFinal,
     replanificaciones,
+    mensajeErrorSimulacion,
   } = useSimulacion(
     id,
     topic,
@@ -52,12 +56,13 @@ export function SimulacionCliente({ id, topic, k, modo, aeropuertosIniciales, er
       await SimulacionService.detener(id);
       setEstadoSim('detenida');
       showToast('Simulacion detenida', 'info');
+      showToast('Simulación detenida', 'info');
     } catch {
       showToast('No se pudo detener en backend; saliendo del visualizador', 'error');
     } finally {
       simulacionWS.desconectar();
-      router.back();
-      setTimeout(() => router.push('/simulation'), 500);
+      //router.back();
+      //setTimeout(() => router.push('/simulation'), 500);
     }
   };
 
@@ -153,6 +158,11 @@ export function SimulacionCliente({ id, topic, k, modo, aeropuertosIniciales, er
           {errorInicial}
         </div>
       )}
+      {mensajeErrorSimulacion && (
+        <div style={{ padding: '8px 16px', background: '#fef2f2', color: '#b91c1c', fontSize: 13 }}>
+          {mensajeErrorSimulacion}
+        </div>
+      )}
 
       <div style={{ flex: 1 }}>
         <MapaSimulacion
@@ -168,6 +178,10 @@ export function SimulacionCliente({ id, topic, k, modo, aeropuertosIniciales, er
           colapso={colapso}
           replanificaciones={replanificaciones}
         />
+        <PopUpResumen openDialog={resumenFinal!=null}
+                      idSimulacion={id}
+                      tiempoSimulacionRef={tiempoSimulacionRef}
+                      ultimoVuelo={resumenFinal?.vueloFinal}/>
         {ToastComponent}
       </div>
     </div>

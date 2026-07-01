@@ -26,6 +26,29 @@ export function crearFeaturesAeropuerto(aeropuertos: Record<string, AeropuertoSi
   return Object.values(aeropuertos || {}).map(crearFeatureAeropuerto);
 }
 
+export function crearAeropuertosSimulacionEstables(
+  aeropuertosIniciales: Aeropuerto[],
+  aeropuertos: Record<string, AeropuertoSimulacion> | undefined
+): AeropuertoSimulacion[] {
+  const porCodigo: Record<string, AeropuertoSimulacion> = {};
+  aeropuertosIniciales.forEach((aeropuerto) => {
+    const codigo = aeropuerto.codigoIata?.trim().toUpperCase();
+    if (codigo) porCodigo[codigo] = normalizarAeropuertoInicial(aeropuerto);
+  });
+  Object.values(aeropuertos || {}).forEach((aeropuerto) => {
+    const codigo = aeropuerto.codigoIata?.trim().toUpperCase();
+    if (codigo) porCodigo[codigo] = aeropuerto;
+  });
+  return Object.values(porCodigo);
+}
+
+export function crearFeaturesAeropuertoEstables(
+  aeropuertosIniciales: Aeropuerto[],
+  aeropuertos: Record<string, AeropuertoSimulacion> | undefined
+): Feature[] {
+  return crearAeropuertosSimulacionEstables(aeropuertosIniciales, aeropuertos).map(crearFeatureAeropuerto);
+}
+
 export function interpolar(inicio: number[], fin: number[], progreso: number): [number, number] {
   return [
     inicio[0] + (fin[0] - inicio[0]) * progreso,
