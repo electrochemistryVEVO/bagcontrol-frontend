@@ -110,7 +110,7 @@ export function LoginModal({
       open={abierto}
       maxWidth="xs"
       fullWidth
-      onKeyDown={(event)=>event.preventDefault()}
+      onKeyDown={(event) => { if (event.key === 'Escape') event.preventDefault(); }}
       slotProps={{
         paper: {
           sx: {

@@ -10,12 +10,6 @@ import { LoginModal, getUsuarioGuardado, cerrarSesion } from '@/app/shared/hooks
 
 const entryCards = [
   {
-    href: '/dashboard',
-    title: 'Dashboard',
-    description: 'Vista general del estado operativo y métricas principales.',
-    image: 'https://placehold.co/800x480?text=Dashboard',
-  },
-  {
     href: '/simulation',
     title: 'Simulation',
     description: 'Acceso al panel de simulación para probar escenarios.',
@@ -93,7 +87,7 @@ export default function Home() {
           sx={{
             display: 'grid',
             gap: 3,
-            gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(0, 1fr))' },
+            gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
           }}
         >
           {entryCards.map((card) => (

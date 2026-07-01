@@ -3,7 +3,7 @@ import Tabs from '@mui/material/Tabs'
 import LinkTab from '@mui/material/Tab'
 import {usePathname} from "next/navigation";
 
-let valueMap = ["/simulation","/dashboard","/management"]
+let valueMap = ["/simulation","/management"]
 
 function useRouteMatch(patterns) {
     const basePath = usePathname()
@@ -40,7 +40,6 @@ export default function PageTabs(){
             }}
         >
             <LinkTab  label="SIMULACIÓN" href="/simulation" />
-            <LinkTab label="DASHBOARD" href="/dashboard" />
             <LinkTab label="GEST. ENTIDADES" href="/management" />
         </Tabs>)
 }
