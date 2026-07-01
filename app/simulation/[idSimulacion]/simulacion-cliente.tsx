@@ -16,17 +16,18 @@ interface Props {
   topic: string;
   k: number;
   modo?: string;
+  fechaInicial?: string;
   aeropuertosIniciales: Aeropuerto[];
   errorInicial?: string | null;
 }
 
-export function SimulacionCliente({ id, topic, k, modo, aeropuertosIniciales, errorInicial }: Props) {
+export function SimulacionCliente({ id, topic, fechaInicial, k, modo, aeropuertosIniciales, errorInicial }: Props) {
   const router = useRouter();
   const SaS_SEGUNDOS = modo === '0' ? k * 60 : 90;
   const { showToast, ToastComponent } = useToast();
   const [segundosPreparando, setSegundosPreparando] = useState(0);
-  const fechaGuardada = typeof window !== 'undefined' ? localStorage.getItem('fechaInicio') : null;
-  const fechaInicioReal = fechaGuardada || '2026-02-10T00:00:00.000Z';
+  //const fechaGuardada = typeof window !== 'undefined' ? localStorage.getItem(`fechaInicio|${id}`) : null;
+  const fechaInicioReal = fechaInicial || '2026-02-10T00:00:00.000Z';
 
   const {
     conectado,
@@ -60,7 +61,7 @@ export function SimulacionCliente({ id, topic, k, modo, aeropuertosIniciales, er
     } catch {
       showToast('No se pudo detener en backend; saliendo del visualizador', 'error');
     } finally {
-      simulacionWS.desconectar();
+      simulacionWS.desconectar(id);
       //router.back();
       //setTimeout(() => router.push('/simulation'), 500);
     }

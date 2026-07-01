@@ -175,6 +175,7 @@ export function useSimulacion(
     simTime('conectando WebSocket', `topic=${topic}`);
 
     simulacionWS.conectar(
+        id,
       topic,
       encolarEventos,
       async () => {
@@ -226,7 +227,7 @@ export function useSimulacion(
     );
 
     return () => {
-      simulacionWS.desconectar();
+      simulacionWS.desconectar(id);
       colaEventos.current = [];
       lotesRecibidosRef.current = 0;
       arrancadoRef.current = false;

@@ -35,12 +35,17 @@ export function RelojSimulacionOverlay({
   }, [tiempoRef]);
 
   const inicioEpoch = useMemo(() => {
+      console.log(`fecha inicio: ${fechaInicio}`)
     const normalizada = /[zZ]|[+-]\d{2}:?\d{2}$/.test(fechaInicio) ? fechaInicio : `${fechaInicio}Z`;
     const parsed = new Date(normalizada).getTime();
     return Number.isFinite(parsed) ? parsed : epoch;
   }, [epoch, fechaInicio]);
 
-  const textElapsado = useMemo(() => formatDuration(epoch - inicioEpoch), [epoch, inicioEpoch]);
+  const textElapsado = useMemo(() => {
+      //console.log(`Epoch: ${new Date(epoch)}`)
+      //console.log(`Inicio epoch: ${new Date(inicioEpoch)}`)
+      return formatDuration(epoch - inicioEpoch)
+  }, [epoch, inicioEpoch]);
   const restanteSim5D = useMemo(() => {
     if (modo !== '1') return null;
     return formatDuration(inicioEpoch + 5 * 24 * 60 * 60 * 1000 - epoch);

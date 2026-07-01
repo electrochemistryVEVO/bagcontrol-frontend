@@ -56,8 +56,8 @@ export function ContenedorSimulacion() {
 
 
         const formattedStart = formatLocalDateTime(_startDate);
-        localStorage.setItem("fechaInicio", formattedStart);
-        
+
+
         const params: ParametrosSimulacion = {
             fechaInicio: formattedStart,
             fechaFin: _endDate ? formatLocalDateTime(_endDate) : undefined,
@@ -67,10 +67,10 @@ export function ContenedorSimulacion() {
 
         try {
             showToast("Preparando entorno de simulación...", "info");
-            const { data } = await SimulacionService.prepararInicio(params);           
+            const { data } = await SimulacionService.prepararInicio(params);
             showToast("¡Simulación lista! Redireccionando...", "success");
             setTimeout(() => {
-                router.push(`/simulation/${data.simulacionId}?topic=${encodeURIComponent(data.websocketTopic)}&k=${_k}&modo=${simulationType}`);
+                router.push(`/simulation/${data.simulacionId}?topic=${encodeURIComponent(data.websocketTopic)}&k=${_k}&modo=${simulationType}&fechaInicio=${formattedStart}`);
             }, 300);
         } catch (error) {
             console.error(error);

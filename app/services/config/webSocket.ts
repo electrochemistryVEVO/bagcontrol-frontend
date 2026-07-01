@@ -5,10 +5,11 @@ import { EventoBatch } from '@/app/shared/types/Evento';
 
 class SimulacionWebSocket {
   private client: Client | null = null;
+  private clients : Record<string, Client> = {};
 
-  conectar(topic: string, onMessage: (lote: EventoBatch) => void, onSuccess: () => void) {
+  conectar(id:string, topic: string, onMessage: (lote: EventoBatch) => void, onSuccess: () => void) {
     const socket = new SockJS(INIT_WEB_SOCKET_URL);
-    this.client = new Client({
+    this.clients[id] = new Client({
       webSocketFactory: () => socket,
       reconnectDelay: 5000,
 
@@ -16,10 +17,12 @@ class SimulacionWebSocket {
         console.log('2. Conectado al WebSocket correctamente.');
         console.log(`[FRONT-SIM-TIME] ${new Date().toISOString()} WebSocket conectado`);
 
-        this.client?.subscribe(topic, (message) => {
+        this.clients[id]?.subscribe(topic, (message) => {
           if (message.body) {
             const lote = JSON.parse(message.body);
-            onMessage(lote);
+            console.log(`paquete recibido en simulacion ${id}:`)
+            console.log(lote)
+            if(lote.simulacionId === id)onMessage(lote);
           }
         });
         console.log(`[FRONT-SIM-TIME] ${new Date().toISOString()} suscrito a topic topic=${topic}`);
@@ -38,13 +41,13 @@ class SimulacionWebSocket {
 
     console.log('1. Conectando al WebSocket...');
     console.log(`[FRONT-SIM-TIME] ${new Date().toISOString()} conectando WebSocket url=${INIT_WEB_SOCKET_URL}`);
-    this.client.activate();
+    this.clients[id].activate();
   }
 
-  desconectar() {
-    if (this.client) {
-      this.client.deactivate();
-      this.client = null;
+  desconectar(id:string) {
+    if (this.clients[id]) {
+      this.clients[id].deactivate();
+      delete this.clients[id];
       console.log('WebSocket desconectado.');
     }
   }
