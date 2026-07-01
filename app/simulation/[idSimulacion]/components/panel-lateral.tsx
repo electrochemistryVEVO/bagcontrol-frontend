@@ -623,7 +623,7 @@ function SeccionAeropuertos({
                                   </TableBody>
                                 </Table>
                                 {totalPags > 1 && (
-                                  <Stack direction="row" justifyContent="center" pt={0.5}>
+                                  <Stack direction="row" sx={{justifyContent:"center",pt:0.5}}>
                                     <Pagination
                                       size="small"
                                       page={pagina + 1}

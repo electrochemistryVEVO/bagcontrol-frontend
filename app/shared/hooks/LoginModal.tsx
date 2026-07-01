@@ -110,20 +110,22 @@ export function LoginModal({
       open={abierto}
       maxWidth="xs"
       fullWidth
-      disableEscapeKeyDown
-      PaperProps={{
-        sx: {
-          bgcolor: '#1e293b',
-          color: '#f8fafc',
-          borderRadius: 3,
-          border: '1px solid rgba(148,163,184,0.2)',
-        },
+      onKeyDown={(event)=>event.preventDefault()}
+      slotProps={{
+        paper: {
+          sx: {
+            bgcolor: '#1e293b',
+            color: '#f8fafc',
+            borderRadius: 3,
+            border: '1px solid rgba(148,163,184,0.2)',
+          },
+        }
       }}
     >
       <DialogContent sx={{ p: 4 }}>
         {/* Título */}
         <Box sx={{ textAlign: 'center', mb: 3 }}>
-          <Typography variant="h5" fontWeight={800} sx={{ color: '#38bdf8' }}>
+          <Typography variant="h5" sx={{ color: '#38bdf8',fontWeight:800 }}>
             BagControl
           </Typography>
           <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
@@ -155,8 +157,21 @@ export function LoginModal({
               value={nombre}
               onChange={(e) => { setNombre(e.target.value); limpiar(); }}
               fullWidth size="small"
-              InputLabelProps={{ sx: { color: '#94a3b8' } }}
-              InputProps={{ sx: { color: '#f8fafc', bgcolor: '#0f172a', borderRadius: 1 } }}
+              slotProps={{
+                input: {
+                  sx: {
+                    color: '#f8fafc',
+                    bgcolor: '#0f172a',
+                    borderRadius: 1
+                  }
+
+                },
+                inputLabel:{
+                  sx: {
+                    color: '#94a3b8'
+                  }
+                }
+              }}
             />
           )}
           <TextField
@@ -165,8 +180,21 @@ export function LoginModal({
             value={email}
             onChange={(e) => { setEmail(e.target.value); limpiar(); }}
             fullWidth size="small"
-            InputLabelProps={{ sx: { color: '#94a3b8' } }}
-            InputProps={{ sx: { color: '#f8fafc', bgcolor: '#0f172a', borderRadius: 1 } }}
+            slotProps={{
+              input: {
+                sx: {
+                  color: '#f8fafc',
+                  bgcolor: '#0f172a',
+                  borderRadius: 1
+                }
+
+              },
+              inputLabel:{
+                sx: {
+                  color: '#94a3b8'
+                }
+              }
+            }}
           />
           <TextField
             label="Contraseña"
@@ -175,8 +203,21 @@ export function LoginModal({
             onChange={(e) => { setPassword(e.target.value); limpiar(); }}
             onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
             fullWidth size="small"
-            InputLabelProps={{ sx: { color: '#94a3b8' } }}
-            InputProps={{ sx: { color: '#f8fafc', bgcolor: '#0f172a', borderRadius: 1 } }}
+            slotProps={{
+              input: {
+                sx: {
+                  color: '#f8fafc',
+                  bgcolor: '#0f172a',
+                  borderRadius: 1
+                }
+
+              },
+              inputLabel:{
+                sx: {
+                  color: '#94a3b8'
+                }
+              }
+            }}
           />
 
           {error && (
