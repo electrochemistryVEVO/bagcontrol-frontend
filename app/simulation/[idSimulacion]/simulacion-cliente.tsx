@@ -86,7 +86,7 @@ export function SimulacionCliente({ id, topic, fechaInicial, k, modo, aeropuerto
     conectando: 'Conectando...',
     conectado: 'Conectado',
     preparando: 'Conectado · preparando primer bloque',
-    en_vivo: 'Simulacion en ejecucion',
+    en_vivo: modo === '0' ? 'Operacion en ejecucion' : 'Simulacion en ejecucion',
     pausada: 'Pausada',
     detenida: 'Detenida',
     finalizada: 'Finalizada',
@@ -162,6 +162,11 @@ export function SimulacionCliente({ id, topic, fechaInicial, k, modo, aeropuerto
       {mensajeErrorSimulacion && (
         <div style={{ padding: '8px 16px', background: '#fef2f2', color: '#b91c1c', fontSize: 13 }}>
           {mensajeErrorSimulacion}
+        </div>
+      )}
+      {modo === '0' && estadoSim === 'en_vivo' && (
+        <div style={{ padding: '8px 16px', background: '#ecfdf5', color: '#047857', fontSize: 13 }}>
+          Operacion activa. Registra envios para iniciar la planificacion.
         </div>
       )}
 

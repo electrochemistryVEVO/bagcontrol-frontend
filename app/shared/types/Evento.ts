@@ -3,6 +3,7 @@ import { Envio, EnvioAeropuerto } from './Envio';
 
 export type TipoEvento =
     | 'SIMULACION_INICIADA'
+    | 'OPERACION_DIA_ACTIVA'
     | 'AEROPUERTO_ACTUALIZADO'
     | 'ALERTA_AEROPUERTO_SATURADO'
     | 'VUELO_DESPEGA'

@@ -10,22 +10,33 @@ import { LoginModal, getUsuarioGuardado, cerrarSesion } from '@/app/shared/hooks
 
 const entryCards = [
   {
-    href: '/simulation',
-    title: 'Simulation',
-    description: 'Acceso al panel de simulación para probar escenarios.',
-    image: 'https://placehold.co/800x480?text=Simulation',
+    href: '/simulation?tipo=simulacion',
+    title: 'Simulacion',
+    description: 'Escenario de 5 dias con envios de simulacion.',
+    image: 'https://placehold.co/800x480?text=Simulacion',
+  },
+  {
+    href: '/simulation?tipo=operacion',
+    title: 'Operacion dia a dia',
+    description: 'Flujo operativo con envios iniciales vacios y registro manual.',
+    image: 'https://placehold.co/800x480?text=Operacion+dia+a+dia',
+  },
+  {
+    href: '/simulation?tipo=colapso',
+    title: 'Colapso logistico',
+    description: 'Escenario hasta detectar colapso operativo.',
+    image: 'https://placehold.co/800x480?text=Colapso+logistico',
   },
   {
     href: '/management',
-    title: 'Management',
-    description: 'Gestión de entidades, vuelos, envíos e incidencias.',
-    image: 'https://placehold.co/800x480?text=Management',
+    title: 'Gestion',
+    description: 'Gestion de aeropuertos, vuelos, envios e incidencias.',
+    image: 'https://placehold.co/800x480?text=Gestion',
   },
 ];
 
 export default function Home() {
   const [usuario, setUsuario] = useState<{ email: string; nombre: string } | null>(null);
-  // Empezamos con modal cerrado para evitar flash en SSR; lo abrimos en useEffect
   const [modalAbierto, setModalAbierto] = useState(false);
 
   useEffect(() => {
@@ -50,7 +61,6 @@ export default function Home() {
 
   return (
     <>
-      {/* Modal de login — solo se muestra si no hay sesión activa */}
       <LoginModal abierto={modalAbierto} onExito={handleExito} />
 
       <Container maxWidth="lg" sx={{ py: { xs: 4, md: 8 } }}>
@@ -60,11 +70,10 @@ export default function Home() {
               Bag Control
             </Typography>
             <Typography variant="body1" color="text.secondary">
-              Selecciona una sección para entrar al sistema.
+              Selecciona un flujo para entrar al sistema.
             </Typography>
           </Box>
 
-          {/* Saludo + botón cerrar sesión */}
           {usuario && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <Typography variant="body2" color="text.secondary">
@@ -77,7 +86,7 @@ export default function Home() {
                 onClick={handleCerrarSesion}
                 sx={{ fontSize: 12, textTransform: 'none', borderColor: 'rgba(148,163,184,0.4)' }}
               >
-                Cerrar sesión
+                Cerrar sesion
               </Button>
             </Box>
           )}

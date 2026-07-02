@@ -26,7 +26,7 @@ import {
   Typography,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
-import { RefObject, useEffect, useMemo, useRef, useState } from 'react';
+import React, { RefObject, useEffect, useMemo, useRef, useState } from 'react';
 import Draggable from 'react-draggable';
 
 import type { AeropuertoSimulacion } from '@/app/shared/types/Aeropuerto';
@@ -715,53 +715,60 @@ function SeccionEnvios({
                   <Table size="small" className={styles.table}>
                     <TableHead><TableRow><TableCell>ID</TableCell><TableCell>Origen</TableCell><TableCell>Destino</TableCell><TableCell align="right">Maletas</TableCell><TableCell /></TableRow></TableHead>
                     <TableBody>
-                      {enviosFiltrados.slice(page * rowsPerPage, (page + 1) * rowsPerPage).map((e) => (
-                        <>
-                          <TableRow
-                            key={e.idPedido}
-                            onClick={() => setExpandidoEnvio(cur => cur === e.idPedido ? null : e.idPedido)}
-                            sx={{ cursor: 'pointer', '&:hover': { bgcolor: 'rgba(56,189,248,0.08)' }, bgcolor: expandidoEnvio === e.idPedido ? 'rgba(56,189,248,0.1)' : 'transparent' }}
-                          >
-                            <TableCell sx={{ fontSize: 11 }}>{e.idPedido}</TableCell>
-                            <TableCell>{e.origenIata}</TableCell>
-                            <TableCell>{e.destinoIata}</TableCell>
-                            <TableCell align="right">{e.cantidadMaletas}</TableCell>
-                            <TableCell align="right" sx={{ color: '#64748b', fontSize: 10 }}>
-                              {expandidoEnvio === e.idPedido ? '▲' : '▼'}
-                            </TableCell>
-                          </TableRow>
-                          <TableRow key={`${e.idPedido}-maletas`}>
-                            <TableCell colSpan={5} sx={{ p: 0, border: 0 }}>
-                              <Collapse in={expandidoEnvio === e.idPedido} unmountOnExit>
-                                <Box sx={{ bgcolor: 'rgba(15,23,42,0.6)', px: 1.5, py: 1 }}>
-                                  <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block', mb: 0.5 }}>
-                                    {e.cantidadMaletas} maleta{e.cantidadMaletas !== 1 ? 's' : ''}
-                                  </Typography>
-                                  <Table size="small">
-                                    <TableBody>
-                                      {Array.from({ length: e.cantidadMaletas }, (_, i) => (
-                                        <TableRow key={`${e.idPedido}-M${i + 1}`}>
-                                          <TableCell sx={{ fontSize: 10, color: '#cbd5e1', border: 0 }}>{e.idPedido}-M{i + 1}</TableCell>
-                                          <TableCell sx={{ fontSize: 10, border: 0 }}>{e.origenIata}</TableCell>
-                                          <TableCell sx={{ fontSize: 10, border: 0 }}>{e.destinoIata}</TableCell>
-                                          <TableCell sx={{ border: 0 }}>
-                                            <button
-                                              onClick={(ev) => { ev.stopPropagation(); onMostrarRutaEnvio(e.idPedido); }}
-                                              style={{ border: 'none', borderRadius: 4, padding: '2px 7px', background: '#2563eb', color: '#fff', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}
-                                            >
-                                              Ruta
-                                            </button>
-                                          </TableCell>
-                                        </TableRow>
-                                      ))}
-                                    </TableBody>
-                                  </Table>
-                                </Box>
-                              </Collapse>
-                            </TableCell>
-                          </TableRow>
-                        </>
-                      ))}
+                      {enviosFiltrados.slice(page * rowsPerPage, (page + 1) * rowsPerPage).map((e, index) => {
+                        const posicionAbsoluta = page * rowsPerPage + index;
+                        const rowKey = e.idPedido
+                          ? `${e.idPedido}-${posicionAbsoluta}`
+                          : `${e.origenIata}-${e.destinoIata}-${e.fechaHora}-${posicionAbsoluta}`;
+
+                        return (
+                          <React.Fragment key={rowKey}>
+                            <TableRow
+                              key={`${rowKey}-main`}
+                              onClick={() => setExpandidoEnvio(cur => cur === e.idPedido ? null : e.idPedido)}
+                              sx={{ cursor: 'pointer', '&:hover': { bgcolor: 'rgba(56,189,248,0.08)' }, bgcolor: expandidoEnvio === e.idPedido ? 'rgba(56,189,248,0.1)' : 'transparent' }}
+                            >
+                              <TableCell sx={{ fontSize: 11 }}>{e.idPedido}</TableCell>
+                              <TableCell>{e.origenIata}</TableCell>
+                              <TableCell>{e.destinoIata}</TableCell>
+                              <TableCell align="right">{e.cantidadMaletas}</TableCell>
+                              <TableCell align="right" sx={{ color: '#64748b', fontSize: 10 }}>
+                                {expandidoEnvio === e.idPedido ? '▲' : '▼'}
+                              </TableCell>
+                            </TableRow>
+                            <TableRow key={`${rowKey}-detail`}>
+                              <TableCell colSpan={5} sx={{ p: 0, border: 0 }}>
+                                <Collapse in={expandidoEnvio === e.idPedido} unmountOnExit>
+                                  <Box sx={{ bgcolor: 'rgba(15,23,42,0.6)', px: 1.5, py: 1 }}>
+                                    <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block', mb: 0.5 }}>
+                                      {e.cantidadMaletas} maleta{e.cantidadMaletas !== 1 ? 's' : ''}
+                                    </Typography>
+                                    <Table size="small">
+                                      <TableBody>
+                                        {Array.from({ length: e.cantidadMaletas }, (_, i) => (
+                                          <TableRow key={`${rowKey}-M${i + 1}`}>
+                                            <TableCell sx={{ fontSize: 10, color: '#cbd5e1', border: 0 }}>{e.idPedido}-M{i + 1}</TableCell>
+                                            <TableCell sx={{ fontSize: 10, border: 0 }}>{e.origenIata}</TableCell>
+                                            <TableCell sx={{ fontSize: 10, border: 0 }}>{e.destinoIata}</TableCell>
+                                            <TableCell sx={{ border: 0 }}>
+                                              <button
+                                                onClick={(ev) => { ev.stopPropagation(); onMostrarRutaEnvio(e.idPedido); }}
+                                                style={{ border: 'none', borderRadius: 4, padding: '2px 7px', background: '#2563eb', color: '#fff', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}
+                                              >
+                                                Ruta
+                                              </button>
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  </Box>
+                                </Collapse>
+                              </TableCell>
+                            </TableRow>
+                          </React.Fragment>
+                        );
+                      })}
                       <TableRow>
                         <TablePagination
                           page={page}

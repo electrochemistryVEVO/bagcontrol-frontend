@@ -49,6 +49,45 @@
     gap: 20px; /* Controla el espaciado interno entre campos uniformemente */
 }
 
+.modeGrid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+}
+
+.modeButton {
+    min-height: 42px;
+    padding: 10px 12px;
+    cursor: pointer;
+    background-color: rgba(30, 41, 59, 0.7);
+    color: #cbd5e1;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-align: left;
+}
+
+.modeButton:hover {
+    border-color: rgba(255, 255, 255, 0.35);
+}
+
+.modeButtonActive {
+    background-color: rgba(37, 99, 235, 0.9);
+    border-color: #60a5fa;
+    color: #ffffff;
+}
+
+.infoText {
+    padding: 10px 12px;
+    border-radius: 8px;
+    background-color: rgba(15, 23, 42, 0.65);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    color: #cbd5e1;
+    font-size: 0.84rem;
+    line-height: 1.35;
+}
+
 /* Estilo para los textos descriptivos arriba de selectores o sliders */
 .fieldLabel {
     font-size: 0.85rem;

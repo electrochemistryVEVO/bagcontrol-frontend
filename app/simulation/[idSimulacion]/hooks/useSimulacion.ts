@@ -99,7 +99,11 @@ export function useSimulacion(
       switch (tipo) {
         case 'SIMULACION_INICIADA':
           setConectado(true);
-          setEstadoSim('preparando');
+          setEstadoSim(modo === '0' ? 'en_vivo' : 'preparando');
+          break;
+        case 'OPERACION_DIA_ACTIVA':
+          setConectado(true);
+          setEstadoSim('en_vivo');
           break;
         case 'SIMULACION_PAUSADA':
         case 'SIMULACION_EN_PAUSA':
@@ -133,7 +137,7 @@ export function useSimulacion(
     // 2. Filtrar eventos de física (vuelos, aeropuertos)
     const TIPOS_IGNORADOS = [
       'SIMULACION_INICIADA', 'SIMULACION_PAUSADA', 'SIMULACION_EN_PAUSA',
-      'SIMULACION_REANUDADA',
+      'SIMULACION_REANUDADA', 'OPERACION_DIA_ACTIVA',
       //'SIMULACION_FINALIZADA', 'COLAPSO_DETECTADO',
       'REPLANIFICACION_ENVIO', 'SIMULACION_DETENIDA', 'ERROR',
     ];
@@ -164,7 +168,7 @@ export function useSimulacion(
       return acum;},{})};
 
     onNuevoLoteRef.current?.();
-  }, [setEstadoSim]);
+  }, [setEstadoSim, modo]);
 
   // ============================================================================
   // Conexión WebSocket
@@ -382,7 +386,7 @@ export function useSimulacion(
       running = false;
       if (animationId) cancelAnimationFrame(animationId);
     };
-  }, [K, SaS]); // ← estadoSim FUERA de deps; se accede via ref
+  }, [K, SaS, modo]); // estadoSim fuera de deps; se accede via ref
 
   return {
     conectado,
