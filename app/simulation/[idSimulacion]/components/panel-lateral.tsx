@@ -84,6 +84,8 @@ type PanelLateralProps = {
   // envíos
   envios: Envio[];
   onMostrarRutaEnvio: (idPedido: string) => void;
+  haySeleccionRelacionada?: boolean;
+  onLimpiarSeleccionRelacionada?: () => void;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -115,6 +117,8 @@ export function PanelLateral({
   onFiltradoAeropuertosCambiado,
   envios,
   onMostrarRutaEnvio,
+  haySeleccionRelacionada,
+  onLimpiarSeleccionRelacionada,
 }: PanelLateralProps) {
   const nodeRef = useRef<HTMLDivElement>(null);
 
@@ -163,6 +167,13 @@ export function PanelLateral({
 
         {/* Contenido scrollable */}
         <Box sx={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
+          {haySeleccionRelacionada && (
+            <Box sx={{ px: 2, py: 1, borderBottom: '1px solid rgba(148,163,184,0.15)' }}>
+              <Button size="small" variant="outlined" onClick={onLimpiarSeleccionRelacionada} fullWidth>
+                Limpiar seleccion
+              </Button>
+            </Box>
+          )}
           <SeccionVuelos
             idSimulacion={idSimulacion}
             vuelosActivos={vuelosActivos}
@@ -173,8 +184,6 @@ export function PanelLateral({
             onMostrarRutaEnvio={onMostrarRutaEnvio}
           />
           <SeccionAeropuertos
-            idSimulacion={idSimulacion}
-            tiempoSimulacionRef={tiempoSimulacionRef}
             aeropuertos={aeropuertos}
             onEnfocarAeropuerto={onEnfocarAeropuerto}
             onFiltradoCambiado={onFiltradoAeropuertosCambiado}
@@ -419,15 +428,11 @@ const ordenAeropuertoFns: Record<OrdenAeropuertos, (a: AeropuertoSimulacion) => 
 };
 
 function SeccionAeropuertos({
-  idSimulacion,
-  tiempoSimulacionRef,
   aeropuertos,
   onEnfocarAeropuerto,
   onFiltradoCambiado,
   onMostrarRutaEnvio,
 }: {
-  idSimulacion: string;
-  tiempoSimulacionRef: RefObject<number>;
   aeropuertos: AeropuertoSimulacion[];
   onEnfocarAeropuerto: (iata: string) => void;
   onFiltradoCambiado?: (iatas: string[] | null) => void;
@@ -439,36 +444,18 @@ function SeccionAeropuertos({
   const [filtroEstados, setFiltroEstados] = useState<EstadoCapacidad[]>(ESTADOS_CAPACIDAD);
   const [tipoOrden, setTipoOrden] = useState<OrdenAeropuertos>('calcularOcupacion');
   const [direccionOrden, setDireccionOrden] = useState<DireccionOrden>('desc');
-  const [expandido, setExpandido] = useState<string | null>(null);
-  const [maletasPorAeropuerto, setMaletasPorAeropuerto] = useState<Record<string, MaletaSimulacion[]>>({});
-  const [loadingMaletas, setLoadingMaletas] = useState<Record<string, boolean>>({});
-  const [errorMaletas, setErrorMaletas] = useState<Record<string, string>>({});
-  const [paginaMaletas, setPaginaMaletas] = useState<Record<string, number>>({});
+  const expandido: string | null = null;
+  const maletasPorAeropuerto: Record<string, MaletaSimulacion[]> = {};
+  const loadingMaletas: Record<string, boolean> = {};
+  const errorMaletas: Record<string, string> = {};
+  const paginaMaletas: Record<string, number> = {};
   const MALETAS_POR_PAGINA = 10;
-
-  const cargarMaletas = async (iata: string) => {
-    if (maletasPorAeropuerto[iata] || loadingMaletas[iata]) return;
-    setLoadingMaletas(p => ({ ...p, [iata]: true }));
-    try {
-      const ts = new Date(tiempoSimulacionRef.current).toISOString();
-      const { data } = await SimulacionService.obtenerMaletasPorAeropuerto(idSimulacion, iata, ts);
-      setMaletasPorAeropuerto(p => ({ ...p, [iata]: data }));
-    } catch {
-      setErrorMaletas(p => ({ ...p, [iata]: 'No se pudieron cargar las maletas.' }));
-    } finally {
-      setLoadingMaletas(p => ({ ...p, [iata]: false }));
-    }
-  };
-
-  const toggleExpandido = (iata: string) => {
+  const setPaginaMaletas = (_: (p: Record<string, number>) => Record<string, number>) => {};
+  const seleccionar = (iata: string) => {
     onEnfocarAeropuerto(iata);
-    if (expandido === iata) {
-      setExpandido(null);
-    } else {
-      setExpandido(iata);
-      cargarMaletas(iata);
-    }
   };
+
+  const toggleExpandido = seleccionar;
 
   const aeropuertosOrdenados = useMemo(() => {
     return [...aeropuertos]
@@ -725,7 +712,10 @@ function SeccionEnvios({
                           <React.Fragment key={rowKey}>
                             <TableRow
                               key={`${rowKey}-main`}
-                              onClick={() => setExpandidoEnvio(cur => cur === e.idPedido ? null : e.idPedido)}
+                              onClick={() => {
+                                setExpandidoEnvio(cur => cur === e.idPedido ? null : e.idPedido);
+                                onMostrarRutaEnvio(e.idPedido);
+                              }}
                               sx={{ cursor: 'pointer', '&:hover': { bgcolor: 'rgba(56,189,248,0.08)' }, bgcolor: expandidoEnvio === e.idPedido ? 'rgba(56,189,248,0.1)' : 'transparent' }}
                             >
                               <TableCell sx={{ fontSize: 11 }}>{e.idPedido}</TableCell>

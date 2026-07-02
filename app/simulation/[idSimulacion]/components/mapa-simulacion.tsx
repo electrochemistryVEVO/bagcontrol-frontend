@@ -65,6 +65,11 @@ interface Props {
 }
 
 type VueloAnimado = EventoVuelo & { _salidaEpoch?: number; _llegadaEpoch?: number };
+type FiltroRelacion = {
+  vuelos?: Set<string>;
+  aeropuertos?: Set<string>;
+  envios?: Set<string>;
+};
 
 function crearFeatureCollection(features: Feature[]): FeatureCollection {
   return { type: 'FeatureCollection', features };
@@ -142,6 +147,7 @@ export function MapaSimulacion({
   const [rutaEnvio, setRutaEnvio] = useState<EnvioRuta | null>(null);
   const [rutaError, setRutaError] = useState<string | null>(null);
   const [replanificacionSeleccionada, setReplanificacionSeleccionada] = useState<EventoReplanificacionEnvio | null>(null);
+  const [filtroRelacion, setFiltroRelacion] = useState<FiltroRelacion>({});
 
   const coordsAeropuertos = useMemo(() => {
     const dict: Record<string, number[]> = {};
@@ -152,6 +158,7 @@ export function MapaSimulacion({
   // Refs para los filtros de los paneles (sin re-render, leídos por el RAF)
   const filtroAeropuertosRef = useRef<Set<string> | null>(null);
   const filtroVuelosRef = useRef<Set<string> | null>(null);
+  const filtroRelacionRef = useRef<FiltroRelacion>({});
 
   const handleFiltradoAeropuertosCambiado = useCallback((iatas: string[] | null) => {
     filtroAeropuertosRef.current = iatas ? new Set(iatas) : null;
@@ -160,6 +167,10 @@ export function MapaSimulacion({
   const handleFiltradoVuelosCambiado = useCallback((codigos: string[] | null) => {
     filtroVuelosRef.current = codigos ? new Set(codigos) : null;
   }, []);
+
+  useEffect(() => {
+    filtroRelacionRef.current = filtroRelacion;
+  }, [filtroRelacion]);
 
   const crearFeaturesAeropuertosMapa = useCallback(() => (
     crearFeaturesAeropuertoEstables(aeropuertosIniciales, aeropuertosRef.current)
@@ -312,6 +323,14 @@ export function MapaSimulacion({
       const { data } = await SimulacionService.obtenerRutaEnvio(idSimulacion, id, ts);
       setRutaEnvio(data);
       setIdEnvioBusqueda(id);
+      const vuelos = new Set(data.escalas.map((escala) => String(escala.codigoVuelo)));
+      const aeropuertos = new Set<string>();
+      data.escalas.forEach((escala) => {
+        aeropuertos.add(escala.origenIata);
+        aeropuertos.add(escala.destinoIata);
+      });
+      if (data.aeropuertoActual) aeropuertos.add(data.aeropuertoActual);
+      setFiltroRelacion({ envios: new Set([data.envio.idPedido]), vuelos, aeropuertos });
     } catch {
       setRutaEnvio(null);
       setRutaError(`No se encontró ruta para el envío ${id}`);
@@ -383,6 +402,11 @@ export function MapaSimulacion({
 
       setSelFlight(feature);
       setPanelOpen(true);
+      const vueloSeleccionado = feature.properties as EventoVuelo;
+      setFiltroRelacion({
+        vuelos: new Set([codigoVuelo]),
+        aeropuertos: new Set([vueloSeleccionado.origenIata, vueloSeleccionado.destinoIata].filter(Boolean)),
+      });
 
       const coords = obtenerCoordenadasFeature(feature);
       if (coords && (coords[0] !== 0 || coords[1] !== 0)) enfocarCoordenadas(coords, 6.5);
@@ -554,6 +578,45 @@ export function MapaSimulacion({
       : null;
   }, [aeropuertosIniciales, selAirport]);
 
+  const seleccionarAeropuerto = useCallback((codigoIata: string) => {
+    const aeropuerto = aeropuertosSnapshot.find((a) => a.codigoIata === codigoIata)
+      ?? aeropuertosIniciales.find((a) => a.codigoIata === codigoIata);
+    setSelAirport(({
+      type: 'Feature',
+      properties: { ...(aeropuerto ?? {}), codigoIata, isAirport: true },
+      geometry: { type: 'Point', coordinates: coordsAeropuertos[codigoIata] ?? [0, 0] },
+    } as unknown) as MapGeoJSONFeature);
+    setAirportPanelOpen(true);
+    enfocarAeropuerto(codigoIata);
+    setFiltroRelacion({
+      aeropuertos: new Set([codigoIata]),
+      vuelos: new Set(vuelosActivosSnapshot
+        .filter((vuelo) => vuelo.origenIata === codigoIata || vuelo.destinoIata === codigoIata)
+        .map((vuelo) => String(vuelo.codigoVuelo))),
+    });
+  }, [aeropuertosIniciales, aeropuertosSnapshot, coordsAeropuertos, enfocarAeropuerto, vuelosActivosSnapshot]);
+
+  const limpiarSeleccionRelacionada = useCallback(() => {
+    setFiltroRelacion({});
+    setRutaEnvio(null);
+    setRutaError(null);
+  }, []);
+
+  const vuelosPanel = useMemo(() => {
+    const filtro = filtroRelacion.vuelos;
+    return filtro ? vuelosActivosSnapshot.filter((vuelo) => filtro.has(String(vuelo.codigoVuelo))) : vuelosActivosSnapshot;
+  }, [filtroRelacion.vuelos, vuelosActivosSnapshot]);
+
+  const aeropuertosPanel = useMemo(() => {
+    const filtro = filtroRelacion.aeropuertos;
+    return filtro ? aeropuertosSnapshot.filter((aeropuerto) => filtro.has(aeropuerto.codigoIata)) : aeropuertosSnapshot;
+  }, [aeropuertosSnapshot, filtroRelacion.aeropuertos]);
+
+  const enviosPanel = useMemo(() => {
+    const filtro = filtroRelacion.envios;
+    return filtro ? enviosSnapshot.filter((envio) => filtro.has(envio.idPedido)) : enviosSnapshot;
+  }, [enviosSnapshot, filtroRelacion.envios]);
+
   // Motor gráfico a 60fps. Aviones/rutas cada frame, aeropuertos cada 30 frames.
   useEffect(() => {
     let rafId: number;
@@ -568,7 +631,9 @@ export function MapaSimulacion({
       const featuresRutas: Feature[] = [];
 
       vuelosActivosRef.current.forEach((vuelo) => {
-        if (filtroVuelosRef.current && !filtroVuelosRef.current.has(String(vuelo.codigoVuelo))) return;
+        const codigoVuelo = String(vuelo.codigoVuelo);
+        if (filtroVuelosRef.current && !filtroVuelosRef.current.has(codigoVuelo)) return;
+        if (filtroRelacionRef.current.vuelos && !filtroRelacionRef.current.vuelos.has(codigoVuelo)) return;
         const o = coordsAeropuertos[vuelo.origenIata];
         const d = coordsAeropuertos[vuelo.destinoIata];
         if (!o || !d) return;
@@ -609,9 +674,12 @@ export function MapaSimulacion({
         const featuresFiltradas = filtroAeropuertosRef.current
           ? todasFeatures.filter(f => filtroAeropuertosRef.current!.has(f.properties?.codigoIata as string))
           : todasFeatures;
+        const featuresRelacionadas = filtroRelacionRef.current.aeropuertos
+          ? featuresFiltradas.filter(f => filtroRelacionRef.current.aeropuertos!.has(f.properties?.codigoIata as string))
+          : featuresFiltradas;
         (map.getSource('aeropuertos-data') as GeoJSONSource)?.setData({
           type: 'FeatureCollection',
-          features: featuresFiltradas,
+          features: featuresRelacionadas,
         });
       }
 
@@ -744,31 +812,18 @@ export function MapaSimulacion({
       <PanelLateral
         visible={conectado}
         idSimulacion={idSimulacion}
-        vuelosActivos={vuelosActivosSnapshot}
+        vuelosActivos={vuelosPanel}
         tiempoSimulacionRef={tiempoSimulacionRef}
         seleccionarVuelo={seleccionarVuelo}
         onEnfocarVuelo={enfocarVueloSeleccionado}
         onFiltradoVuelosCambiado={handleFiltradoVuelosCambiado}
-        aeropuertos={aeropuertosSnapshot}
-        onEnfocarAeropuerto={enfocarAeropuerto}
+        aeropuertos={aeropuertosPanel}
+        onEnfocarAeropuerto={seleccionarAeropuerto}
         onFiltradoAeropuertosCambiado={handleFiltradoAeropuertosCambiado}
-        envios={enviosSnapshot}
+        envios={enviosPanel}
         onMostrarRutaEnvio={mostrarRutaEnvio}
-      />
-
-      <PanelResumenDerecho
-        ocupacionFlota={ocupacionPromedioFlota}
-        ocupacionAeropuertos={metricasGlobales.ocupacionPromedioAeropuertos}
-        vuelosEnAire={vuelosActivosSnapshot.length}
-        enviosTransito={metricasGlobales.enviosTransito}
-        enviosEntregados={metricasGlobales.enviosEntregados}
-        enviosPendientes={metricasGlobales.enviosPendientes}
-        aeropuertos={{ rojo: metricasGlobales.aeropuertosRojo, ambar: metricasGlobales.aeropuertosAmbar, verde: metricasGlobales.aeropuertosVerde, vacio: metricasGlobales.aeropuertosVacio }}
-        vuelos={{ rojo: metricasGlobales.vuelosRojo, ambar: metricasGlobales.vuelosAmbar, verde: metricasGlobales.vuelosVerde, vacio: metricasGlobales.vuelosVacio }}
-        replanificaciones={replanificaciones}
-        replanificacionSeleccionada={replanificacionSeleccionada}
-        onSeleccionarReplanificacion={enfocarReplanificacion}
-        visible={conectado}
+        haySeleccionRelacionada={Boolean(filtroRelacion.vuelos || filtroRelacion.aeropuertos || filtroRelacion.envios)}
+        onLimpiarSeleccionRelacionada={limpiarSeleccionRelacionada}
       />
 
       {colapso && <PanelColapso colapso={colapso} />}
@@ -857,10 +912,14 @@ export function MapaSimulacion({
             setPanelOpen(true);
             const coords = obtenerCoordenadasFeature(feature ?? null);
             if (coords) enfocarCoordenadas(coords, 6.5);
+            if (typeof props.codigoVuelo === 'string' || typeof props.codigoVuelo === 'number') {
+              setFiltroRelacion({
+                vuelos: new Set([String(props.codigoVuelo)]),
+                aeropuertos: new Set([props.origenIata, props.destinoIata].filter(Boolean)),
+              });
+            }
           } else if (props.isAirport) {
-            setSelAirport(feature ?? null);
-            setAirportPanelOpen(true);
-            if (typeof props.codigoIata === 'string') enfocarAeropuerto(props.codigoIata);
+            if (typeof props.codigoIata === 'string') seleccionarAeropuerto(props.codigoIata);
           }
         }}
         interactiveLayerIds={['point', 'plane']}
