@@ -258,6 +258,10 @@ export function useSimulacion(
     let loteStartTime = 0;
     let eventosEnLote = 0;
     let animationId: number | null = null;
+    // Opción A: anclar el reloj al tiempo real para evitar drift
+    let batchStartTime: number = 0;    // Date.now() cuando el batch empieza
+    let batchStartClock: number = 0;   // tiempoSimulacion.current cuando el batch empieza
+    let lastElapsed: number = 0;       // para cap de seguridad (evitar saltos por suspense)
 
     function tick() {
       if (!running) return;
@@ -285,13 +289,22 @@ export function useSimulacion(
         eventosEnLote = colaEventos.current.length;
         console.log(`[DIAG-LOTE-INICIO] eventos=${eventosEnLote} | tiempoSim=${new Date(tiempoSimulacion.current).toISOString()}`);
         tickCount = 0;
+        // Anclar el batch al tiempo real
+        batchStartTime = Date.now();
+        batchStartClock = tiempoSimulacion.current;
+        lastElapsed = 0;
       }
       colaEstabaVacia = false;
 
       tickCount++;
 
+      // Opción A: reloj anclado al tiempo real (sin drift)
       const ahora = Date.now();
-      tiempoSimulacion.current += (ahora - ultimoFrame) * factorAceleracion;
+      const elapsed = ahora - batchStartTime;
+      // Cap de seguridad: máximo 200ms por tick para evitar saltos por suspense del sistema
+      const safeElapsed = Math.min(elapsed, lastElapsed + 200);
+      lastElapsed = safeElapsed;
+      tiempoSimulacion.current = batchStartClock + safeElapsed * factorAceleracion;
       ultimoFrame = ahora;
       const tiempoActual = tiempoSimulacion.current;
 
