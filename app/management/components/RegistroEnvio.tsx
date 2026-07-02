@@ -158,9 +158,9 @@ export function RegistroEnvio({ envioInicial, onSuccess, onCancel }: Props) {
           }}>
             {loading ? 'Guardando...' : envioInicial ? 'Guardar cambios' : 'Registrar envío'}
           </button>
-          <button onClick={() => envioInicial ? onCancel?.() : setForm(formularioVacio)}
+          <button onClick={() => onCancel ? onCancel() : setForm({ ...formularioVacio, fechaHora: nowDateTimeLocalInput() })}
             style={S.btnSecondary}>
-            {envioInicial ? 'Cancelar' : 'Limpiar'}
+            {onCancel ? 'Cancelar' : 'Limpiar'}
           </button>
         </div>
       </div>

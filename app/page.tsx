@@ -10,28 +10,16 @@ import { LoginModal, getUsuarioGuardado, cerrarSesion } from '@/app/shared/hooks
 
 const entryCards = [
   {
-    href: '/simulation?tipo=simulacion',
-    title: 'Simulacion',
-    description: 'Escenario de 5 dias con envios de simulacion.',
-    image: 'https://placehold.co/800x480?text=Simulacion',
-  },
-  {
     href: '/simulation?tipo=operacion',
     title: 'Operacion dia a dia',
-    description: 'Flujo operativo con envios iniciales vacios y registro manual.',
+    description: 'Mapa operativo compartido para registrar envios mientras la operacion esta activa.',
     image: 'https://placehold.co/800x480?text=Operacion+dia+a+dia',
   },
   {
-    href: '/simulation?tipo=colapso',
-    title: 'Colapso logistico',
-    description: 'Escenario hasta detectar colapso operativo.',
-    image: 'https://placehold.co/800x480?text=Colapso+logistico',
-  },
-  {
-    href: '/management',
-    title: 'Gestion',
-    description: 'Gestion de aeropuertos, vuelos, envios e incidencias.',
-    image: 'https://placehold.co/800x480?text=Gestion',
+    href: '/simulation?tipo=simulacion',
+    title: 'Simulacion',
+    description: 'Escenarios aislados de 5 dias o hasta el colapso, con gestion previa de entidades.',
+    image: 'https://placehold.co/800x480?text=Simulacion',
   },
 ];
 

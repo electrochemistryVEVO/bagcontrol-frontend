@@ -5,6 +5,18 @@
     overflow: hidden;
 }
 
+.workspacePanel {
+    position: absolute;
+    inset: 24px;
+    z-index: 10;
+    overflow: auto;
+    padding: 24px;
+    background: rgba(248, 250, 252, 0.94);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 8px;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.24);
+}
+
 /* Modal flotante estilizado como tarjeta translúcida moderna (Glassmorphism) */
 .simulacionModal {
     position: absolute;

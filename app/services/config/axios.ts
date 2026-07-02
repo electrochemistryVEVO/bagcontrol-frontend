@@ -28,10 +28,10 @@ const attachToken = (config: any) => {
 // Si el backend devuelve 401, limpiar sesión y redirigir a /login
 const handleUnauthorized = (error: any) => {
   if (error?.response?.status === 401 && typeof window !== 'undefined') {
-    sessionStorage.removeItem('bagcontrol_token');
-    sessionStorage.removeItem('bagcontrol_user');
+    localStorage.removeItem('bagcontrol_token');
+    localStorage.removeItem('bagcontrol_user');
     document.cookie = 'bagcontrol_token=; path=/; max-age=0';
-    window.location.href = '/login?session=expired';
+    window.location.href = '/';
   }
   return Promise.reject(error);
 };

@@ -11,11 +11,24 @@ export type ParametrosSimulacion = {
   modo?: string;       // '0' (OPERACION_DIA), '1' (VENTANA_CINCO_DIAS), '2' (COLAPSO_OPERATIVO)
 }
 
+export type SimulacionActiva = {
+  simulacionId: string;
+  websocketTopic?: string;
+  modo?: string;
+  estado?: string;
+  k?: number;
+  fechaInicio?: string;
+  fechaCreacion?: string;
+}
+
 export const SimulacionService = {
     // Usa timeout extendido: el backend corre el planificador en el primer ciclo
     // y con 9.5M de envíos puede tardar bastante más de 10 segundos.
     prepararInicio : (params: ParametrosSimulacion) =>
         axiosSimulacion.post<RespuestaInicioSimulacionDTO>('/simulacion/preparar', null, { params }),
+
+    listarActivas: (modo?: string) =>
+        axiosApi.get<SimulacionActiva[]>('/simulacion/activas', { params: modo ? { modo } : undefined }),
 
     iniciar: (idSimulacion: string) =>
         axiosSimulacion.post(`/simulacion/iniciar/${idSimulacion}/arrancar`),
