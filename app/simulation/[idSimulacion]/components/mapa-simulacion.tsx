@@ -27,6 +27,7 @@ import { formatUtcDisplay } from '@/app/shared/dateTime';
 import { AeropuertoPopupContent } from './pop-up-aeropuerto';
 import { RelojSimulacionOverlay } from './reloj-simulacion';
 import { PanelLateral } from './panel-lateral';
+import { PanelMetricas } from './panel-metricas';
 import AeropuertoSidePanel from '@/app/simulation/components/aeropuerto-sidepanel';
 import AvionSidePanel from '@/app/simulation/components/avion-sidepanel';
 import { Drawer } from '@mui/material';
@@ -554,7 +555,29 @@ export function MapaSimulacion({
     const enviosEntregados = enviosSnapshot.filter(e => (e as any)._estado === 'ENTREGADO').length;
     const enviosTransito = enviosSnapshot.filter(e => (e as any)._estado === 'EN_CURSO').length;
     const enviosPendientes = enviosSnapshot.filter(e => (e as any)._estado === 'PLANIFICADO').length;
+
+    // Maletas que aún no llegan a destino (planificadas o en curso)
+    const maletasPendientes = enviosSnapshot
+      .filter(e => (e as any)._estado !== 'ENTREGADO')
+      .reduce((acc, e) => acc + (e.cantidadMaletas || 0), 0);
+
+    // Tiempo promedio de entrega: diferencia entre _llegadaEpoch y fechaHora de creación,
+    // solo para envíos ya entregados.
+    const entregadosConTiempos = enviosSnapshot.filter(e => {
+      const env = e as any;
+      return env._estado === 'ENTREGADO' && env._llegadaEpoch && env.fechaHora;
+    });
+    const tiempoPromedioEntregaMs = entregadosConTiempos.length === 0 ? null :
+      entregadosConTiempos.reduce((acc, e) => {
+        const env = e as any;
+        const inicio = Date.parse(env.fechaHora);
+        const duracion = Number.isFinite(inicio) ? env._llegadaEpoch - inicio : 0;
+        return acc + Math.max(0, duracion);
+      }, 0) / entregadosConTiempos.length;
+
     return {
+      maletasPendientes,
+      tiempoPromedioEntregaMs,
       ocupacionPromedioAeropuertos,
       enviosEntregados,
       enviosTransito,
@@ -822,6 +845,14 @@ export function MapaSimulacion({
         onMostrarRutaEnvio={mostrarRutaEnvio}
         haySeleccionRelacionada={Boolean(filtroRelacion.vuelos || filtroRelacion.aeropuertos || filtroRelacion.envios)}
         onLimpiarSeleccionRelacionada={limpiarSeleccionRelacionada}
+      />
+
+      <PanelMetricas
+        visible={conectado}
+        ocupacionFlota={ocupacionPromedioFlota}
+        ocupacionAeropuertos={metricasGlobales.ocupacionPromedioAeropuertos}
+        maletasPendientes={metricasGlobales.maletasPendientes}
+        tiempoPromedioEntregaMs={metricasGlobales.tiempoPromedioEntregaMs}
       />
 
       {colapso && <PanelColapso colapso={colapso} />}

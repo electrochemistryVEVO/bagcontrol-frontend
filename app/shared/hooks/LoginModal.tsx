@@ -71,7 +71,7 @@ export function LoginModal({
       setError('Ingresa un correo valido.');
       return;
     }
-    if (p.length < 6) {
+    if (tab === 1 && p.length < 6) {
       setError('La contrasena debe tener al menos 6 caracteres.');
       return;
     }
@@ -83,8 +83,12 @@ export function LoginModal({
         : await intentarRegistro(e, p, n);
       onExito(usuario);
     } catch (err: any) {
-      const mensaje = err?.response?.data?.message || err?.response?.data?.error || err?.message;
-      setError(mensaje ?? 'Error inesperado. Intenta de nuevo.');
+      if (tab === 0 && err?.response?.status === 401) {
+        setError('Contrasena incorrecta.');
+      } else {
+        const mensaje = err?.response?.data?.message || err?.response?.data?.error || err?.message;
+        setError(mensaje ?? 'Error inesperado. Intenta de nuevo.');
+      }
     } finally {
       setLoading(false);
     }

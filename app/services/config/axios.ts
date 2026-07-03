@@ -27,7 +27,9 @@ const attachToken = (config: any) => {
 
 // Si el backend devuelve 401, limpiar sesión y redirigir a /login
 const handleUnauthorized = (error: any) => {
-  if (error?.response?.status === 401 && typeof window !== 'undefined') {
+  const url: string = error?.config?.url || '';
+  const esIntentoDeAuth = url.includes('/auth/login') || url.includes('/auth/register');
+  if (error?.response?.status === 401 && !esIntentoDeAuth && typeof window !== 'undefined') {
     localStorage.removeItem('bagcontrol_token');
     localStorage.removeItem('bagcontrol_user');
     document.cookie = 'bagcontrol_token=; path=/; max-age=0';
