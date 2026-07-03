@@ -330,7 +330,7 @@ export function MapaSimulacion({
         aeropuertos.add(escala.destinoIata);
       });
       if (data.aeropuertoActual) aeropuertos.add(data.aeropuertoActual);
-      setFiltroRelacion({ envios: new Set([data.envio.idPedido]), vuelos, aeropuertos });
+      setFiltroRelacion({ envios: new Set([data.envio.idPedido]), vuelos });
     } catch {
       setRutaEnvio(null);
       setRutaError(`No se encontró ruta para el envío ${id}`);
@@ -405,7 +405,6 @@ export function MapaSimulacion({
       const vueloSeleccionado = feature.properties as EventoVuelo;
       setFiltroRelacion({
         vuelos: new Set([codigoVuelo]),
-        aeropuertos: new Set([vueloSeleccionado.origenIata, vueloSeleccionado.destinoIata].filter(Boolean)),
       });
 
       const coords = obtenerCoordenadasFeature(feature);
@@ -589,7 +588,6 @@ export function MapaSimulacion({
     setAirportPanelOpen(true);
     enfocarAeropuerto(codigoIata);
     setFiltroRelacion({
-      aeropuertos: new Set([codigoIata]),
       vuelos: new Set(vuelosActivosSnapshot
         .filter((vuelo) => vuelo.origenIata === codigoIata || vuelo.destinoIata === codigoIata)
         .map((vuelo) => String(vuelo.codigoVuelo))),
@@ -915,7 +913,6 @@ export function MapaSimulacion({
             if (typeof props.codigoVuelo === 'string' || typeof props.codigoVuelo === 'number') {
               setFiltroRelacion({
                 vuelos: new Set([String(props.codigoVuelo)]),
-                aeropuertos: new Set([props.origenIata, props.destinoIata].filter(Boolean)),
               });
             }
           } else if (props.isAirport) {

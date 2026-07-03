@@ -2,23 +2,29 @@ import { Aeropuerto } from './types/Aeropuerto';
 
 const pad = (value: number) => value.toString().padStart(2, '0');
 
-export function formatUtcDisplay(value: string | number | Date | null | undefined): string {
+export function formatUtcDisplay(
+  value: string | number | Date | null | undefined,
+  showSeconds?: boolean,
+): string {
   if (value == null) return 'No disponible';
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return 'No disponible';
-  return `${pad(date.getUTCDate())}/${pad(date.getUTCMonth() + 1)}/${date.getUTCFullYear()} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())} UTC`;
+  const sec = showSeconds ? `:${pad(date.getUTCSeconds())}` : '';
+  return `${pad(date.getUTCDate())}/${pad(date.getUTCMonth() + 1)}/${date.getUTCFullYear()} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}${sec} UTC`;
 }
 
 export function formatAirportLocalDisplay(
   value: string | number | Date | null | undefined,
   aeropuerto?: Pick<Aeropuerto, 'codigoIata' | 'gmt'> | null,
+  showSeconds?: boolean,
 ): string {
   if (value == null || !aeropuerto) return 'No disponible';
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return 'No disponible';
   const localMs = date.getTime() + aeropuerto.gmt * 60 * 60 * 1000;
   const local = new Date(localMs);
-  return `${pad(local.getUTCDate())}/${pad(local.getUTCMonth() + 1)}/${local.getUTCFullYear()} ${pad(local.getUTCHours())}:${pad(local.getUTCMinutes())} ${aeropuerto.codigoIata}`;
+  const sec = showSeconds ? `:${pad(local.getUTCSeconds())}` : '';
+  return `${pad(local.getUTCDate())}/${pad(local.getUTCMonth() + 1)}/${local.getUTCFullYear()} ${pad(local.getUTCHours())}:${pad(local.getUTCMinutes())}${sec} ${aeropuerto.codigoIata}`;
 }
 
 export function toDateTimeLocalInput(value: string | Date | null | undefined): string {
