@@ -37,8 +37,8 @@ export function toDateTimeLocalInput(value: string | Date | null | undefined): s
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-export function nowDateTimeLocalInput(): string {
-  return toDateTimeLocalInput(new Date());
+export function nowDateTimeLocalInput(gmt : number): string {
+  return toDateTimeLocalInput(new Date(Date.now() + 1000*60*60*(gmt+5)));
 }
 
 export function formatDuration(ms: number): string {

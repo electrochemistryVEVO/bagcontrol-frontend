@@ -49,6 +49,7 @@ export function useSimulacion(
   const [mensajeErrorSimulacion, setMensajeErrorSimulacion] = useState<string | null>(null);
   const primerEventoRecibidoRef = useRef(false);
   const primerLoteRecibidoRef = useRef(false);
+  const clockEstadoRef = useRef(0); //Tiempo obtenido del estado al iniciar
 
   const onNuevoLoteRef = useRef(onNuevoLote);
   useEffect(() => { onNuevoLoteRef.current = onNuevoLote; }, [onNuevoLote]);
@@ -189,9 +190,8 @@ export function useSimulacion(
             setMensajeErrorSimulacion(null);
             simTime('solicitando estado/snapshot');
             const { data: estado } = await SimulacionService.obtenerEstado(id);
-            if (estado.tiempoSimuladoActual) {
-              tiempoSimulacion.current = parseFechaInicio(estado.tiempoSimuladoActual);
-            }
+            tiempoSimulacion.current = parseFechaInicio(estado.tiempoSimuladoActual ?? estado.fechaInicio);
+            clockEstadoRef.current = tiempoSimulacion.current
             if (estado.estado && estado.estado !== 'CREADA') {
               setEstadoSim(estado.pausada ? 'pausada' : estado.detenida ? 'detenida' : 'preparando');
               try {
@@ -265,9 +265,20 @@ export function useSimulacion(
 
     function tick() {
       if (!running) return;
+      //console.log("tock")
 
       // Re-agendar siempre para mantener el loop vivo a 60fps
       animationId = requestAnimationFrame(tick);
+
+      function elapseTime(){ //Dejar que tiempo transcurra
+        const ahora = Date.now();
+        const elapsed = ahora - (batchStartTime || clockEstadoRef.current);
+        // Cap de seguridad: máximo 200ms por tick para evitar saltos por suspense del sistema
+        const safeElapsed = Math.min(elapsed, lastElapsed + 200);
+        lastElapsed = safeElapsed;
+        tiempoSimulacion.current = (batchStartClock || clockEstadoRef.current) + safeElapsed * factorAceleracion;
+        ultimoFrame = ahora;
+      }
 
       if (estadoSimRef.current !== 'en_vivo') {
         ultimoFrame = Date.now();
@@ -279,10 +290,12 @@ export function useSimulacion(
           tickCount = 0;
         }
         colaEstabaVacia = true;
-        ultimoFrame = Date.now();
+        if(modo==="0") elapseTime();
+        else ultimoFrame = Date.now();
         return;
       }
       //vueloFinalRef.current = (colaEventos.current.filter((e)=>e.tipo==="VUELO_ATERRIZA").pop() as EventoVuelo);
+
 
       if (colaEstabaVacia) {
         loteStartTime = Date.now();
@@ -292,6 +305,7 @@ export function useSimulacion(
         // Anclar el batch al tiempo real
         batchStartTime = Date.now();
         batchStartClock = tiempoSimulacion.current;
+        console.log(`Modo: ${modo}`)
         lastElapsed = 0;
       }
       colaEstabaVacia = false;
@@ -299,13 +313,7 @@ export function useSimulacion(
       tickCount++;
 
       // Opción A: reloj anclado al tiempo real (sin drift)
-      const ahora = Date.now();
-      const elapsed = ahora - batchStartTime;
-      // Cap de seguridad: máximo 200ms por tick para evitar saltos por suspense del sistema
-      const safeElapsed = Math.min(elapsed, lastElapsed + 200);
-      lastElapsed = safeElapsed;
-      tiempoSimulacion.current = batchStartClock + safeElapsed * factorAceleracion;
-      ultimoFrame = ahora;
+      elapseTime();
       const tiempoActual = tiempoSimulacion.current;
 
       for(let key in enviosPlanificados.current){

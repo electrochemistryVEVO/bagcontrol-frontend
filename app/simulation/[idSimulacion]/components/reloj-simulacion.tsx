@@ -35,7 +35,6 @@ export function RelojSimulacionOverlay({
   }, [tiempoRef]);
 
   const inicioEpoch = useMemo(() => {
-      console.log(`fecha inicio: ${fechaInicio}`)
     const normalizada = /[zZ]|[+-]\d{2}:?\d{2}$/.test(fechaInicio) ? fechaInicio : `${fechaInicio}Z`;
     const parsed = new Date(normalizada).getTime();
     return Number.isFinite(parsed) ? parsed : epoch;

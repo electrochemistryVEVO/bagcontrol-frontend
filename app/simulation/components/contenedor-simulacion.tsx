@@ -110,7 +110,10 @@ export function ContenedorSimulacion() {
   };
 
   const crearEscenario = async () => {
-    const inicio = entorno === 'operacion' ? new Date() : startDate;
+    //NOTA: startDate esta ajustado a UTC, pero new Date() no lo esta
+    //Para no modificar formatLocalDateTime, se ajusta manualmente el UTC al new Date()
+    //El formato hace que el backend ignore la timezone y trate todo como UTC
+    const inicio = entorno === 'operacion' ? new Date(Date.now()+ 1000*60*60*5) : startDate;
     if (!inicio) {
       showToast('Selecciona la fecha de inicio', 'error');
       return;

@@ -64,8 +64,8 @@ export function SimulacionCliente({ id, topic, fechaInicial, k, modo, aeropuerto
       showToast('No se pudo detener en backend; saliendo del visualizador', 'error');
     } finally {
       simulacionWS.desconectar(id);
-      //router.back();
-      //setTimeout(() => router.push('/simulation'), 500);
+      router.back();
+      setTimeout(() => router.push('/simulation'), 500);
     }
   };
 

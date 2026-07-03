@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import {useState, useEffect, useMemo} from 'react'
 import { AeropuertoService } from '@/app/services/aeropuerto.service'
 import { EnvioService, NuevoEnvioDTO } from '@/app/services/envio.service'
 import { Aeropuerto } from '@/app/shared/types/Aeropuerto'
@@ -28,10 +28,16 @@ export function RegistroEnvio({ envioInicial, onSuccess, onCancel }: Props) {
     idCliente: envioInicial.idCliente,
     cantidadMaletas: envioInicial.cantidadMaletas,
     fechaHora: toDateTimeLocalInput(envioInicial.fechaHora),
-  } : { ...formularioVacio, fechaHora: nowDateTimeLocalInput() })
+  } : { ...formularioVacio, fechaHora: nowDateTimeLocalInput(-5) })
+  const gmtEnvio = useMemo(()=> {
+        return aeropuertos.find((e) => e.codigoIata === form?.destinoIata)?.gmt ?? -5
+      },
+      [aeropuertos,form])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [exito, setExito] = useState(false)
+
+
 
   useEffect(() => {
     AeropuertoService.listarAeropuertos()
@@ -60,7 +66,7 @@ export function RegistroEnvio({ envioInicial, onSuccess, onCancel }: Props) {
         destinoIata: form.destinoIata,
         idCliente: form.idCliente,
         cantidadMaletas: form.cantidadMaletas,
-        fechaHora: form.fechaHora || nowDateTimeLocalInput(),
+        fechaHora: form.fechaHora || nowDateTimeLocalInput(gmtEnvio),
       }
       const respuesta = envioInicial
         ? await EnvioService.actualizarEnvio(envioInicial.idPedido, payload)
@@ -138,7 +144,7 @@ export function RegistroEnvio({ envioInicial, onSuccess, onCancel }: Props) {
                 onChange={e => setForm(f => ({ ...f, fechaHora: e.target.value }))} />
               <button
                 type="button"
-                onClick={() => setForm(f => ({ ...f, fechaHora: nowDateTimeLocalInput() }))}
+                onClick={() => setForm(f => ({ ...f, fechaHora: nowDateTimeLocalInput(gmtEnvio) }))}
                 style={S.btnSecondary}
               >
                 Usar hora actual
@@ -158,7 +164,7 @@ export function RegistroEnvio({ envioInicial, onSuccess, onCancel }: Props) {
           }}>
             {loading ? 'Guardando...' : envioInicial ? 'Guardar cambios' : 'Registrar envío'}
           </button>
-          <button onClick={() => onCancel ? onCancel() : setForm({ ...formularioVacio, fechaHora: nowDateTimeLocalInput() })}
+          <button onClick={() => onCancel ? onCancel() : setForm({ ...formularioVacio, fechaHora: nowDateTimeLocalInput(gmtEnvio) })}
             style={S.btnSecondary}>
             {onCancel ? 'Cancelar' : 'Limpiar'}
           </button>
