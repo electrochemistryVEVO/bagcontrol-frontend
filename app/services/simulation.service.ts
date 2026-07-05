@@ -53,6 +53,12 @@ export const SimulacionService = {
 
     detener: (idSimulacion: string) =>
         axiosApi.post(`/simulacion/${idSimulacion}/detener`),
+
+    iniciarOperacionDia: () =>
+        axiosSimulacion.post<RespuestaInicioSimulacionDTO>('/simulacion/operacion-dia/iniciar'),
+
+    obtenerOperacionDiaActiva: () =>
+        axiosApi.get<SimulacionActiva | ''>('/simulacion/operacion-dia/activa'),
 }
 
 

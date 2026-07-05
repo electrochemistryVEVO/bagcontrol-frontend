@@ -63,6 +63,8 @@ interface Props {
   modo?: string;
   colapso?: EventoColapso | null;
   replanificaciones: EventoReplanificacionEnvio[];
+  gmtUsuario?: number | null;
+  aeropuertoUsuario?: Aeropuerto | null;
 }
 
 type VueloAnimado = EventoVuelo & { _salidaEpoch?: number; _llegadaEpoch?: number };
@@ -118,6 +120,8 @@ export function MapaSimulacion({
   modo,
   colapso,
   replanificaciones,
+  gmtUsuario,
+  aeropuertoUsuario,
 }: Props) {
   const mapRef = useRef<MapRef>(null);
   const backgroundMapRef = useRef<MapRef>(null);
@@ -1002,6 +1006,8 @@ export function MapaSimulacion({
         fechaInicio={fechaInicio}
         modo={modo}
         aeropuertoSeleccionado={aeropuertoSeleccionado}
+        gmtUsuario={gmtUsuario}
+        aeropuertoUsuario={aeropuertoUsuario}
       />
     </div>
   );

@@ -14,21 +14,23 @@ export function RelojSimulacionOverlay({
   fechaInicio,
   modo,
   aeropuertoSeleccionado,
+  gmtUsuario,
+  aeropuertoUsuario,
 }: {
   tiempoRef: RefObject<number>;
   ocupacionFlota?: number;
   fechaInicio: string;
   modo?: string;
   aeropuertoSeleccionado?: Aeropuerto | null;
+  gmtUsuario?: number | null;
+  aeropuertoUsuario?: Aeropuerto | null;
 }) {
-  const [hora, setHora] = useState<string>('');
   const [epoch, setEpoch] = useState<number>(0);
 
   useEffect(() => {
     const timer = setInterval(() => {
       if (tiempoRef.current) {
         setEpoch(tiempoRef.current);
-        setHora(formatUtcDisplay(tiempoRef.current));
       }
     }, 100);
     return () => clearInterval(timer);
@@ -40,9 +42,17 @@ export function RelojSimulacionOverlay({
     return Number.isFinite(parsed) ? parsed : epoch;
   }, [epoch, fechaInicio]);
 
+  // Display principal: hora local del usuario si tiene aeropuerto y GMT,
+  // sino UTC. La conversion se hace siempre desde el epoch UTC.
+  const hora = useMemo(() => {
+    if (!epoch) return '';
+    if (typeof gmtUsuario === 'number' && aeropuertoUsuario) {
+      return formatAirportLocalDisplay(epoch, aeropuertoUsuario);
+    }
+    return formatUtcDisplay(epoch);
+  }, [epoch, gmtUsuario, aeropuertoUsuario]);
+
   const textElapsado = useMemo(() => {
-      //console.log(`Epoch: ${new Date(epoch)}`)
-      //console.log(`Inicio epoch: ${new Date(inicioEpoch)}`)
       return formatDuration(epoch - inicioEpoch)
   }, [epoch, inicioEpoch]);
   const restanteSim5D = useMemo(() => {

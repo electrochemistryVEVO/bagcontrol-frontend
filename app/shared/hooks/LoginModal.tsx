@@ -17,11 +17,20 @@ import { AuthService } from '@/app/services/auth.service';
 
 const SESSION_KEY = 'bagcontrol_user';
 
-export function getUsuarioGuardado(): { email: string; nombre: string } | null {
+export type UsuarioGuardado = { email: string; nombre: string; rol: string; aeropuerto: string };
+
+export function getUsuarioGuardado(): UsuarioGuardado | null {
   if (typeof window === 'undefined') return null;
   try {
     const raw = localStorage.getItem(SESSION_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return {
+      email: parsed.email || '',
+      nombre: parsed.nombre || '',
+      rol: parsed.rol || '',
+      aeropuerto: parsed.aeropuerto || '',
+    };
   } catch {
     return null;
   }
@@ -31,14 +40,14 @@ export function cerrarSesion() {
   AuthService.logout();
 }
 
-async function intentarLogin(email: string, password: string) {
+async function intentarLogin(email: string, password: string): Promise<UsuarioGuardado> {
   const usuario = await AuthService.login(email, password);
-  return { email: usuario.email, nombre: usuario.nombre };
+  return { email: usuario.email, nombre: usuario.nombre, rol: usuario.rol, aeropuerto: usuario.aeropuerto };
 }
 
-async function intentarRegistro(email: string, password: string, nombre: string) {
+async function intentarRegistro(email: string, password: string, nombre: string): Promise<UsuarioGuardado> {
   const usuario = await AuthService.register(email, password, nombre);
-  return { email: usuario.email, nombre: usuario.nombre };
+  return { email: usuario.email, nombre: usuario.nombre, rol: usuario.rol, aeropuerto: usuario.aeropuerto };
 }
 
 export function LoginModal({
@@ -46,7 +55,7 @@ export function LoginModal({
   onExito,
 }: {
   abierto: boolean;
-  onExito: (usuario: { email: string; nombre: string }) => void;
+  onExito: (usuario: UsuarioGuardado) => void;
 }) {
   const [tab, setTab] = useState<0 | 1>(0);
   const [email, setEmail] = useState('');

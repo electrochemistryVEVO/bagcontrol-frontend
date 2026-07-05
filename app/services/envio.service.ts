@@ -62,11 +62,12 @@ export const EnvioService = {
     return axiosSimulacion.get<PageResponse<Envio>>('/envios/paginados', { params })
   },
 
-  cargarCsv: (archivo: File) => {
+  cargarCsv: (archivo: File, origenIata?: string) => {
     const fd = new FormData()
     fd.append('archivo', archivo)
+    const query = origenIata ? `?origenIata=${encodeURIComponent(origenIata)}` : ''
     return axiosApi.post<{ insertados: number; errores: string[]; totalFilas: number }>(
-      '/envios/cargar-csv', fd,
+      `/envios/cargar-csv${query}`, fd,
       { headers: { 'Content-Type': 'multipart/form-data' } }
     )
   },

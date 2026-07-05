@@ -1,8 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { Box, Button, Dialog, DialogContent, DialogTitle } from '@mui/material';
+import { useEffect, useMemo, useState } from 'react';
 import { useSimulacion } from './hooks/useSimulacion';
 import { Aeropuerto } from '@/app/shared/types/Aeropuerto';
 import { MapaSimulacion } from './components/mapa-simulacion';
@@ -10,7 +9,7 @@ import { useToast } from '@/app/shared/hooks/useToast';
 import { SimulacionService } from '@/app/services/simulation.service';
 import { simulacionWS } from '@/app/services/config/webSocket';
 import {PopUpResumen} from "@/app/simulation/[idSimulacion]/components/pop-up-resumen";
-import { RegistroEnvio } from '@/app/management/components/RegistroEnvio';
+import { getUsuarioGuardado, UsuarioGuardado } from '@/app/shared/hooks/LoginModal';
 
 interface Props {
   id: string;
@@ -27,9 +26,25 @@ export function SimulacionCliente({ id, topic, fechaInicial, k, modo, aeropuerto
   const SaS_SEGUNDOS = modo === '0' ? k * 60 : 90;
   const { showToast, ToastComponent } = useToast();
   const [segundosPreparando, setSegundosPreparando] = useState(0);
-  const [registroEnvioAbierto, setRegistroEnvioAbierto] = useState(false);
-  //const fechaGuardada = typeof window !== 'undefined' ? localStorage.getItem(`fechaInicio|${id}`) : null;
-  const fechaInicioReal = fechaInicial || '2026-02-10T00:00:00.000Z';
+  // Estabilizar fechaInicioReal: solo se calcula una vez (o cuando cambia fechaInicial).
+  // Antes se recalculaba en cada render, lo que provocaba que el cronometro
+  // "Transcurrido" se reiniciara cada vez que el componente re-renderizaba.
+  const fechaInicioReal = useMemo(
+    () => fechaInicial || new Date().toISOString(),
+    [fechaInicial]
+  );
+
+  // Resolver la zona horaria del usuario desde su aeropuerto guardado en sesion.
+  // Se accede a localStorage solo despues de hidratar para evitar mismatch SSR/CSR.
+  const [usuario, setUsuario] = useState<UsuarioGuardado | null>(null);
+  useEffect(() => {
+    setUsuario(getUsuarioGuardado());
+  }, []);
+  const aeropuertoUsuario = useMemo(() => {
+    if (!usuario?.aeropuerto) return null;
+    return aeropuertosIniciales.find(a => a.codigoIata === usuario.aeropuerto) ?? null;
+  }, [aeropuertosIniciales, usuario]);
+  const gmtUsuario = aeropuertoUsuario?.gmt ?? null;
 
   const {
     conectado,
@@ -144,17 +159,6 @@ export function SimulacionCliente({ id, topic, fechaInicial, k, modo, aeropuerto
           Detener
         </button>
 
-        {modo === '0' && (
-          <Button
-            variant="contained"
-            size="small"
-            onClick={() => setRegistroEnvioAbierto(true)}
-            sx={{ textTransform: 'none', fontWeight: 700 }}
-          >
-            Registrar envio
-          </Button>
-        )}
-
         <div style={{ marginLeft: 'auto' }}>
           <span style={{ fontSize: '0.8rem', color: '#334155' }}>
             Velocidad: {k} min simulados / {SaS_SEGUNDOS}s reales
@@ -196,30 +200,13 @@ export function SimulacionCliente({ id, topic, fechaInicial, k, modo, aeropuerto
           modo={modo}
           colapso={colapso}
           replanificaciones={replanificaciones}
+          gmtUsuario={gmtUsuario}
+          aeropuertoUsuario={aeropuertoUsuario}
         />
         <PopUpResumen openDialog={resumenFinal!=null}
                       idSimulacion={id}
                       tiempoSimulacionRef={tiempoSimulacionRef}
                       ultimoVuelo={resumenFinal?.vueloFinal}/>
-        <Dialog
-          open={registroEnvioAbierto}
-          onClose={() => setRegistroEnvioAbierto(false)}
-          maxWidth="md"
-          fullWidth
-        >
-          <DialogTitle sx={{ fontWeight: 800 }}>Registrar envio en operacion</DialogTitle>
-          <DialogContent>
-            <Box sx={{ pt: 1 }}>
-              <RegistroEnvio
-                onSuccess={() => {
-                  showToast('Envio registrado en la operacion', 'success');
-                  setRegistroEnvioAbierto(false);
-                }}
-                onCancel={() => setRegistroEnvioAbierto(false)}
-              />
-            </Box>
-          </DialogContent>
-        </Dialog>
         {ToastComponent}
       </div>
     </div>

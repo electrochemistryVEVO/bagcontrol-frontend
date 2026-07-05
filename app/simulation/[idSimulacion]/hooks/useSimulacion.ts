@@ -157,6 +157,7 @@ export function useSimulacion(
     // 4. Arrancar el motor solo cuando tenemos ≥2 lotes (colchón de seguridad)
     if (['conectando', 'conectado', 'preparando'].includes(estadoSimRef.current)) {
       tiempoSimulacion.current = new Date(colaEventos.current[0].fechaHoraEvento).getTime();
+      clockEstadoRef.current = tiempoSimulacion.current;
       simTime('estado cambia de SINCRONIZANDO a EN_EJECUCION', `primerEvento=${colaEventos.current[0].fechaHoraEvento}`);
       setEstadoSim('en_vivo');
     }
@@ -271,6 +272,13 @@ export function useSimulacion(
       animationId = requestAnimationFrame(tick);
 
       function elapseTime(){ //Dejar que tiempo transcurra
+        // Si no hay anchor (antes del primer lote), inicializar desde clockEstadoRef
+        // para que elapsed=~0 y el cap de 200ms no haga saltar el reloj hacia adelante.
+        if (batchStartTime === 0 && clockEstadoRef.current > 0) {
+          batchStartTime = Date.now();
+          batchStartClock = tiempoSimulacion.current;
+          lastElapsed = 0;
+        }
         const ahora = Date.now();
         const elapsed = ahora - (batchStartTime || clockEstadoRef.current);
         // Cap de seguridad: máximo 200ms por tick para evitar saltos por suspense del sistema

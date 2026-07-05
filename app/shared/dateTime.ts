@@ -41,6 +41,20 @@ export function nowDateTimeLocalInput(gmt : number): string {
   return toDateTimeLocalInput(new Date(Date.now() + 1000*60*60*(gmt+5)));
 }
 
+export function formatGmtOffset(gmt: number): string {
+  const sign = gmt >= 0 ? '+' : '-';
+  return `GMT${sign}${Math.abs(gmt)}`;
+}
+
+export function convertLocalToUtcDisplay(localDateTimeStr: string, gmt: number): string {
+  if (!localDateTimeStr) return '--';
+  const localDate = new Date(localDateTimeStr);
+  if (Number.isNaN(localDate.getTime())) return '--';
+  const utcMs = localDate.getTime() - gmt * 60 * 60 * 1000;
+  const utcDate = new Date(utcMs);
+  return `${pad(utcDate.getUTCDate())}/${pad(utcDate.getUTCMonth() + 1)}/${utcDate.getUTCFullYear()} ${pad(utcDate.getUTCHours())}:${pad(utcDate.getUTCMinutes())} UTC`;
+}
+
 export function formatDuration(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
   const days = Math.floor(totalSeconds / 86400);
