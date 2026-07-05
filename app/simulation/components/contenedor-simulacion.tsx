@@ -120,7 +120,7 @@ export function ContenedorSimulacion() {
     try {
       showToast('Preparando simulacion...', 'info');
       const { data } = await SimulacionService.prepararInicio(params);
-      router.push(`/simulation/${data.simulacionId}?topic=${encodeURIComponent(data.websocketTopic)}&k=${params.k}&modo=${modo}&fechaInicio=${formattedStart}`);
+      router.push(`/simulation/${data.simulacionId}?topic=${encodeURIComponent(data.websocketTopic)}&k=${params.k}&modo=${params.modo}&fechaInicio=${formattedStart}`);
     } catch (error) {
       showToast(obtenerMensajeError(error) || 'No se pudo crear el escenario', 'error');
     } finally {
