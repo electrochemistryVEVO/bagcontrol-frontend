@@ -15,7 +15,7 @@ export function calcularOcupacionVuelo(cantidadMaletas: number, capacidadMax: nu
 }
 
 export function esAeropuertoVacio(aeropuerto: AeropuertoSimulacion) {
-  return (aeropuerto.maletasActuales ?? 0) === 0 || calcularOcupacionAeropuerto(aeropuerto) === 0;
+  return Number(aeropuerto.maletasActuales ?? 0) <= 0;
 }
 
 export function esVueloVacio(vuelo: Pick<EventoVuelo, 'cantidadMaletas' | 'capacidadMax'>) {
@@ -24,11 +24,25 @@ export function esVueloVacio(vuelo: Pick<EventoVuelo, 'cantidadMaletas' | 'capac
 
 export function obtenerEstadoAeropuerto(aeropuerto: AeropuertoSimulacion): EstadoCapacidad {
   if (esAeropuertoVacio(aeropuerto)) return 'VACIO';
+  if (aeropuerto.estadoCapacidad === 'VACIO') {
+    const ocupacion = calcularOcupacionAeropuerto(aeropuerto);
+    const estadoCorregido: EstadoCapacidad = ocupacion >= 85
+      ? 'ROJO'
+      : ocupacion >= 60 ? 'AMARILLO' : 'VERDE';
+    console.warn('[AIRPORT-FRONT-INCONSISTENCY]', {
+      iata: aeropuerto.codigoIata,
+      ocupacion: aeropuerto.maletasActuales,
+      capacidad: aeropuerto.capacidadAlmacen,
+      estadoRecibido: aeropuerto.estadoCapacidad,
+      estadoMostrado: estadoCorregido,
+    });
+    return estadoCorregido;
+  }
   return aeropuerto.estadoCapacidad;
 }
 
 export function obtenerEstadoPorOcupacion(ocupacion: number): EstadoCapacidad {
-  if (ocupacion === 0) return 'VACIO';
+  if (ocupacion <= 0) return 'VACIO';
   if (ocupacion < 33) return 'VERDE';
   if (ocupacion <= 66) return 'AMARILLO';
   return 'ROJO';
