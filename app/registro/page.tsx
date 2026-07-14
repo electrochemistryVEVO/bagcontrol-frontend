@@ -73,6 +73,7 @@ export default function RegistroPage() {
         idCliente: form.idCliente,
         cantidadMaletas: form.cantidadMaletas,
         fechaHora: form.fechaHora || toDateTimeLocalInput(new Date()),
+        esOperacionDia: true,
       }
       await EnvioService.registrarEnvio(payload)
       setExito(true)

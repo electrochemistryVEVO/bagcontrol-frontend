@@ -72,8 +72,15 @@ export function CargaCsvModal({ titulo, formato, ejemplo, onCargar, onCerrar, on
       if (data.insertados > 0 && data.errores.length === 0) {
         setTimeout(onExito, 1200)
       }
-    } catch {
-      setErrorGeneral('No se pudo procesar el archivo. Verifica el formato e intenta nuevamente.')
+    } catch (err: any) {
+      const serverMsg = err?.response?.data?.error || err?.response?.data?.message
+      if (serverMsg) {
+        setErrorGeneral(serverMsg)
+      } else if (err?.response?.status === 401) {
+        setErrorGeneral('Sesión expirada. Inicia sesión nuevamente.')
+      } else {
+        setErrorGeneral('No se pudo procesar el archivo. Verifica el formato e intenta nuevamente.')
+      }
     } finally {
       setLoading(false)
     }

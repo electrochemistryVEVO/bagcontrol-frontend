@@ -6,7 +6,8 @@ export type NuevoEnvioDTO = {
   destinoIata: string
   cantidadMaletas: number
   idCliente: string
-  fechaHora: string // ISO string
+  fechaHora: string
+  esOperacionDia?: boolean
 }
 
 export type FiltrosEnvios = {
@@ -16,6 +17,7 @@ export type FiltrosEnvios = {
   q?: string
   maletasMin?: number
   maletasMax?: number
+  esOperacionDia?: boolean
 }
 
 export type PageResponse<T> = {
@@ -59,6 +61,7 @@ export const EnvioService = {
     if (filtros?.q) params.q = filtros.q
     if (filtros?.maletasMin != null) params.maletasMin = filtros.maletasMin
     if (filtros?.maletasMax != null) params.maletasMax = filtros.maletasMax
+    if (filtros?.esOperacionDia != null) params.esOperacionDia = filtros.esOperacionDia.toString()
     return axiosSimulacion.get<PageResponse<Envio>>('/envios/paginados', { params })
   },
 
