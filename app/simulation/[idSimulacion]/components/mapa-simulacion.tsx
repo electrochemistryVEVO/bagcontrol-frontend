@@ -15,8 +15,6 @@ import { Feature, FeatureCollection } from 'geojson';
 import { MapLibreEvent } from 'maplibre-gl';
 import type { GeoJSONSource, Map as MapLibreNative, LayerSpecification } from 'maplibre-gl';
 import Draggable from 'react-draggable';
-// @ts-expect-error El paquete no publica tipos compatibles con MapLibre 5.
-import * as syncMaps from '@mapbox/mapbox-gl-sync-move';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import { AeropuertoSimulacion, Aeropuerto } from '@/app/shared/types/Aeropuerto';
@@ -134,6 +132,8 @@ export function MapaSimulacion({
   const backgroundMapRef = useRef<MapRef>(null);
   const popupRef = useRef<PopupInstance | null>(null);
   const syncRegistradoRef = useRef(false);
+  const limpiarSyncRef = useRef<(() => void) | null>(null);
+  const mapasAuditadosRef = useRef<Set<string>>(new Set());
   const vuelosConCoordenadasInvalidasRef = useRef<Set<string>>(new Set());
   const ultimoDiagnosticoAeropuertosRef = useRef('');
 
@@ -761,16 +761,91 @@ export function MapaSimulacion({
       const mapaDatos = mapRef.current?.getMap();
       const mapaFondo = backgroundMapRef.current?.getMap();
       if (mapaDatos && mapaFondo && !syncRegistradoRef.current) {
-        syncMaps(mapaDatos, mapaFondo);
+        const centroDatos = mapaDatos.getCenter();
+        const centroFondo = mapaFondo.getCenter();
+        const camarasValidas = [
+          centroDatos.lng, centroDatos.lat, mapaDatos.getZoom(),
+          centroFondo.lng, centroFondo.lat, mapaFondo.getZoom(),
+        ].every(Number.isFinite);
+        if (!camarasValidas) return;
+
+        const copiarCamaraAlFondo = () => {
+          const center = mapaDatos.getCenter();
+          const zoom = mapaDatos.getZoom();
+          const bearing = mapaDatos.getBearing();
+          const pitch = mapaDatos.getPitch();
+          if (![center.lng, center.lat, zoom, bearing, pitch].every(Number.isFinite)) return;
+          mapaFondo.jumpTo({ center: [center.lng, center.lat], zoom, bearing, pitch });
+        };
+        mapaDatos.on('move', copiarCamaraAlFondo);
+        copiarCamaraAlFondo();
+        limpiarSyncRef.current = () => {
+          mapaDatos.off('move', copiarCamaraAlFondo);
+        };
         syncRegistradoRef.current = true;
         clearInterval(intervalo);
       }
     }, 30);
-    return () => clearInterval(intervalo);
+    return () => {
+      clearInterval(intervalo);
+      limpiarSyncRef.current?.();
+      limpiarSyncRef.current = null;
+      syncRegistradoRef.current = false;
+    };
+  }, []);
+
+  const auditarCargaMapa = useCallback((mapa: MapLibreNative, nombre: 'principal' | 'secundario') => {
+    if (mapasAuditadosRef.current.has(nombre)) return;
+    mapasAuditadosRef.current.add(nombre);
+    const centro = mapa.getCenter();
+    const contenedor = mapa.getContainer();
+    console.info('[MAP-LOAD-AUDIT]', {
+      mapa: nombre,
+      mapLoaded: mapa.loaded(),
+      styleLoaded: mapa.isStyleLoaded(),
+      containerWidth: contenedor.clientWidth,
+      containerHeight: contenedor.clientHeight,
+      zoom: mapa.getZoom(),
+      center: [centro.lng, centro.lat],
+      renderWorldCopies: false,
+      maxBoundsConfigurado: false,
+    });
+    requestAnimationFrame(() => {
+      const canvas = mapa.getCanvas();
+      const contenedorRect = mapa.getContainer().getBoundingClientRect();
+      const elementoSuperior = document.elementFromPoint(
+        contenedorRect.left + contenedorRect.width / 2,
+        contenedorRect.top + contenedorRect.height / 2,
+      );
+      console.info('[MAP-INTERACTION-AUDIT]', {
+        mapa: nombre,
+        interactive: true,
+        dragPanEnabled: mapa.dragPan.isEnabled(),
+        scrollZoomEnabled: mapa.scrollZoom.isEnabled(),
+        doubleClickZoomEnabled: mapa.doubleClickZoom.isEnabled(),
+        keyboardEnabled: mapa.keyboard.isEnabled(),
+        boxZoomEnabled: mapa.boxZoom.isEnabled(),
+        containerPointerEvents: getComputedStyle(mapa.getContainer()).pointerEvents,
+        canvasPointerEvents: getComputedStyle(canvas).pointerEvents,
+        overlayEncontrado: elementoSuperior !== null && !mapa.getContainer().contains(elementoSuperior),
+      });
+    });
+  }, []);
+
+  const registrarInteraccionUsuario = useCallback((mapa: MapLibreNative, evento: string) => {
+    if (process.env.NODE_ENV !== 'development') return;
+    const center = mapa.getCenter();
+    console.debug('[MAP-USER-INTERACTION]', {
+      mapa: 'principal',
+      evento,
+      center: [center.lng, center.lat],
+      zoom: mapa.getZoom(),
+    });
   }, []);
 
   const handleMapLoad = useCallback((e: MapLibreEvent) => {
     const map = e.target;
+    auditarCargaMapa(map, 'principal');
     asegurarSourcesYLayers(map);
 
     cargarIconosAeropuerto(map, '/aeropuerto.png', 'airport', {
@@ -800,7 +875,7 @@ export function MapaSimulacion({
         console.error('Error al cargar íconos de avión:', err);
         setIconosAvionListos(false);
       });
-  }, [asegurarSourcesYLayers]);
+  }, [asegurarSourcesYLayers, auditarCargaMapa]);
 
   const handleMouseEnter = (event: MapLayerMouseEvent) => {
     setSelFeature(event.features?.[0] ?? null);
@@ -811,10 +886,11 @@ export function MapaSimulacion({
   const handleBackgroundLoad = useCallback((e: MapLibreEvent) => {
     const language = 'es';
     const map = e.target;
+    auditarCargaMapa(map, 'secundario');
     map.setLayoutProperty('label_country_1', 'text-field', ['get', `name:${language}`]);
     map.setLayoutProperty('label_country_2', 'text-field', ['get', `name:${language}`]);
     map.setLayoutProperty('label_country_3', 'text-field', ['get', `name:${language}`]);
-  }, []);
+  }, [auditarCargaMapa]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -935,15 +1011,28 @@ export function MapaSimulacion({
 
       <MapLibre
         ref={backgroundMapRef}
-        style={{ zIndex: 17, position: 'absolute' }}
+        style={{ zIndex: 17, position: 'absolute', inset: 0, pointerEvents: 'none' }}
         mapStyle="https://tiles.openfreemap.org/styles/bright"
+        renderWorldCopies={false}
         onLoad={handleBackgroundLoad}
       />
       <MapLibre
         ref={mapRef}
-        style={{ position: 'absolute', zIndex: 18 }}
-        initialViewState={{ longitude: -75, latitude: -10, zoom: 4 }}
+        style={{ position: 'absolute', inset: 0, zIndex: 18, pointerEvents: 'auto' }}
+        initialViewState={{ longitude: 0, latitude: 10, zoom: 1.2 }}
         mapStyle={EMPTY_MAP_STYLE}
+        renderWorldCopies={false}
+        interactive={true}
+        dragPan={true}
+        scrollZoom={true}
+        doubleClickZoom={true}
+        touchZoomRotate={true}
+        keyboard={true}
+        boxZoom={true}
+        onDragStart={(e) => registrarInteraccionUsuario(e.target, 'dragstart')}
+        onDragEnd={(e) => registrarInteraccionUsuario(e.target, 'dragend')}
+        onZoomStart={(e) => registrarInteraccionUsuario(e.target, 'zoomstart')}
+        onZoomEnd={(e) => registrarInteraccionUsuario(e.target, 'zoomend')}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={() => setShowPopup(false)}
         onMouseDown={(e: MapLayerMouseEvent) => {

@@ -234,6 +234,7 @@ function SeccionVuelos({
   const [abierto, setAbierto] = useState(false);
   const [busqueda, setBusqueda] = useState('');
   const [orden, setOrden] = useState<OrdenVuelos>('ocupacion');
+  const [direccionOrden, setDireccionOrden] = useState<DireccionOrden>('desc');
   const [filtroEstados, setFiltroEstados] = useState<EstadoCapacidad[]>(ESTADOS_CAPACIDAD);
   const [vueloExpandido, setVueloExpandido] = useState<string | null>(null);
   const [enviosPorVuelo, setEnviosPorVuelo] = useState<Record<string, Envio[]>>({});
@@ -250,15 +251,17 @@ function SeccionVuelos({
         return texto && filtroEstados.includes(obtenerEstadoVuelo(v));
       })
       .sort((a, b) => {
+        let diferencia: number;
         switch (orden) {
-          case 'salida': return new Date(a.horaSalidaUtc).getTime() - new Date(b.horaSalidaUtc).getTime();
-          case 'llegada': return new Date(a.horaLlegadaUtc).getTime() - new Date(b.horaLlegadaUtc).getTime();
-          case 'origen': return a.origenIata.localeCompare(b.origenIata, 'es');
-          case 'destino': return a.destinoIata.localeCompare(b.destinoIata, 'es');
-          default: return calcularOcupacionVuelo(b.cantidadMaletas, b.capacidadMax) - calcularOcupacionVuelo(a.cantidadMaletas, a.capacidadMax);
+          case 'salida': diferencia = new Date(a.horaSalidaUtc).getTime() - new Date(b.horaSalidaUtc).getTime(); break;
+          case 'llegada': diferencia = new Date(a.horaLlegadaUtc).getTime() - new Date(b.horaLlegadaUtc).getTime(); break;
+          case 'origen': diferencia = a.origenIata.localeCompare(b.origenIata, 'es'); break;
+          case 'destino': diferencia = a.destinoIata.localeCompare(b.destinoIata, 'es'); break;
+          default: diferencia = calcularOcupacionVuelo(a.cantidadMaletas, a.capacidadMax) - calcularOcupacionVuelo(b.cantidadMaletas, b.capacidadMax);
         }
+        return direccionOrden === 'asc' ? diferencia : -diferencia;
       });
-  }, [busqueda, orden, filtroEstados, vuelosActivos]);
+  }, [busqueda, orden, direccionOrden, filtroEstados, vuelosActivos]);
 
   const hayFiltro = busqueda.trim() !== '' || filtroEstados.length < ESTADOS_CAPACIDAD.length;
   useEffect(() => {
@@ -300,7 +303,8 @@ function SeccionVuelos({
           <>
             <Stack spacing={1.5} className={styles.filtersContainer}>
               <TextField size="small" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar vuelo, origen o destino" fullWidth className={styles.input} />
-              <FormControl size="small" fullWidth className={styles.input}>
+              <Stack direction="row" spacing={1.5} className={styles.orderContainer}>
+              <FormControl size="small" className={styles.input}>
                 <InputLabel>Ordenar por</InputLabel>
                 <Select value={orden} label="Ordenar por" onChange={(e: SelectChangeEvent) => setOrden(e.target.value as OrdenVuelos)}>
                   <MenuItem value="ocupacion">Nivel de ocupación</MenuItem>
@@ -310,6 +314,15 @@ function SeccionVuelos({
                   <MenuItem value="destino">Destino</MenuItem>
                 </Select>
               </FormControl>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setDireccionOrden((actual) => actual === 'asc' ? 'desc' : 'asc')}
+                className={styles.orderButton}
+              >
+                Orden {direccionOrden === 'asc' ? 'ascendente' : 'descendente'}
+              </Button>
+              </Stack>
               <Stack direction="row" spacing={1}>
                 {ESTADOS_CAPACIDAD.map((estado) => {
                   const activo = filtroEstados.includes(estado);

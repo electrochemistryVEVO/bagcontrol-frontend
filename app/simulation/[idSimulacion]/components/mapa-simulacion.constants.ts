@@ -37,7 +37,7 @@ export const layerStyleAeropuertos: SymbolLayerSpecification = {
     ],
     // PNG es 256×256 → queremos ~40px en pantalla → 40/256 ≈ 0.156
     // Subimos a 0.24 para que se vea más grande en el mapa mundial
-    'icon-size': 0.24,
+    'icon-size': 0.17,
     'icon-allow-overlap': true,
     'icon-ignore-placement': true,
   },
@@ -83,6 +83,6 @@ export const layerStyleAirplane: SymbolLayerSpecification = {
     'icon-rotation-alignment': 'map',
     'icon-allow-overlap': true,
     'icon-ignore-placement': true,
-    'icon-size': 0.056,
+    'icon-size': 0.048,
   }
 };

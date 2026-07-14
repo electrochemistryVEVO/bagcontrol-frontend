@@ -1,7 +1,8 @@
-import {RefObject, useEffect, useMemo, useRef, useState} from 'react';
+import { RefObject, useEffect, useMemo, useRef, useState } from 'react';
 import { Aeropuerto } from '@/app/shared/types/Aeropuerto';
 import { formatAirportLocalDisplay, formatDuration, formatUtcDisplay } from '@/app/shared/dateTime';
 import type { EstadoSimulacion } from '../hooks/useSimulacion';
+import Draggable from 'react-draggable';
 
 function formatearTiempoReal(ms: number) {
   const segundosTotales = Math.max(0, Math.floor(ms / 1000));
@@ -17,18 +18,10 @@ function formatearHoraLocal(epoch: number) {
   return `${dosDigitos(fecha.getDate())}/${dosDigitos(fecha.getMonth() + 1)}/${fecha.getFullYear()} ${dosDigitos(fecha.getHours())}:${dosDigitos(fecha.getMinutes())}:${dosDigitos(fecha.getSeconds())}`;
 }
 
-function obtenerColorFlota(ocupacion: number) {
-  if (ocupacion < 33) return '#22c55e';
-  if (ocupacion <= 66) return '#eab308';
-  return '#ef4444';
-}
-
 export function RelojSimulacionOverlay({
   tiempoRef,
-  ocupacionFlota,
   fechaInicio,
   modo,
-  aeropuertoSeleccionado,
   gmtUsuario,
   aeropuertoUsuario,
   fechaHoraInicioReal,
@@ -46,53 +39,38 @@ export function RelojSimulacionOverlay({
   fechaHoraFinReal?: string | null;
   estadoSim: EstadoSimulacion;
 }) {
-  const [epoch, setEpoch] = useState<number>(0);
-  const [ahoraReal, setAhoraReal] = useState(() => Date.now());
-  const finVisualRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      if (tiempoRef.current) {
-        setEpoch(tiempoRef.current);
-      }
-      setAhoraReal(Date.now());
-    }, 250);
-    return () => clearInterval(timer);
-  }, [tiempoRef]);
-
   const inicioEpoch = useMemo(() => {
     const normalizada = /[zZ]|[+-]\d{2}:?\d{2}$/.test(fechaInicio) ? fechaInicio : `${fechaInicio}Z`;
     const parsed = new Date(normalizada).getTime();
-    return Number.isFinite(parsed) ? parsed : epoch;
-  }, [epoch, fechaInicio]);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }, [fechaInicio]);
+  const [epoch, setEpoch] = useState<number>(() => inicioEpoch);
+  const [ahoraReal, setAhoraReal] = useState(() => Date.now());
+  const finVisualRef = useRef<number | null>(null);
+  const panelRef = useRef<HTMLElement>(null);
 
-  // Display principal: hora local del usuario si tiene aeropuerto y GMT,
-  // sino UTC. La conversion se hace siempre desde el epoch UTC.
-  const hora = useMemo(() => {
-    if (!epoch) return '';
+  useEffect(() => {
+    const actualizar = () => {
+      if (Number.isFinite(tiempoRef.current)) setEpoch(tiempoRef.current);
+      setAhoraReal(Date.now());
+    };
+    actualizar();
+    const timer = setInterval(actualizar, 250);
+    return () => clearInterval(timer);
+  }, [tiempoRef]);
+
+  const fechaSimulada = useMemo(() => {
     if (typeof gmtUsuario === 'number' && aeropuertoUsuario) {
       return formatAirportLocalDisplay(epoch, aeropuertoUsuario);
     }
     return formatUtcDisplay(epoch);
-  }, [epoch, gmtUsuario, aeropuertoUsuario]);
-
-  const textElapsado = useMemo(() => {
-      return formatDuration(epoch - inicioEpoch)
-  }, [epoch, inicioEpoch]);
+  }, [aeropuertoUsuario, epoch, gmtUsuario]);
+  const tiempoSimulado = useMemo(() => formatDuration(epoch - inicioEpoch), [epoch, inicioEpoch]);
   const restanteSim5D = useMemo(() => {
     if (modo !== '1') return null;
     return formatDuration(inicioEpoch + 5 * 24 * 60 * 60 * 1000 - epoch);
   }, [epoch, inicioEpoch, modo]);
-  const horaLocal = useMemo(
-    () => aeropuertoSeleccionado ? formatAirportLocalDisplay(epoch, aeropuertoSeleccionado) : null,
-    [aeropuertoSeleccionado, epoch],
-  );
 
-  if (!hora) return null;
-
-  const ocupacionNormalizada = typeof ocupacionFlota === 'number'
-    ? Math.max(0, Math.min(100, Math.round(ocupacionFlota)))
-    : null;
   const esTerminal = ['colapsada', 'finalizada', 'detenida', 'error'].includes(estadoSim);
   if (esTerminal && finVisualRef.current === null) finVisualRef.current = ahoraReal;
   if (!esTerminal) finVisualRef.current = null;
@@ -106,90 +84,56 @@ export function RelojSimulacionOverlay({
     : '00h 00m 00s';
   const zonaHoraria = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  const estiloIndicador = {
-    position: 'absolute' as const,
-    bottom: '84px',
-    backgroundColor: 'rgba(15, 23, 42, 0.88)',
-    color: '#38bdf8',
-    padding: '5px 10px',
-    borderRadius: '7px',
-    fontFamily: 'monospace',
-    fontSize: 'clamp(0.68rem, 1.4vw, 0.78rem)',
-    fontWeight: 600,
-    border: '1px solid rgba(56, 189, 248, 0.3)',
-    zIndex: 22,
-    pointerEvents: 'none' as const,
-    boxShadow: '0 3px 6px rgba(0,0,0,0.25)',
-    whiteSpace: 'nowrap' as const,
-    maxWidth: 'calc(50vw - 18px)',
-  };
+  const fila = {
+    display: 'grid',
+    gridTemplateColumns: '88px minmax(0, 1fr)',
+    gap: '8px',
+    alignItems: 'baseline',
+  } as const;
 
   return (
-    <>
-        <div style={{ ...estiloIndicador, left: 'clamp(12px, 3vw, 30px)' }}>
-          Tiempo real: {tiempoReal}
+    <Draggable nodeRef={panelRef} bounds="parent">
+      <section
+        ref={panelRef}
+        aria-label="Tiempos de la simulacion"
+        title="Arrastra para mover el panel"
+        style={{
+          position: 'absolute',
+          bottom: 24,
+          left: 24,
+          zIndex: 23,
+          width: 'min(300px, calc(100vw - 32px))',
+          overflow: 'hidden',
+          color: '#e2e8f0',
+          background: 'rgba(15, 23, 42, 0.92)',
+          border: '1px solid rgba(56, 189, 248, 0.28)',
+          borderRadius: 10,
+          boxShadow: '0 6px 18px rgba(0, 0, 0, 0.28)',
+          backdropFilter: 'blur(5px)',
+          fontFamily: 'var(--font-jetbrains-mono), monospace',
+          fontSize: 12,
+          lineHeight: 1.55,
+          cursor: 'grab',
+          userSelect: 'none',
+          pointerEvents: 'auto',
+        }}
+      >
+      <div style={{ padding: '9px 12px 8px' }}>
+        <div style={{ marginBottom: 3, color: '#38bdf8', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+          Simulado
         </div>
-        <div
-          style={{ ...estiloIndicador, right: 'clamp(12px, 3vw, 30px)' }}
-          title={zonaHoraria}
-        >
-          Hora local: {formatearHoraLocal(ahoraReal)}
+        <div style={fila}><span style={{ color: '#94a3b8' }}>Transcurrido</span><strong>{tiempoSimulado}</strong></div>
+        {restanteSim5D && <div style={fila}><span style={{ color: '#94a3b8' }}>Restante</span><strong>{restanteSim5D}</strong></div>}
+        <div style={fila}><span style={{ color: '#94a3b8' }}>Fecha sim.</span><strong>{fechaSimulada}</strong></div>
+      </div>
+      <div style={{ padding: '8px 12px 9px', borderTop: '1px solid rgba(148, 163, 184, 0.2)', background: 'rgba(30, 41, 59, 0.42)' }}>
+        <div style={{ marginBottom: 3, color: '#38bdf8', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+          Real
         </div>
-        <div style={{
-            position: 'absolute',
-            bottom: '30px',
-            right: '30px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            backgroundColor: 'rgba(15, 23, 42, 0.85)',
-            color: '#38bdf8',
-            padding: '10px 20px',
-            borderRadius: '8px',
-            fontFamily: 'monospace',
-            fontSize: '1.2rem',
-            fontWeight: 'bold',
-            border: '1px solid rgba(56, 189, 248, 0.3)',
-            zIndex: 22,
-            pointerEvents: 'none',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
-        }}>
-            {ocupacionNormalizada !== null && (
-                <span style={{
-                    color: '#0f172a',
-                    backgroundColor: obtenerColorFlota(ocupacionNormalizada),
-                    borderRadius: '999px',
-                    padding: '3px 9px',
-                    fontSize: '0.8rem',
-                    lineHeight: 1.2,
-                }}>
-          Flota: {ocupacionNormalizada}%
-        </span>
-            )}
-            <span>{hora}</span>
-            {horaLocal && <span style={{ color: '#e2e8f0' }}>Local: {horaLocal}</span>}
-        </div>
-        <div style={{
-            position: 'absolute',
-            bottom: '30px',
-            left: '30px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            backgroundColor: 'rgba(15, 23, 42, 0.85)',
-            color: '#38bdf8',
-            padding: '10px 20px',
-            borderRadius: '8px',
-            fontFamily: 'monospace',
-            fontSize: '1.2rem',
-            fontWeight: 'bold',
-            border: '1px solid rgba(56, 189, 248, 0.3)',
-            zIndex: 22,
-            pointerEvents: 'none',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
-        }}>
-            <span>Transcurrido: {textElapsado}</span>
-        </div>
-    </>
+        <div style={fila}><span style={{ color: '#94a3b8' }}>Transcurrido</span><strong>{tiempoReal}</strong></div>
+        <div style={fila} title={zonaHoraria}><span style={{ color: '#94a3b8' }}>Hora local</span><strong>{formatearHoraLocal(ahoraReal)}</strong></div>
+      </div>
+      </section>
+    </Draggable>
   );
 }

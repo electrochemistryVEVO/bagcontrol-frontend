@@ -189,7 +189,7 @@ export function SimulacionCliente({ id, topic, fechaInicial, k, modo, aeropuerto
         </div>
       )}
 
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
         <MapaSimulacion
           aeropuertosIniciales={aeropuertosIniciales}
           aeropuertosRef={aeropuertosRef}
