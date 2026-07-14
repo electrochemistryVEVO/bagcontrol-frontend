@@ -231,8 +231,8 @@ export function GestionEnvios() {
       {csvAbierto && (
         <CargaCsvModal
           titulo="Cargar envíos desde CSV"
-          formato="origenIata,destinoIata,cantidadMaletas,idCliente,fechaHora"
-          ejemplo="SPIM,SBBR,2,00135135,2026-06-12T05:23:00Z"
+          formato="idPedido-aaaammdd-hh-mm-destino-cantidad-idCliente"
+          ejemplo="000000001-20260102-00-47-SUAA-002-0032535"
           onCargar={EnvioService.cargarCsv}
           onCerrar={() => setCsvAbierto(false)}
           onExito={() => { setCsvAbierto(false); cargarEnvios(0, {}) }}

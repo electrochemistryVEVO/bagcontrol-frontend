@@ -341,11 +341,11 @@ export function useSimulacion(
       elapseTime();
       const tiempoActual = tiempoSimulacion.current;
 
-      for(let key in enviosPlanificados.current){
+      for(const key in enviosPlanificados.current){
         const envio = enviosPlanificados.current[key]
         const epoch = envio._llegadaEpoch;
         //console.log(ahora-epoch)
-        if(epoch && ((tiempoActual - epoch) >= 1000*60*60*4)){
+        if(epoch && ((tiempoActual - epoch) > 1000 * 60 * 60 * 168)){
           console.log(`${envio.idPedido} eliminado`)
           delete enviosPlanificados.current[key]
         }
@@ -364,13 +364,13 @@ export function useSimulacion(
           const evVuelo = ev as EventoVuelo;
           (evVuelo as any)._salidaEpoch = new Date(evVuelo.horaSalidaUtc).getTime();
           (evVuelo as any)._llegadaEpoch = new Date(evVuelo.horaLlegadaUtc).getTime()
-          let vuelo = vuelosActivos.current.get(evVuelo.codigoVuelo.toString());
+          const vuelo = vuelosActivos.current.get(evVuelo.codigoVuelo.toString());
           if(vuelo)console.log(`Vuelo repetido: ${evVuelo.codigoVuelo.toString()}`)
           //if(vuelo)vuelo.cantidadMaletas += evVuelo.cantidadMaletas;
           //else
             vuelosActivos.current.set(evVuelo.codigoVuelo.toString(), evVuelo);
           //Modificar estado de envios
-          for(let env of evVuelo.codigoEnvios){
+          for(const env of evVuelo.codigoEnvios){
             const _envio = enviosPlanificados.current[env]
             if(_envio){ //Vuelo es el primero
               _envio._estado = "EN_CURSO"
@@ -382,7 +382,7 @@ export function useSimulacion(
           vueloFinalRef.current = evVuelo;
           vuelosActivos.current.delete(evVuelo.codigoVuelo.toString());
           //Modificar estado de envios
-          for(let env of evVuelo.codigoEnvios){
+          for(const env of evVuelo.codigoEnvios){
             const _envio = enviosPlanificados.current[env]
             if(_envio && _envio.destinoIata === evVuelo.destinoIata){ //Vuelo es el ultimo
               _envio._estado = "ENTREGADO";

@@ -48,6 +48,13 @@ type OrdenVuelos = 'ocupacion' | 'salida' | 'llegada' | 'origen' | 'destino';
 type OrdenAeropuertos = 'calcularOcupacion' | 'calcularProximidadSalida' | 'calcularProximidadLlegada';
 type DireccionOrden = 'asc' | 'desc';
 type EstadoEnvio = 'EN_CURSO' | 'ENTREGADO' | 'PLANIFICADO';
+type FiltroEnvio = EstadoEnvio | 'ULTIMAS_HORAS' | '';
+
+const etiquetaEstadoEnvio: Record<EstadoEnvio, string> = {
+  PLANIFICADO: 'Planificado',
+  EN_CURSO: 'En tránsito',
+  ENTREGADO: 'Entregado',
+};
 
 const ESTADOS_CAPACIDAD: EstadoCapacidad[] = ['VACIO', 'VERDE', 'AMARILLO', 'ROJO'];
 
@@ -83,6 +90,7 @@ type PanelLateralProps = {
   onFiltradoAeropuertosCambiado?: (iatas: string[] | null) => void;
   // envíos
   envios: Envio[];
+  tiempoSimulacion: number;
   onMostrarRutaEnvio: (idPedido: string) => void;
   haySeleccionRelacionada?: boolean;
   onLimpiarSeleccionRelacionada?: () => void;
@@ -116,6 +124,7 @@ export function PanelLateral({
   onEnfocarAeropuerto,
   onFiltradoAeropuertosCambiado,
   envios,
+  tiempoSimulacion,
   onMostrarRutaEnvio,
   haySeleccionRelacionada,
   onLimpiarSeleccionRelacionada,
@@ -190,7 +199,9 @@ export function PanelLateral({
             onMostrarRutaEnvio={onMostrarRutaEnvio}
           />
           <SeccionEnvios
+            key={idSimulacion}
             envios={envios}
+            tiempoSimulacion={tiempoSimulacion}
             onMostrarRutaEnvio={onMostrarRutaEnvio}
           />
         </Box>
@@ -642,66 +653,133 @@ function SeccionAeropuertos({
 
 function SeccionEnvios({
   envios,
+  tiempoSimulacion,
   onMostrarRutaEnvio,
 }: {
   envios: Envio[];
+  tiempoSimulacion: number;
   onMostrarRutaEnvio: (idPedido: string) => void;
 }) {
   const [abierto, setAbierto] = useState(false);
   const [busquedaOrigen, setBusquedaOrigen] = useState('');
   const [busquedaDestino, setBusquedaDestino] = useState('');
-  const [filtroEstado, setFiltroEstado] = useState('');
+  const [filtroEstado, setFiltroEstado] = useState<FiltroEnvio>('');
+  const [horasTexto, setHorasTexto] = useState('4');
+  const [ultimasHoras, setUltimasHoras] = useState(4);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [expandidoEnvio, setExpandidoEnvio] = useState<string | null>(null);
 
   const enviosFiltrados = useMemo(() => {
-    return envios.filter((e) => {
+    const inicioIntervalo = tiempoSimulacion - ultimasHoras * 60 * 60 * 1000;
+    const enviosUnicos = new Map(envios.map((envio) => [envio.idPedido, envio]));
+
+    return Array.from(enviosUnicos.values()).filter((e) => {
       const origen = !busquedaOrigen || e.origenIata.toLowerCase().includes(busquedaOrigen.trim().toLowerCase());
       const destino = !busquedaDestino || e.destinoIata.toLowerCase().includes(busquedaDestino.trim().toLowerCase());
-      const estado = !filtroEstado || (e as any)._estado === filtroEstado;
-      return origen && destino && estado;
+      if (!origen || !destino) return false;
+      if (filtroEstado === 'ULTIMAS_HORAS') {
+        return e._estado === 'ENTREGADO'
+          && e._llegadaEpoch !== undefined
+          && e._llegadaEpoch >= inicioIntervalo
+          && e._llegadaEpoch <= tiempoSimulacion;
+      }
+      return !filtroEstado || e._estado === filtroEstado;
     });
-  }, [envios, busquedaOrigen, busquedaDestino, filtroEstado]);
+  }, [envios, busquedaOrigen, busquedaDestino, filtroEstado, tiempoSimulacion, ultimasHoras]);
+
+  const cambiarUltimasHoras = (valor: string) => {
+    if (valor === '') {
+      setHorasTexto(valor);
+      return;
+    }
+    if (!/^\d+$/.test(valor)) return;
+    const horas = Number(valor);
+    if (Number.isInteger(horas) && horas >= 1 && horas <= 168) {
+      setHorasTexto(valor);
+      setUltimasHoras(horas);
+      setPage(0);
+    }
+  };
+
+  const mensajeVacio = filtroEstado === 'ULTIMAS_HORAS'
+    ? `No hay envíos entregados en las últimas ${ultimasHoras} horas`
+    : filtroEstado === 'PLANIFICADO'
+      ? 'No hay envíos planificados'
+      : filtroEstado === 'EN_CURSO'
+        ? 'No hay envíos en tránsito'
+        : filtroEstado === 'ENTREGADO'
+          ? 'No hay envíos entregados'
+          : 'No hay envíos registrados';
 
   return (
     <Accordion
       expanded={abierto}
       onChange={(_, v) => setAbierto(v)}
       disableGutters
-      sx={{ bgcolor: 'transparent', color: 'inherit', '&:before': { display: 'none' } }}
+      sx={{ bgcolor: 'transparent', color: 'inherit', display: 'flex', flexDirection: 'column', maxHeight: '70vh', minHeight: 0, overflow: 'hidden', '&:before': { display: 'none' } }}
     >
       <AccordionSummary className={styles.accordionSummary}>
         <Typography sx={{ fontWeight: 700 }}>Envíos</Typography>
-        <Chip size="small" label={envios.length} color={envios.length ? 'primary' : 'default'} />
+        <Chip size="small" label={enviosFiltrados.length} color={enviosFiltrados.length ? 'primary' : 'default'} />
       </AccordionSummary>
-      <AccordionDetails className={styles.accordionDetails}>
+      <AccordionDetails className={styles.accordionDetails} sx={{ flex: 1, minHeight: 0 }}>
         {abierto && (
           <>
             <Stack spacing={1.5} className={styles.filtersContainer}>
               <Stack direction="row" spacing={1.5}>
-                <TextField size="small" value={busquedaOrigen} onChange={(e) => setBusquedaOrigen(e.target.value)} placeholder="IATA origen" fullWidth className={styles.input} />
-                <TextField size="small" value={busquedaDestino} onChange={(e) => setBusquedaDestino(e.target.value)} placeholder="IATA destino" fullWidth className={styles.input} />
+                <TextField size="small" value={busquedaOrigen} onChange={(e) => { setBusquedaOrigen(e.target.value); setPage(0); }} placeholder="IATA origen" fullWidth className={styles.input} />
+                <TextField size="small" value={busquedaDestino} onChange={(e) => { setBusquedaDestino(e.target.value); setPage(0); }} placeholder="IATA destino" fullWidth className={styles.input} />
               </Stack>
               <FormControl size="small" fullWidth className={styles.input}>
-                <InputLabel>Filtrar por estado</InputLabel>
-                <Select value={filtroEstado} label="Filtrar por estado" onChange={(e: SelectChangeEvent) => setFiltroEstado(e.target.value)}>
+                <InputLabel>Filtrar envíos</InputLabel>
+                <Select value={filtroEstado} label="Filtrar envíos" onChange={(e: SelectChangeEvent) => { setFiltroEstado(e.target.value as FiltroEnvio); setPage(0); }}>
                   <MenuItem value="">Todos</MenuItem>
                   <MenuItem value="PLANIFICADO">Planificados</MenuItem>
-                  <MenuItem value="EN_CURSO">En vuelo</MenuItem>
+                  <MenuItem value="EN_CURSO">En tránsito</MenuItem>
                   <MenuItem value="ENTREGADO">Entregados</MenuItem>
+                  <MenuItem value="ULTIMAS_HORAS">Entregados en las últimas X horas</MenuItem>
                 </Select>
               </FormControl>
+              {filtroEstado === 'ULTIMAS_HORAS' && (
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                  <Typography variant="caption" sx={{ color: '#cbd5e1', whiteSpace: 'nowrap' }}>
+                    Entregados en las últimas
+                  </Typography>
+                  <TextField
+                    type="number"
+                    size="small"
+                    value={horasTexto}
+                    onChange={(e) => cambiarUltimasHoras(e.target.value)}
+                    slotProps={{ htmlInput: { min: 1, max: 168, step: 1, 'aria-label': 'Últimas horas de entregas' } }}
+                    className={styles.input}
+                    sx={{ width: 72 }}
+                  />
+                  <Typography variant="caption" sx={{ color: '#cbd5e1' }}>horas</Typography>
+                </Stack>
+              )}
             </Stack>
 
-            {enviosFiltrados.length === 0 ? (
-              <Box className={styles.empty}>No hay envíos disponibles</Box>
-            ) : (
-              <Stack className={styles.scrollList}>
-                <Box sx={{ border: '1px solid rgba(148,163,184,0.2)', borderRadius: 1, overflow: 'hidden', bgcolor: 'rgba(30,41,59,0.82)' }}>
-                  <Table size="small" className={styles.table}>
-                    <TableHead><TableRow><TableCell>ID</TableCell><TableCell>Origen</TableCell><TableCell>Destino</TableCell><TableCell align="right">Maletas</TableCell><TableCell /></TableRow></TableHead>
+            <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, border: '1px solid rgba(148,163,184,0.2)', borderRadius: 1, overflow: 'hidden', bgcolor: 'rgba(30,41,59,0.82)' }}>
+              <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', scrollbarWidth: 'thin', scrollbarColor: '#64748b rgba(15,23,42,0.45)' }}>
+                  <Table stickyHeader size="small" className={styles.table} sx={{ minWidth: 680, tableLayout: 'fixed' }}>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ width: 125, bgcolor: '#1e293b', zIndex: 2 }}>ID</TableCell>
+                        <TableCell sx={{ width: 70, bgcolor: '#1e293b', zIndex: 2 }}>Origen</TableCell>
+                        <TableCell sx={{ width: 70, bgcolor: '#1e293b', zIndex: 2 }}>Destino</TableCell>
+                        <TableCell sx={{ width: 165, bgcolor: '#1e293b', zIndex: 2 }}>Entrega UTC</TableCell>
+                        <TableCell align="right" sx={{ width: 75, bgcolor: '#1e293b', zIndex: 2 }}>Maletas</TableCell>
+                        <TableCell sx={{ width: 110, bgcolor: '#1e293b', zIndex: 2 }}>Estado</TableCell>
+                        <TableCell sx={{ width: 35, bgcolor: '#1e293b', zIndex: 2 }} />
+                      </TableRow>
+                    </TableHead>
                     <TableBody>
+                      {enviosFiltrados.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={7} className={styles.empty}>{mensajeVacio}</TableCell>
+                        </TableRow>
+                      )}
                       {enviosFiltrados.slice(page * rowsPerPage, (page + 1) * rowsPerPage).map((e, index) => {
                         const posicionAbsoluta = page * rowsPerPage + index;
                         const rowKey = e.idPedido
@@ -718,16 +796,20 @@ function SeccionEnvios({
                               }}
                               sx={{ cursor: 'pointer', '&:hover': { bgcolor: 'rgba(56,189,248,0.08)' }, bgcolor: expandidoEnvio === e.idPedido ? 'rgba(56,189,248,0.1)' : 'transparent' }}
                             >
-                              <TableCell sx={{ fontSize: 11 }}>{e.idPedido}</TableCell>
+                              <TableCell title={e.idPedido} sx={{ width: 125, maxWidth: 125, fontSize: 11, overflowWrap: 'anywhere', lineHeight: 1.25 }}>{e.idPedido}</TableCell>
                               <TableCell>{e.origenIata}</TableCell>
                               <TableCell>{e.destinoIata}</TableCell>
+                              <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                {e._llegadaEpoch === undefined ? '—' : `${new Date(e._llegadaEpoch).toLocaleString('es-PE', { timeZone: 'UTC', hour12: false })} UTC`}
+                              </TableCell>
                               <TableCell align="right">{e.cantidadMaletas}</TableCell>
+                              <TableCell sx={{ whiteSpace: 'normal', overflowWrap: 'break-word' }}>{e._estado ? etiquetaEstadoEnvio[e._estado as EstadoEnvio] : 'Sin estado'}</TableCell>
                               <TableCell align="right" sx={{ color: '#64748b', fontSize: 10 }}>
                                 {expandidoEnvio === e.idPedido ? '▲' : '▼'}
                               </TableCell>
                             </TableRow>
                             <TableRow key={`${rowKey}-detail`}>
-                              <TableCell colSpan={5} sx={{ p: 0, border: 0 }}>
+                              <TableCell colSpan={7} sx={{ p: 0, border: 0 }}>
                                 <Collapse in={expandidoEnvio === e.idPedido} unmountOnExit>
                                   <Box sx={{ bgcolor: 'rgba(15,23,42,0.6)', px: 1.5, py: 1 }}>
                                     <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block', mb: 0.5 }}>
@@ -759,21 +841,22 @@ function SeccionEnvios({
                           </React.Fragment>
                         );
                       })}
-                      <TableRow>
-                        <TablePagination
-                          page={page}
-                          onPageChange={(_, v) => setPage(v)}
-                          rowsPerPage={rowsPerPage}
-                          onRowsPerPageChange={(e) => setRowsPerPage(Number(e.target.value))}
-                          count={enviosFiltrados.length}
-                          sx={{ color: '#e2e8f0', '& .MuiSvgIcon-root': { color: '#cbd5e1' } }}
-                        />
-                      </TableRow>
                     </TableBody>
                   </Table>
-                </Box>
-              </Stack>
-            )}
+              </Box>
+              <TablePagination
+                component="div"
+                page={page}
+                onPageChange={(_, v) => setPage(v)}
+                rowsPerPage={rowsPerPage}
+                rowsPerPageOptions={[10, 25, 50]}
+                onRowsPerPageChange={(e) => { setRowsPerPage(Number(e.target.value)); setPage(0); }}
+                count={enviosFiltrados.length}
+                labelRowsPerPage="Filas por página:"
+                labelDisplayedRows={({ from, to, count }) => `${from}–${to} de ${count}`}
+                sx={{ flexShrink: 0, color: '#e2e8f0', borderTop: '1px solid rgba(148,163,184,0.18)', overflow: 'hidden', '& .MuiTablePagination-toolbar': { minHeight: 52, px: 1 }, '& .MuiTablePagination-selectLabel': { fontSize: 11 }, '& .MuiTablePagination-displayedRows': { fontSize: 11 }, '& .MuiSvgIcon-root': { color: '#cbd5e1' } }}
+              />
+            </Box>
           </>
         )}
       </AccordionDetails>

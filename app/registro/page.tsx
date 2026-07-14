@@ -97,7 +97,7 @@ export default function RegistroPage() {
     setCargandoArchivo(true)
     setError(null)
     try {
-      const { data } = await EnvioService.cargarCsv(file, origenIata)
+      const { data } = await EnvioService.cargarCsv(file)
       setExito(true)
       setTimeout(() => setExito(false), 5000)
       if (data.errores && data.errores.length > 0) {
