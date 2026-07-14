@@ -47,6 +47,8 @@ export function useSimulacion(
   const [colapso, setColapso] = useState<EventoColapso | null>(null);
   const [replanificaciones, setReplanificaciones] = useState<EventoReplanificacionEnvio[]>([]);
   const [mensajeErrorSimulacion, setMensajeErrorSimulacion] = useState<string | null>(null);
+  const [fechaHoraInicioReal, setFechaHoraInicioReal] = useState<string | null>(null);
+  const [fechaHoraFinReal, setFechaHoraFinReal] = useState<string | null>(null);
   const primerEventoRecibidoRef = useRef(false);
   const primerLoteRecibidoRef = useRef(false);
   const clockEstadoRef = useRef(0); //Tiempo obtenido del estado al iniciar
@@ -80,10 +82,21 @@ export function useSimulacion(
     setEstadoSimInterno(nuevoEstado);
   }, []);
 
+  const sincronizarTiemposReales = useCallback(async () => {
+    try {
+      const { data } = await SimulacionService.obtenerEstado(id);
+      setFechaHoraInicioReal(data.fechaHoraInicioReal ?? null);
+      setFechaHoraFinReal(data.fechaHoraFinReal ?? null);
+    } catch (error) {
+      console.warn('[SIM] No se pudieron sincronizar los timestamps reales:', error);
+    }
+  }, [id]);
+
   // ============================================================================
   // Encolar eventos entrantes y gestionar el arranque con búfer de 2 lotes
   // ============================================================================
   const encolarEventos = useCallback((lote: EventoBatch) => {
+    if (estadoSimRef.current === 'colapsada') return;
     if (!lote.eventos || !Array.isArray(lote.eventos)) return;
     if (!primerLoteRecibidoRef.current) {
       primerLoteRecibidoRef.current = true;
@@ -128,6 +141,7 @@ export function useSimulacion(
         case 'SIMULACION_DETENIDA':
           //setResumenFinal({vueloFinal:vueloFinalRef.current});
           setEstadoSim('detenida');
+          void sincronizarTiemposReales();
           break;
         case 'ERROR':
           setEstadoSim('error');
@@ -170,7 +184,7 @@ export function useSimulacion(
       return acum;},{})};
 
     onNuevoLoteRef.current?.();
-  }, [setEstadoSim, modo]);
+  }, [setEstadoSim, modo, sincronizarTiemposReales]);
 
   // ============================================================================
   // Conexión WebSocket
@@ -191,6 +205,8 @@ export function useSimulacion(
             setMensajeErrorSimulacion(null);
             simTime('solicitando estado/snapshot');
             const { data: estado } = await SimulacionService.obtenerEstado(id);
+            setFechaHoraInicioReal(estado.fechaHoraInicioReal ?? null);
+            setFechaHoraFinReal(estado.fechaHoraFinReal ?? null);
             tiempoSimulacion.current = parseFechaInicio(estado.tiempoSimuladoActual ?? estado.fechaInicio);
             clockEstadoRef.current = tiempoSimulacion.current
             if (estado.estado && estado.estado !== 'CREADA') {
@@ -204,6 +220,7 @@ export function useSimulacion(
               }
             } else {
               await SimulacionService.iniciar(id);
+              await sincronizarTiemposReales();
             }
           } catch (error: unknown) {
             if (axios.isAxiosError(error) && error.response?.status === 404) {
@@ -392,12 +409,15 @@ export function useSimulacion(
         else if (tipo === "SIMULACION_FINALIZADA"){
           setResumenFinal({vueloFinal:vueloFinalRef.current});
           setEstadoSim('finalizada');
+          void sincronizarTiemposReales();
           procesados++;
           break;
         }
         else if (tipo === "COLAPSO_DETECTADO"){
           setColapso(ev as EventoColapso);
+          colaEventos.current = [];
           setEstadoSim('colapsada');
+          void sincronizarTiemposReales();
           procesados++;
           break;
         }
@@ -429,5 +449,7 @@ export function useSimulacion(
     resumenFinal,
     replanificaciones,
     mensajeErrorSimulacion,
+    fechaHoraInicioReal,
+    fechaHoraFinReal,
   };
 }

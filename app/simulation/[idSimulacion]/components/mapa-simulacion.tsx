@@ -26,6 +26,7 @@ import { SimulacionService } from '@/app/services/simulation.service';
 import { formatUtcDisplay } from '@/app/shared/dateTime';
 import { AeropuertoPopupContent } from './pop-up-aeropuerto';
 import { RelojSimulacionOverlay } from './reloj-simulacion';
+import type { EstadoSimulacion } from '../hooks/useSimulacion';
 import { PanelLateral } from './panel-lateral';
 import { PanelMetricas } from './panel-metricas';
 import AeropuertoSidePanel from '@/app/simulation/components/aeropuerto-sidepanel';
@@ -65,6 +66,9 @@ interface Props {
   replanificaciones: EventoReplanificacionEnvio[];
   gmtUsuario?: number | null;
   aeropuertoUsuario?: Aeropuerto | null;
+  fechaHoraInicioReal?: string | null;
+  fechaHoraFinReal?: string | null;
+  estadoSim: EstadoSimulacion;
 }
 
 type VueloAnimado = EventoVuelo & { _salidaEpoch?: number; _llegadaEpoch?: number };
@@ -122,6 +126,9 @@ export function MapaSimulacion({
   replanificaciones,
   gmtUsuario,
   aeropuertoUsuario,
+  fechaHoraInicioReal,
+  fechaHoraFinReal,
+  estadoSim,
 }: Props) {
   const mapRef = useRef<MapRef>(null);
   const backgroundMapRef = useRef<MapRef>(null);
@@ -1008,6 +1015,9 @@ export function MapaSimulacion({
         aeropuertoSeleccionado={aeropuertoSeleccionado}
         gmtUsuario={gmtUsuario}
         aeropuertoUsuario={aeropuertoUsuario}
+        fechaHoraInicioReal={fechaHoraInicioReal}
+        fechaHoraFinReal={fechaHoraFinReal}
+        estadoSim={estadoSim}
       />
     </div>
   );
@@ -1183,6 +1193,7 @@ function PanelReplanificaciones({
 
 function PanelColapso({ colapso }: { colapso: EventoColapso }) {
   const d = colapso.detalle;
+  const esCapacidad = colapso.causaPrincipal === 'CAPACIDAD_AEROPUERTO_SUPERADA';
   return (
     <div style={{
       position: 'absolute', left: '50%', top: 24, transform: 'translateX(-50%)',
@@ -1191,8 +1202,20 @@ function PanelColapso({ colapso }: { colapso: EventoColapso }) {
       borderRadius: 8, padding: 16, boxShadow: '0 18px 40px rgba(0,0,0,0.28)',
     }}>
       <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>Colapso logistico detectado</div>
-      <div style={{ fontWeight: 700 }}>Causa: Incumplimiento de SLA</div>
+      <div style={{ fontWeight: 700 }}>
+        Causa: {esCapacidad ? 'Capacidad del aeropuerto superada' : 'Incumplimiento de SLA'}
+      </div>
       <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.55 }}>
+        {esCapacidad && <>
+          <div><strong>Aeropuerto:</strong> {colapso.codigoAeropuerto ?? d?.codigoAeropuerto ?? 'No disponible'}{colapso.nombreAeropuerto ? ` - ${colapso.nombreAeropuerto}` : ''}</div>
+          <div><strong>Capacidad máxima:</strong> {colapso.capacidadMaxima ?? d?.capacidad ?? '-'} maletas</div>
+          <div><strong>Ocupación alcanzada:</strong> {colapso.ocupacionActual ?? d?.maletasActuales ?? '-'} maletas</div>
+          <div><strong>Exceso:</strong> {colapso.exceso ?? '-'} maleta(s)</div>
+          <div><strong>Ocupación:</strong> {(colapso.porcentajeOcupacion ?? d?.porcentajeOcupacion)?.toFixed(3) ?? '-'}%</div>
+          <div><strong>Hora simulada:</strong> {formatUtcDisplay(d?.horaColapso ?? colapso.fechaHoraEvento)}</div>
+          <div><strong>Motivo:</strong> {colapso.motivo ?? d?.motivo ?? 'CAPACIDAD_AEROPUERTO_SUPERADA'}</div>
+        </>}
+        {!esCapacidad && <>
         <div><strong>Envio/maleta responsable:</strong> {d?.idPedido ?? 'No disponible'}</div>
         <div><strong>Ruta:</strong> {d?.origenIata ?? '-'} - {d?.destinoIata ?? '-'} · {d?.cantidadMaletas ?? '-'} maletas</div>
         <div><strong>Registro:</strong> {formatUtcDisplay(d?.fechaHoraRegistro)}</div>
@@ -1202,6 +1225,7 @@ function PanelColapso({ colapso }: { colapso: EventoColapso }) {
         <div><strong>Estado:</strong> {d?.estadoEnvio ?? 'No disponible'}</div>
         <div><strong>Ultimo aeropuerto:</strong> {d?.aeropuertoActual ?? 'No disponible'}</div>
         <div><strong>Vuelo/ruta:</strong> {d?.vueloAfectado ?? d?.itinerarioAfectado ?? 'No disponible'}</div>
+        </>}
       </div>
     </div>
   );

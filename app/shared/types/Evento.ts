@@ -73,6 +73,10 @@ export interface DetalleColapso {
     tipoSla?: string;
     estadoEnvio?: string;
     aeropuertoActual?: string;
+    codigoAeropuerto?: string;
+    capacidad?: number;
+    maletasActuales?: number;
+    porcentajeOcupacion?: number;
 }
 
 export interface EventoColapso extends EventoBase {
@@ -82,6 +86,13 @@ export interface EventoColapso extends EventoBase {
     causaPrincipal?: string;
     criteriosActivados?: string[];
     detalle?: DetalleColapso;
+    codigoAeropuerto?: string;
+    nombreAeropuerto?: string;
+    capacidadMaxima?: number;
+    ocupacionActual?: number;
+    exceso?: number;
+    porcentajeOcupacion?: number;
+    motivo?: string;
 }
 
 export interface EventoReplanificacionEnvio extends EventoBase {

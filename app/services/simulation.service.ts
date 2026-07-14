@@ -1,4 +1,4 @@
-import { RespuestaInicioSimulacionDTO } from '../shared/types/Simulacion';
+import { RespuestaEstadoSimulacionDTO, RespuestaInicioSimulacionDTO } from '../shared/types/Simulacion';
 import { Envio, EnvioAlmacen, EnvioRuta, MaletaSimulacion } from '@/app/shared/types/Envio';
 import axiosApi, { axiosSimulacion } from './config/axios';
 import {EventoVuelo} from "@/app/shared/types/Evento";
@@ -34,7 +34,7 @@ export const SimulacionService = {
         axiosSimulacion.post(`/simulacion/iniciar/${idSimulacion}/arrancar`),
 
     obtenerEstado : (idSimulacion: string) =>
-        axiosApi.get(`/simulacion/${idSimulacion}/estado`),
+        axiosApi.get<RespuestaEstadoSimulacionDTO>(`/simulacion/${idSimulacion}/estado`),
     obtenerSnapshot : (idSimulacion: string) =>
         axiosApi.get(`/simulacion/${idSimulacion}/snapshot`),
     obtenerEnviosPorVuelo: (idSimulacion: string, flight:EventoVuelo,timestamp:string) =>

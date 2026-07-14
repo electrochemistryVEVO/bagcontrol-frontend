@@ -58,6 +58,8 @@ export function SimulacionCliente({ id, topic, fechaInicial, k, modo, aeropuerto
     resumenFinal,
     replanificaciones,
     mensajeErrorSimulacion,
+    fechaHoraInicioReal,
+    fechaHoraFinReal,
   } = useSimulacion(
     id,
     topic,
@@ -202,6 +204,9 @@ export function SimulacionCliente({ id, topic, fechaInicial, k, modo, aeropuerto
           replanificaciones={replanificaciones}
           gmtUsuario={gmtUsuario}
           aeropuertoUsuario={aeropuertoUsuario}
+          fechaHoraInicioReal={fechaHoraInicioReal}
+          fechaHoraFinReal={fechaHoraFinReal}
+          estadoSim={estadoSim}
         />
         <PopUpResumen openDialog={resumenFinal!=null}
                       idSimulacion={id}
