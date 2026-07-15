@@ -73,6 +73,7 @@ export default function RegistroPage() {
         idCliente: form.idCliente,
         cantidadMaletas: form.cantidadMaletas,
         fechaHora: form.fechaHora || toDateTimeLocalInput(new Date()),
+        esOperacionDia: true,
       }
       await EnvioService.registrarEnvio(payload)
       setExito(true)
@@ -97,7 +98,7 @@ export default function RegistroPage() {
     setCargandoArchivo(true)
     setError(null)
     try {
-      const { data } = await EnvioService.cargarCsv(file, origenIata)
+      const { data } = await EnvioService.cargarCsv(file)
       setExito(true)
       setTimeout(() => setExito(false), 5000)
       if (data.errores && data.errores.length > 0) {

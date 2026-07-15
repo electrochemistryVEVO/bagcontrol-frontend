@@ -67,6 +67,7 @@ export function RegistroEnvio({ envioInicial, onSuccess, onCancel }: Props) {
         idCliente: form.idCliente,
         cantidadMaletas: form.cantidadMaletas,
         fechaHora: form.fechaHora || nowDateTimeLocalInput(gmtEnvio),
+        esOperacionDia: false,
       }
       const respuesta = envioInicial
         ? await EnvioService.actualizarEnvio(envioInicial.idPedido, payload)

@@ -5,6 +5,7 @@ export type Envio = {
     fechaHora : string;
     cantidadMaletas : number;
     idCliente : string;
+    esOperacionDia?: boolean;
     _estado ?: string;
     _llegadaEpoch ?: number;
 }

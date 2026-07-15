@@ -27,6 +27,7 @@ export function GestionEnvios() {
   const [filtroDestino, setFiltroDestino] = useState('')
   const [filtroCliente, setFiltroCliente] = useState('')
   const [filtroBusqueda, setFiltroBusqueda] = useState('')
+  const [filtroOperacionDia, setFiltroOperacionDia] = useState<boolean | null>(null)
 
   const inicio = new Date()
   inicio.setDate(inicio.getDate() - 30)
@@ -67,6 +68,7 @@ export function GestionEnvios() {
     if (filtroDestino.trim()) nuevosFiltros.destinoIata = filtroDestino.trim().toUpperCase()
     if (filtroCliente.trim()) nuevosFiltros.idCliente = filtroCliente.trim()
     if (filtroBusqueda.trim()) nuevosFiltros.q = filtroBusqueda.trim().toUpperCase()
+    if (filtroOperacionDia !== null) nuevosFiltros.esOperacionDia = filtroOperacionDia
     setFiltros(nuevosFiltros)
     setPagina(0)
     cargarEnvios(0, nuevosFiltros)
@@ -77,6 +79,7 @@ export function GestionEnvios() {
     setFiltroDestino('')
     setFiltroCliente('')
     setFiltroBusqueda('')
+    setFiltroOperacionDia(null)
     setFiltros({})
     setPagina(0)
     cargarEnvios(0)
@@ -204,6 +207,21 @@ export function GestionEnvios() {
             onKeyDown={e => e.key === 'Enter' && aplicarFiltros()}
           />
         </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 140px' }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: '#000000', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>Tipo</label>
+          <select
+            value={filtroOperacionDia === null ? '' : filtroOperacionDia.toString()}
+            onChange={e => {
+              const v = e.target.value
+              setFiltroOperacionDia(v === '' ? null : v === 'true')
+            }}
+            style={inputStyle}
+          >
+            <option value="">Todos</option>
+            <option value="false">Simulación</option>
+            <option value="true">Operación día</option>
+          </select>
+        </div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button
             onClick={aplicarFiltros}
@@ -231,8 +249,8 @@ export function GestionEnvios() {
       {csvAbierto && (
         <CargaCsvModal
           titulo="Cargar envíos desde CSV"
-          formato="origenIata,destinoIata,cantidadMaletas,idCliente,fechaHora"
-          ejemplo="SPIM,SBBR,2,00135135,2026-06-12T05:23:00Z"
+          formato="idPedido-aaaammdd-hh-mm-destino-cantidad-idCliente"
+          ejemplo="000000001-20260102-00-47-SUAA-002-0032535"
           onCargar={EnvioService.cargarCsv}
           onCerrar={() => setCsvAbierto(false)}
           onExito={() => { setCsvAbierto(false); cargarEnvios(0, {}) }}

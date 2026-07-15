@@ -5,13 +5,13 @@ import {usePathname} from "next/navigation";
 import { useEffect, useState } from 'react'
 import { AuthService, AuthUser } from '@/app/services/auth.service'
 
-let allTabs = [
+const allTabs = [
     { label: 'REG. MALETAS', href: '/registro', roles: ['REGISTRADOR', 'ADMINISTRADOR'] },
     { label: 'VISUALIZADOR', href: '/operaciones', roles: ['LOGISTICA', 'ADMINISTRADOR'] },
     { label: 'SIMULACION', href: '/simulation', roles: ['ADMINISTRADOR'] },
 ]
 
-function useRouteMatch(patterns: string[], pathname: string | null): number | null {
+function findRouteMatch(patterns: string[], pathname: string | null): number | null {
     for (let i = 0; i < patterns.length; i += 1) {
         if (pathname?.startsWith(patterns[i])) {
             return i
@@ -34,7 +34,7 @@ export default function PageTabs(){
     if (tabs.length === 0) return null
 
     const tabRoutes = tabs.map(t => t.href)
-    const routeMatch = useRouteMatch(tabRoutes, pathname)
+    const routeMatch = findRouteMatch(tabRoutes, pathname)
     const currentTab = routeMatch !== null ? routeMatch : 0
 
     return (

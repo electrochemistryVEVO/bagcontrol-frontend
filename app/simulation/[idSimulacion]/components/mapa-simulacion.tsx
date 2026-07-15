@@ -15,7 +15,7 @@ import { Feature, FeatureCollection } from 'geojson';
 import { MapLibreEvent } from 'maplibre-gl';
 import type { GeoJSONSource, Map as MapLibreNative, LayerSpecification } from 'maplibre-gl';
 import Draggable from 'react-draggable';
-// @ts-ignore
+// @ts-expect-error El paquete no publica tipos compatibles con MapLibre 5.
 import * as syncMaps from '@mapbox/mapbox-gl-sync-move';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
@@ -147,6 +147,7 @@ export function MapaSimulacion({
 
   const [vuelosActivosSnapshot, setVuelosActivosSnapshot] = useState<EventoVuelo[]>([]);
   const [enviosSnapshot, setEnviosSnapshot] = useState<Envio[]>([]);
+  const [tiempoSimulacionSnapshot, setTiempoSimulacionSnapshot] = useState(() => Date.parse(fechaInicio));
   const [aeropuertosSnapshot, setAeropuertosSnapshot] = useState<AeropuertoSimulacion[]>(() =>
     aeropuertosIniciales.map(normalizarAeropuertoInicial)
   );
@@ -548,9 +549,10 @@ export function MapaSimulacion({
       setVuelosActivosSnapshot(Array.from(vuelosActivosRef.current.values()));
       setAeropuertosSnapshot(crearAeropuertosSimulacionEstables(aeropuertosIniciales, aeropuertosRef.current));
       setEnviosSnapshot(Object.values(enviosPlanificadosRef.current || {}));
+      setTiempoSimulacionSnapshot(tiempoSimulacionRef.current);
     }, 500);
     return () => clearInterval(timer);
-  }, [aeropuertosIniciales, aeropuertosRef, conectado, enviosPlanificadosRef, vuelosActivosRef]);
+  }, [aeropuertosIniciales, aeropuertosRef, conectado, enviosPlanificadosRef, tiempoSimulacionRef, vuelosActivosRef]);
 
   const ocupacionPromedioFlota = useMemo(() => {
     if (vuelosActivosSnapshot.length === 0) return 0;
@@ -853,6 +855,7 @@ export function MapaSimulacion({
         onEnfocarAeropuerto={seleccionarAeropuerto}
         onFiltradoAeropuertosCambiado={handleFiltradoAeropuertosCambiado}
         envios={enviosPanel}
+        tiempoSimulacion={tiempoSimulacionSnapshot}
         onMostrarRutaEnvio={mostrarRutaEnvio}
         haySeleccionRelacionada={Boolean(filtroRelacion.vuelos || filtroRelacion.aeropuertos || filtroRelacion.envios)}
         onLimpiarSeleccionRelacionada={limpiarSeleccionRelacionada}
