@@ -43,7 +43,7 @@ export default function PageTabs(){
             aria-label="Pestañas de navegación"
             role="navigation"
             sx={{
-                '& .MuiTab-root': { color: '#000000' },
+                '& .MuiTab-root': { color: '#000000',maxHeight:20 },
                 '& .MuiTab-root.Mui-selected': { color: '#000000' },
                 '& .MuiTabs-indicator': { backgroundColor: '#000000' },
             }}
