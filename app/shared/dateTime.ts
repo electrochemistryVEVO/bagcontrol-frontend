@@ -13,6 +13,16 @@ export function formatUtcDisplay(
   return `${pad(date.getUTCDate())}/${pad(date.getUTCMonth() + 1)}/${date.getUTCFullYear()} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}${sec} UTC`;
 }
 
+export function formatShortDateTime(
+  value: string | number | Date | null | undefined,
+): string {
+  if (value == null) return '--';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '--';
+  const yy = String(date.getUTCFullYear()).slice(-2);
+  return `${pad(date.getUTCDate())}/${pad(date.getUTCMonth() + 1)}/${yy}-${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
+}
+
 export function formatAirportLocalDisplay(
   value: string | number | Date | null | undefined,
   aeropuerto?: Pick<Aeropuerto, 'codigoIata' | 'gmt'> | null,
