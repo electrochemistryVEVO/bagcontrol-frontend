@@ -159,6 +159,7 @@
 
 .airportCode {
     font-weight: 700;
+    flex-shrink: 0;
 }
 
 .airportChips {
@@ -182,10 +183,31 @@
 
 .airportCapacity {
     color: #94a3b8;
+    flex-shrink: 0;
+}
+
+.airportProximidad {
+    flex: 1;
+    min-width: 0;
+    align-items: center;
+    justify-content: center;
+    gap: 0 !important;
+    padding: 0 4px;
+}
+
+.airportProximidadLinea {
+    color: #94a3b8;
+    font-size: 9.5px !important;
+    line-height: 12px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
 }
 
 .airportOccupation {
     font-weight: 700;
+    flex-shrink: 0;
 }
 
 .expandedContent {

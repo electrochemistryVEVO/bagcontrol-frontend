@@ -33,6 +33,7 @@ import type { AeropuertoSimulacion } from '@/app/shared/types/Aeropuerto';
 import type { EstadoCapacidad, EventoVuelo } from '@/app/shared/types/Evento';
 import type { Envio, MaletaSimulacion } from '@/app/shared/types/Envio';
 import { SimulacionService } from '@/app/services/simulation.service';
+import { formatShortDateTime } from '@/app/shared/dateTime';
 import {
   calcularOcupacionAeropuerto,
   calcularOcupacionVuelo,
@@ -364,6 +365,14 @@ function SeccionVuelos({
                           <Typography variant="body2" className={styles.airportLocation}>{vuelo.origenIata} - {vuelo.destinoIata}</Typography>
                           <Stack className={styles.airportFooter}>
                             <Typography variant="caption" className={styles.airportCapacity}>{maletas}/{vuelo.capacidadMax} maletas</Typography>
+                            <Stack className={styles.airportProximidad}>
+                              <Typography variant="caption" className={styles.airportProximidadLinea}>
+                                S: {formatShortDateTime(vuelo.horaSalidaUtc)}
+                              </Typography>
+                              <Typography variant="caption" className={styles.airportProximidadLinea}>
+                                L: {formatShortDateTime(vuelo.horaLlegadaUtc)}
+                              </Typography>
+                            </Stack>
                             <Typography variant="caption" className={styles.airportOccupation}>{ocup}%</Typography>
                           </Stack>
                         </Box>
@@ -582,6 +591,16 @@ function SeccionAeropuertos({
                           <Typography variant="body2" className={styles.airportLocation}>{aeropuerto.ciudad} - {aeropuerto.pais}</Typography>
                           <Stack className={styles.airportFooter}>
                             <Typography variant="caption" className={styles.airportCapacity}>{aeropuerto.maletasActuales}/{aeropuerto.capacidadAlmacen} maletas</Typography>
+                            {proximosSLA.length > 0 && (
+                              <Stack className={styles.airportProximidad}>
+                                <Typography variant="caption" className={styles.airportProximidadLinea}>
+                                  S: {formatShortDateTime(proximosSLA[0].fechaHoraSalidaUtc)}
+                                </Typography>
+                                <Typography variant="caption" className={styles.airportProximidadLinea}>
+                                  L: {formatShortDateTime(proximosSLA[0].fechaHoraLlegadaUtc)}
+                                </Typography>
+                              </Stack>
+                            )}
                             <Typography variant="caption" className={styles.airportCode}>{ocup}%</Typography>
                           </Stack>
                         </Box>
@@ -775,22 +794,20 @@ function SeccionEnvios({
 
             <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, border: '1px solid rgba(148,163,184,0.2)', borderRadius: 1, overflow: 'hidden', bgcolor: 'rgba(30,41,59,0.82)' }}>
               <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', scrollbarWidth: 'thin', scrollbarColor: '#64748b rgba(15,23,42,0.45)' }}>
-                  <Table stickyHeader size="small" className={styles.table} sx={{ minWidth: 680, tableLayout: 'fixed' }}>
+                  <Table stickyHeader size="small" className={styles.table}>
                     <TableHead>
                       <TableRow>
-                        <TableCell sx={{ width: 125, bgcolor: '#1e293b', zIndex: 2 }}>ID</TableCell>
-                        <TableCell sx={{ width: 70, bgcolor: '#1e293b', zIndex: 2 }}>Origen</TableCell>
-                        <TableCell sx={{ width: 70, bgcolor: '#1e293b', zIndex: 2 }}>Destino</TableCell>
-                        <TableCell sx={{ width: 165, bgcolor: '#1e293b', zIndex: 2 }}>Entrega UTC</TableCell>
-                        <TableCell align="right" sx={{ width: 75, bgcolor: '#1e293b', zIndex: 2 }}>Maletas</TableCell>
-                        <TableCell sx={{ width: 110, bgcolor: '#1e293b', zIndex: 2 }}>Estado</TableCell>
-                        <TableCell sx={{ width: 35, bgcolor: '#1e293b', zIndex: 2 }} />
+                        <TableCell sx={{ bgcolor: '#1e293b', zIndex: 2, maxWidth: 110 }}>ID</TableCell>
+                        <TableCell sx={{ bgcolor: '#1e293b', zIndex: 2 }}>Ruta</TableCell>
+                        <TableCell sx={{ bgcolor: '#1e293b', zIndex: 2 }}>Estado</TableCell>
+                        <TableCell align="center" sx={{ bgcolor: '#1e293b', zIndex: 2 }}>Maletas</TableCell>
+                        <TableCell sx={{ width: 28, bgcolor: '#1e293b', zIndex: 2 }} />
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {enviosFiltrados.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={7} className={styles.empty}>{mensajeVacio}</TableCell>
+                          <TableCell colSpan={5} className={styles.empty}>{mensajeVacio}</TableCell>
                         </TableRow>
                       )}
                       {enviosFiltrados.slice(page * rowsPerPage, (page + 1) * rowsPerPage).map((e, index) => {
@@ -803,50 +820,84 @@ function SeccionEnvios({
                           <React.Fragment key={rowKey}>
                             <TableRow
                               key={`${rowKey}-main`}
-                              onClick={() => {
-                                setExpandidoEnvio(cur => cur === e.idPedido ? null : e.idPedido);
-                                onMostrarRutaEnvio(e.idPedido);
-                              }}
+                              onClick={() => setExpandidoEnvio(cur => cur === e.idPedido ? null : e.idPedido)}
                               sx={{ cursor: 'pointer', '&:hover': { bgcolor: 'rgba(56,189,248,0.08)' }, bgcolor: expandidoEnvio === e.idPedido ? 'rgba(56,189,248,0.1)' : 'transparent' }}
                             >
-                              <TableCell title={e.idPedido} sx={{ width: 125, maxWidth: 125, fontSize: 11, overflowWrap: 'anywhere', lineHeight: 1.25 }}>{e.idPedido}</TableCell>
-                              <TableCell>{e.origenIata}</TableCell>
-                              <TableCell>{e.destinoIata}</TableCell>
-                              <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                                {e._llegadaEpoch === undefined ? '—' : `${new Date(e._llegadaEpoch).toLocaleString('es-PE', { timeZone: 'UTC', hour12: false })} UTC`}
+                              {/* ID truncado; hover muestra el completo */}
+                              <TableCell
+                                title={e.idPedido}
+                                sx={{ maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11 }}
+                              >
+                                {e.idPedido}
                               </TableCell>
-                              <TableCell align="right">{e.cantidadMaletas}</TableCell>
-                              <TableCell sx={{ whiteSpace: 'normal', overflowWrap: 'break-word' }}>{e._estado ? etiquetaEstadoEnvio[e._estado as EstadoEnvio] : 'Sin estado'}</TableCell>
-                              <TableCell align="right" sx={{ color: '#64748b', fontSize: 10 }}>
+                              {/* Origen → Destino en una sola celda */}
+                              <TableCell sx={{ whiteSpace: 'nowrap', fontSize: 12 }}>
+                                {e.origenIata} → {e.destinoIata}
+                              </TableCell>
+                              {/* Estado como chip */}
+                              <TableCell>
+                                <Chip
+                                  size="small"
+                                  label={
+                                    e._estado === 'EN_CURSO' ? 'En curso'
+                                    : e._estado === 'ENTREGADO' ? 'Entregado'
+                                    : e._estado === 'PLANIFICADO' ? 'Planificado'
+                                    : (e._estado ?? '—')
+                                  }
+                                  color={
+                                    e._estado === 'EN_CURSO' ? 'warning'
+                                    : e._estado === 'ENTREGADO' ? 'success'
+                                    : 'default'
+                                  }
+                                  sx={{ fontSize: 10, height: 20 }}
+                                />
+                              </TableCell>
+                              {/* Cantidad de maletas */}
+                              <TableCell align="center">{e.cantidadMaletas}</TableCell>
+                              <TableCell align="right" sx={{ color: '#64748b', fontSize: 10, pr: 1 }}>
                                 {expandidoEnvio === e.idPedido ? '▲' : '▼'}
                               </TableCell>
                             </TableRow>
+
+                            {/* Fila expandida: maletas con salida, llegada y boton Ruta */}
                             <TableRow key={`${rowKey}-detail`}>
-                              <TableCell colSpan={7} sx={{ p: 0, border: 0 }}>
+                              <TableCell colSpan={5} sx={{ p: 0, border: 0 }}>
                                 <Collapse in={expandidoEnvio === e.idPedido} unmountOnExit>
                                   <Box sx={{ bgcolor: 'rgba(15,23,42,0.6)', px: 1.5, py: 1 }}>
                                     <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block', mb: 0.5 }}>
                                       {e.cantidadMaletas} maleta{e.cantidadMaletas !== 1 ? 's' : ''}
                                     </Typography>
-                                    <Table size="small">
-                                      <TableBody>
-                                        {Array.from({ length: e.cantidadMaletas }, (_, i) => (
-                                          <TableRow key={`${rowKey}-M${i + 1}`}>
-                                            <TableCell sx={{ fontSize: 10, color: '#cbd5e1', border: 0 }}>{e.idPedido}-M{i + 1}</TableCell>
-                                            <TableCell sx={{ fontSize: 10, border: 0 }}>{e.origenIata}</TableCell>
-                                            <TableCell sx={{ fontSize: 10, border: 0 }}>{e.destinoIata}</TableCell>
-                                            <TableCell sx={{ border: 0 }}>
-                                              <button
-                                                onClick={(ev) => { ev.stopPropagation(); onMostrarRutaEnvio(e.idPedido); }}
-                                                style={{ border: 'none', borderRadius: 4, padding: '2px 7px', background: '#2563eb', color: '#fff', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}
-                                              >
-                                                Ruta
-                                              </button>
-                                            </TableCell>
-                                          </TableRow>
-                                        ))}
-                                      </TableBody>
-                                    </Table>
+                                    <Stack spacing={0.5}>
+                                      {Array.from({ length: e.cantidadMaletas }, (_, i) => (
+                                        <Stack
+                                          key={`${rowKey}-M${i + 1}`}
+                                          direction="row"
+                                          alignItems="center"
+                                          justifyContent="space-between"
+                                          sx={{ bgcolor: 'rgba(30,41,59,0.7)', borderRadius: 1, px: 1, py: 0.4 }}
+                                        >
+                                          {/* Codigo completo */}
+                                          <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#e2e8f0', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', mr: 0.5 }}>
+                                            {e.idPedido}-M{i + 1}
+                                          </Typography>
+                                          {/* Salida (fecha registro del pedido) */}
+                                          <Typography variant="caption" sx={{ color: '#94a3b8', whiteSpace: 'nowrap', mr: 0.5, fontSize: 10 }}>
+                                            ↑{e.fechaHora ? new Date(e.fechaHora).toLocaleString('es-PE', { timeZone: 'UTC', hour12: false, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
+                                          </Typography>
+                                          {/* Llegada estimada */}
+                                          <Typography variant="caption" sx={{ color: '#94a3b8', whiteSpace: 'nowrap', mr: 0.5, fontSize: 10 }}>
+                                            ↓{e._llegadaEpoch ? new Date(e._llegadaEpoch).toLocaleString('es-PE', { timeZone: 'UTC', hour12: false, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
+                                          </Typography>
+                                          {/* Boton Ruta */}
+                                          <button
+                                            onClick={(ev) => { ev.stopPropagation(); onMostrarRutaEnvio(e.idPedido); }}
+                                            style={{ border: 'none', borderRadius: 4, padding: '2px 7px', background: '#2563eb', color: '#fff', fontSize: 10, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+                                          >
+                                            Ruta
+                                          </button>
+                                        </Stack>
+                                      ))}
+                                    </Stack>
                                   </Box>
                                 </Collapse>
                               </TableCell>

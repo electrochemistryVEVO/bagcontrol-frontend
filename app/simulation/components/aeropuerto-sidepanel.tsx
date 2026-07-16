@@ -37,6 +37,7 @@ function AeropuertoPanelContents({
     const [pageAlmacen, setPageAlmacen] = useState<number>(0);
     const [rowsPerPageAlmacen, setRowsPerPageAlmacen] = useState<number>(5);
     const [enviosAlmacen, setEnviosAlmacen] = useState<EnvioAlmacen[]>([]);
+    const [filtroAlmacen, setFiltroAlmacen] = useState<'TODOS' | 'TRANSITO' | 'DESTINO_FINAL'>('TODOS');
 
     // 2. Efecto de sincronización para mantener el Sheet "vivo" al ritmo del motor lógico
     useEffect(() => {
@@ -135,8 +136,22 @@ function AeropuertoPanelContents({
 
 
             <div className={styles.card}>
-                <div className={styles["section-title"]}>
-                    Productos en almacen
+                <div className={styles["card-header"]}>
+                    <div className={styles["section-title"]}>
+                        Productos en almacen
+                    </div>
+                    <select
+                        value={filtroAlmacen}
+                        onChange={(e) => {
+                            setFiltroAlmacen(e.target.value as 'TODOS' | 'TRANSITO' | 'DESTINO_FINAL');
+                            setPageAlmacen(0);
+                        }}
+                        style={selectStyle}
+                    >
+                        <option value="TODOS">General</option>
+                        <option value="TRANSITO">Tránsito</option>
+                        <option value="DESTINO_FINAL">Destino</option>
+                    </select>
                 </div>
 
                 <div className={styles["subtitle"]}>
@@ -153,6 +168,7 @@ function AeropuertoPanelContents({
                             </TableRow>
                         ) : (
                             enviosAlmacen
+                                .filter((item) => filtroAlmacen === 'TODOS' || item.tipoAlmacen === filtroAlmacen)
                                 .slice(pageAlmacen * rowsPerPageAlmacen, pageAlmacen * rowsPerPageAlmacen + rowsPerPageAlmacen)
                                 .map((item: EnvioAlmacen) => (
                                     <TableRow key={item.envio.idPedido} className={styles["package-item"]}>
@@ -185,7 +201,7 @@ function AeropuertoPanelContents({
                     component="div"
                     rowsPerPageOptions={[5, 10, 15]}
                     page={pageAlmacen}
-                    count={enviosAlmacen.length}
+                    count={enviosAlmacen.filter((item) => filtroAlmacen === 'TODOS' || item.tipoAlmacen === filtroAlmacen).length}
                     onPageChange={(_, value) => setPageAlmacen(value)}
                     onRowsPerPageChange={(e) => {
                         setRowsPerPageAlmacen(Number(e.target.value));
@@ -318,4 +334,15 @@ const miniButtonStyle: React.CSSProperties = {
     fontSize: 12,
     fontWeight: 700,
     cursor: 'pointer',
+};
+
+const selectStyle: React.CSSProperties = {
+    border: '1px solid rgba(148, 163, 184, 0.35)',
+    borderRadius: 6,
+    padding: '4px 8px',
+    background: '#1e293b',
+    color: '#f8fafc',
+    fontSize: 12,
+    cursor: 'pointer',
+    outline: 'none',
 };

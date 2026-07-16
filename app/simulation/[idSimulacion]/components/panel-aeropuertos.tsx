@@ -27,6 +27,7 @@ import type { EstadoCapacidad } from '@/app/shared/types/Evento';
 import styles from "../../../stylesheets/simpanel.module.css";
 import Draggable from 'react-draggable';
 import { calcularOcupacionAeropuerto, obtenerEstadoAeropuerto } from '@/app/shared/simulation/semaforo';
+import { formatShortDateTime } from '@/app/shared/dateTime';
 
 type PanelAeropuertosProps = {
   aeropuertos: AeropuertoSimulacion[];
@@ -285,6 +286,16 @@ export function PanelAeropuertos({ aeropuertos, visible, onEnfocarAeropuerto, on
                                                           <Typography variant="caption" className={styles.airportCapacity}>
                                                               {aeropuerto.maletasActuales}/{aeropuerto.capacidadAlmacen} maletas
                                                           </Typography>
+                                                          {enviosProximos.length > 0 && (
+                                                              <Stack className={styles.airportProximidad}>
+                                                                  <Typography variant="caption" className={styles.airportProximidadLinea}>
+                                                                      S: {formatShortDateTime(enviosProximos[0].fechaHoraSalidaUtc)}
+                                                                  </Typography>
+                                                                  <Typography variant="caption" className={styles.airportProximidadLinea}>
+                                                                      L: {formatShortDateTime(enviosProximos[0].fechaHoraLlegadaUtc)}
+                                                                  </Typography>
+                                                              </Stack>
+                                                          )}
                                                           <Typography variant="caption" className={styles.airportCode}>
                                                               {ocupacion}%
                                                           </Typography>
@@ -309,7 +320,17 @@ export function PanelAeropuertos({ aeropuertos, visible, onEnfocarAeropuerto, on
                                                               <TableBody>
                                                                   {enviosProximos.map((envio) => (
                                                                       <TableRow key={envio.envio.idPedido}>
-                                                                          <TableCell>{envio.envio.idPedido}</TableCell>
+                                                                          <TableCell
+                                                                              sx={{
+                                                                                  maxWidth: 90,
+                                                                                  overflow: 'hidden',
+                                                                                  textOverflow: 'ellipsis',
+                                                                                  whiteSpace: 'nowrap',
+                                                                              }}
+                                                                              title={envio.envio.idPedido}
+                                                                          >
+                                                                              {envio.envio.idPedido}
+                                                                          </TableCell>
                                                                           <TableCell>{envio.envio.origenIata}</TableCell>
                                                                           <TableCell>{envio.envio.destinoIata}</TableCell>
                                                                           <TableCell align="right">{envio.envio.cantidadMaletas}</TableCell>
