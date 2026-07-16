@@ -294,12 +294,12 @@ export function PanelEnvios({ aeropuertos, envios, visible, onMostrarRutaEnvio }
                                                                                         </Typography>
                                                                                         <Stack spacing={0.5}>
                                                                                             {maletas.map((codigo) => (
-                                                                                                <Stack
+                                                                                                <Box
                                                                                                     key={codigo}
-                                                                                                    direction="row"
-                                                                                                    alignItems="center"
-                                                                                                    justifyContent="space-between"
                                                                                                     sx={{
+                                                                                                        display: 'flex',
+                                                                                                        alignItems: 'center',
+                                                                                                        justifyContent: 'space-between',
                                                                                                         bgcolor: 'rgba(30, 41, 59, 0.7)',
                                                                                                         borderRadius: 1,
                                                                                                         px: 1,
@@ -341,7 +341,7 @@ export function PanelEnvios({ aeropuertos, envios, visible, onMostrarRutaEnvio }
                                                                                                     >
                                                                                                         Ruta
                                                                                                     </Button>
-                                                                                                </Stack>
+                                                                                                </Box>
                                                                                             ))}
                                                                                         </Stack>
                                                                                     </Box>

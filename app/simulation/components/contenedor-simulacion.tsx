@@ -26,7 +26,7 @@ enum SimulationType {
 type GestionTab = 'aeropuertos' | 'vuelos' | 'envios' | 'incidencias';
 
 const UN_DIA_MS = 24 * 60 * 60 * 1000;
-const K_SIMULACION = 300;
+const K_SIMULACION = 120;
 
 function formatLocalDateTime(date: Date): string {
   const pad = (value: number) => value.toString().padStart(2, '0');

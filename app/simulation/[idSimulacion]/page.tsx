@@ -20,12 +20,12 @@ export default async function SimulacionPage({
       errorInicial = 'No se pudieron cargar los aeropuertos iniciales. Verifica que el backend este activo.';
     }
 
-    const k = Number(resolvedSearchParams.k ?? 300);
+    const k = Number(resolvedSearchParams.k ?? 120);
   return (
     <SimulacionCliente
       id={resolvedParams.idSimulacion}
       topic={resolvedSearchParams.topic ?? ''}
-      k={Number.isFinite(k) && k > 0 ? k : 300}
+      k={Number.isFinite(k) && k > 0 ? k : 120}
       fechaInicial={resolvedSearchParams.fechaInicio}
       modo={resolvedSearchParams.modo ?? ''}
       aeropuertosIniciales={aeropuertosIniciales}

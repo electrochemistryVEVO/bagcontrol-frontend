@@ -869,12 +869,17 @@ function SeccionEnvios({
                                     </Typography>
                                     <Stack spacing={0.5}>
                                       {Array.from({ length: e.cantidadMaletas }, (_, i) => (
-                                        <Stack
+                                        <Box
                                           key={`${rowKey}-M${i + 1}`}
-                                          direction="row"
-                                          alignItems="center"
-                                          justifyContent="space-between"
-                                          sx={{ bgcolor: 'rgba(30,41,59,0.7)', borderRadius: 1, px: 1, py: 0.4 }}
+                                          sx={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            bgcolor: 'rgba(30,41,59,0.7)',
+                                            borderRadius: 1,
+                                            px: 1,
+                                            py: 0.4,
+                                          }}
                                         >
                                           {/* Codigo completo */}
                                           <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#e2e8f0', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', mr: 0.5 }}>
@@ -895,7 +900,7 @@ function SeccionEnvios({
                                           >
                                             Ruta
                                           </button>
-                                        </Stack>
+                                        </Box>
                                       ))}
                                     </Stack>
                                   </Box>

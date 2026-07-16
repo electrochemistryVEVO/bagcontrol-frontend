@@ -262,8 +262,8 @@ export function useSimulacion(
   // Motor lógico — intervalo estable, lee estadoSimRef para evitar closure stale
   // ============================================================================
   useEffect(() => {
-    const msSimuladosPorLote = K * 60 * 1000;   // ej: 90min → 5_400_000 ms
-    const msRealesPorLote    = SaS * 1000;       // ej: 90s  →    90_000 ms
+    const msSimuladosPorLote = K * 60 * 1000;   // ej: 120min → 7_200_000 ms
+    const msRealesPorLote    = SaS * 1000;       // ej: 30s  →    30_000 ms
     // En operación día a día, el reloj debe avanzar en tiempo real (1s real = 1s sim)
     // independientemente de K y SaS, para que un vuelo de 2h demore 2h reales
     const factorAceleracion  = modo === '0'
