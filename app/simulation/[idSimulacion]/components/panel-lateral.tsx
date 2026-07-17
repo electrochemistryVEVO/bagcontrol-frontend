@@ -26,7 +26,7 @@ import {
   Typography,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
-import React, { RefObject, useEffect, useMemo, useRef, useState } from 'react';
+import React, {RefObject, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import Draggable from 'react-draggable';
 
 import type { AeropuertoSimulacion } from '@/app/shared/types/Aeropuerto';
@@ -42,6 +42,7 @@ import {
   obtenerEstadoVuelo,
 } from '@/app/shared/simulation/semaforo';
 import styles from '../../../stylesheets/simpanel.module.css';
+import {useToast} from "@/app/shared/hooks/useToast";
 
 // ─── Tipos compartidos ────────────────────────────────────────────────────────
 
@@ -55,6 +56,20 @@ const etiquetaEstadoEnvio: Record<EstadoEnvio, string> = {
   PLANIFICADO: 'Planificado',
   EN_CURSO: 'En tránsito',
   ENTREGADO: 'Entregado',
+};
+
+const btnBase: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '6px',
+  padding: '6px 16px',
+  borderRadius: '6px',
+  fontWeight: 600,
+  fontSize: '14px',
+  cursor: 'pointer',
+  border: '2px solid',
+  color: '#111827',
+  transition: 'opacity .15s',
 };
 
 const ESTADOS_CAPACIDAD: EstadoCapacidad[] = ['VACIO', 'VERDE', 'AMARILLO', 'ROJO'];
@@ -80,8 +95,10 @@ type PanelLateralProps = {
   visible: boolean;
   idSimulacion: string;
   tiempoSimulacionRef: RefObject<number>;
+  modo:string|undefined;
   // vuelos
   vuelosActivos: EventoVuelo[];
+  vuelosActivosRef: RefObject<Map<string, EventoVuelo>>;
   seleccionarVuelo: (codigoVuelo: string) => void;
   onEnfocarVuelo: (codigoVuelo: string | number) => void;
   onFiltradoVuelosCambiado?: (codigos: string[] | null) => void;
@@ -117,6 +134,8 @@ export function PanelLateral({
   visible,
   idSimulacion,
   vuelosActivos,
+    modo,
+    vuelosActivosRef,
   tiempoSimulacionRef,
   seleccionarVuelo,
   onEnfocarVuelo,
@@ -187,7 +206,9 @@ export function PanelLateral({
           <SeccionVuelos
             idSimulacion={idSimulacion}
             vuelosActivos={vuelosActivos}
+            modo={modo}
             tiempoSimulacionRef={tiempoSimulacionRef}
+            vuelosActivosRef={vuelosActivosRef}
             seleccionarVuelo={seleccionarVuelo}
             onEnfocarVuelo={onEnfocarVuelo}
             onFiltradoCambiado={onFiltradoVuelosCambiado}
@@ -218,6 +239,8 @@ export function PanelLateral({
 function SeccionVuelos({
   idSimulacion,
   vuelosActivos,
+  vuelosActivosRef,
+    modo,
   tiempoSimulacionRef,
   seleccionarVuelo,
   onEnfocarVuelo,
@@ -226,6 +249,8 @@ function SeccionVuelos({
 }: {
   idSimulacion: string;
   vuelosActivos: EventoVuelo[];
+  vuelosActivosRef: RefObject<Map<string, EventoVuelo>>;
+  modo:string|undefined,
   tiempoSimulacionRef: RefObject<number>;
   seleccionarVuelo: (codigoVuelo: string) => void;
   onEnfocarVuelo: (codigoVuelo: string | number) => void;
@@ -243,6 +268,23 @@ function SeccionVuelos({
   const [errorPorVuelo, setErrorPorVuelo] = useState<Record<string, string>>({});
   const [page, setPage] = useState(1);
   const rowsPerPage = 20;
+  const toast = useToast();
+
+  const flightCancelDebounce = useRef<boolean>(true);
+  flightCancelDebounce.current = true;
+
+  const handleDetener = useCallback((vuelo:EventoVuelo)=>{
+    console.log(flightCancelDebounce.current)
+    //Debounce
+    if(!flightCancelDebounce.current)return;
+    flightCancelDebounce.current = false;
+    //Borrar vuelo de vuelos activos
+    //vuelosActivosRef.current.delete(String(vuelo.codigoVuelo))
+    //Cancelar vuelo en back
+    const ts = new Date(tiempoSimulacionRef.current).toISOString();
+    SimulacionService.cancelarVuelo(idSimulacion, vuelo, ts).then(r  => {})
+        .catch((err)=>{console.error(err);toast.showToast("Error al cancelar vuelo","error")})
+  },[])
 
   const vuelosFiltrados = useMemo(() => {
     const filtro = busqueda.trim().toLowerCase();
@@ -263,6 +305,8 @@ function SeccionVuelos({
         return direccionOrden === 'asc' ? diferencia : -diferencia;
       });
   }, [busqueda, orden, direccionOrden, filtroEstados, vuelosActivos]);
+
+
 
   const hayFiltro = busqueda.trim() !== '' || filtroEstados.length < ESTADOS_CAPACIDAD.length;
   useEffect(() => {
@@ -354,6 +398,7 @@ function SeccionVuelos({
                   const maletas = enviosCargados ? envios.reduce((s, e) => s + e.cantidadMaletas, 0) : vuelo.cantidadMaletas;
                   const ocup = calcularOcupacionVuelo(maletas, vuelo.capacidadMax);
                   const estado = enviosCargados ? obtenerEstadoPorOcupacion(ocup) : obtenerEstadoVuelo(vuelo);
+
                   return (
                     <Box key={codigo} className={styles.airportBoxList}>
                       <Button fullWidth onClick={() => seleccionarVuelo(codigo)} className={styles.airportButton}>
@@ -375,8 +420,21 @@ function SeccionVuelos({
                             </Stack>
                             <Typography variant="caption" className={styles.airportOccupation}>{ocup}%</Typography>
                           </Stack>
+
                         </Box>
                       </Button>
+                      {modo === '0' && (<Button fullWidth
+                                                sx={{
+                                                  ...btnBase,
+                                                  borderColor: '#dc2626',
+                                                  background: '#f87171',
+                                                  opacity: 1,
+                                                  cursor: 'pointer',
+                                                }}
+                                                onClick={()=>{handleDetener(vuelo)}}
+                      >
+                        Cancelar
+                      </Button>)}
                       {expandido && (
                         <Box className={styles.expandedContent}>
                           {loadingPorVuelo[codigo] ? (

@@ -39,6 +39,8 @@ export const SimulacionService = {
         axiosApi.get(`/simulacion/${idSimulacion}/snapshot`),
     obtenerEnviosPorVuelo: (idSimulacion: string, flight:EventoVuelo,timestamp:string) =>
         axiosApi.post<Envio[]>(`/simulacion/${idSimulacion}/vuelos/envios`, { flight,timestamp }),
+    cancelarVuelo: (idSimulacion: string, flight:EventoVuelo,timestamp:string) =>
+        axiosApi.post<Envio[]>(`/simulacion/${idSimulacion}/vuelos/cancelar`, { flight,timestamp }),
     obtenerRutaEnvio: (idSimulacion: string, idPedido: string, timestamp: string) =>
         axiosApi.get<EnvioRuta>(`/simulacion/${idSimulacion}/envios/${idPedido}/ruta`, { params: { timestamp } }),
     obtenerEnviosPorAlmacen: (idSimulacion: string, codigoIata: string, timestamp: string) =>
