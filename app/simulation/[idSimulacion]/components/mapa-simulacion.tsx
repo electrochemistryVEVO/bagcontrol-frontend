@@ -847,6 +847,8 @@ export function MapaSimulacion({
         visible={conectado}
         idSimulacion={idSimulacion}
         vuelosActivos={vuelosPanel}
+        modo={modo}
+        vuelosActivosRef = {vuelosActivosRef}
         tiempoSimulacionRef={tiempoSimulacionRef}
         seleccionarVuelo={seleccionarVuelo}
         onEnfocarVuelo={enfocarVueloSeleccionado}
