@@ -141,7 +141,7 @@ export function SimulacionCliente({ id, topic, fechaInicial, k, modo, aeropuerto
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <header style={{ padding: '0.6rem 1rem', background: '#ffffff', color: '#111827', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+      <header style={{ padding: '0.2rem 1rem', background: '#ffffff', color: '#111827', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
         <span style={{ fontSize: '13px', opacity: 0.8 }}>ID Simulacion: {id}</span>
         <span style={{ color: colorEstado[estadoSim], fontWeight: 600 }}>
           ● {etiquetaEstado[estadoSim]}

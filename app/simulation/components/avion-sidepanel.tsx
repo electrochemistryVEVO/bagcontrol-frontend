@@ -9,6 +9,20 @@ import {Aeropuerto} from "@/app/shared/types/Aeropuerto";
 import {HourFormat} from "@/app/shared/Utils";
 
 
+const btnBase: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '6px 16px',
+    borderRadius: '6px',
+    fontWeight: 600,
+    fontSize: '14px',
+    cursor: 'pointer',
+    border: '2px solid',
+    color: '#111827',
+    transition: 'opacity .15s',
+};
+
 function SidePanelContents({
     flight,
     isOpen,

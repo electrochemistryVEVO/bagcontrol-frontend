@@ -108,6 +108,7 @@ export function useSimulacion(
     }
 
     // 1. Procesar eventos de control (ciclo de vida)
+    //NOTA: Cancelacion de eventos se procesa aqui para realizarse lo mas rapido posible
     for (const e of lote.eventos) {
       const tipo = e.tipo;
       switch (tipo) {
@@ -143,6 +144,16 @@ export function useSimulacion(
           setEstadoSim('detenida');
           void sincronizarTiemposReales();
           break;
+        case 'VUELO_CANCELADO':
+          console.log(`Vuelo cancelado: ${e}`)
+            vuelosActivos.current.delete(String((e as EventoVuelo).codigoVuelo));
+          console.log(e as EventoVuelo)
+            for(const envio of (e as EventoVuelo).codigoEnvios)
+            {
+              console.log(`Envio ${envio} eliminado`)
+              delete enviosPlanificados.current[envio];
+            }
+            break;
         case 'ERROR':
           setEstadoSim('error');
           break;
