@@ -44,8 +44,8 @@ function obtenerMensajeError(error: unknown): string | null {
 }
 
 function modoLabel(modo?: string) {
-  if (modo === String(SimulationType.VENTANA_CINCO_DIAS)) return '5 dias';
-  if (modo === String(SimulationType.COLAPSO_OPERATIVO)) return 'Hasta colapso';
+  if (modo === '1') return '5 dias';
+  if (modo === '2') return 'Hasta colapso';
   return 'Simulacion';
 }
 

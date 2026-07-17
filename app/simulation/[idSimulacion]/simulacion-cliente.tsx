@@ -128,22 +128,22 @@ export function SimulacionCliente({ id, topic, fechaInicial, k, modo, aeropuerto
   const btnBase: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: '6px',
-    padding: '6px 16px',
-    borderRadius: '6px',
+    gap: '4px',
+    padding: '3px 12px',
+    borderRadius: '5px',
     fontWeight: 600,
-    fontSize: '14px',
+    fontSize: '13px',
     cursor: 'pointer',
-    border: '2px solid',
+    border: '1px solid',
     color: '#111827',
     transition: 'opacity .15s',
   };
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <header style={{ padding: '0.2rem 1rem', background: '#ffffff', color: '#111827', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: '13px', opacity: 0.8 }}>ID Simulacion: {id}</span>
-        <span style={{ color: colorEstado[estadoSim], fontWeight: 600 }}>
+      <header style={{ padding: '0.15rem 1rem', minHeight: '32px', background: '#ffffff', color: '#111827', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: '12px', opacity: 0.8 }}>ID Simulacion: {id}</span>
+        <span style={{ color: colorEstado[estadoSim], fontWeight: 600, fontSize: '13px' }}>
           ● {etiquetaEstado[estadoSim]}
         </span>
 
