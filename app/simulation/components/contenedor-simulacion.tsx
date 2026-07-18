@@ -5,7 +5,7 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { Map, MapRef } from '@vis.gl/react-maplibre';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Alert, Box, Button, Chip, Tab, Tabs, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, FormControl, InputLabel, MenuItem, Select, Tab, Tabs, Typography } from '@mui/material';
 import styles from '../../stylesheets/contenedor.module.css';
 import {
   ParametrosSimulacion,
@@ -53,6 +53,7 @@ export function ContenedorSimulacion() {
   const router = useRouter();
   const [startDate, setStartDate] = useState<Date | null>(new Date('2026-02-10T08:30:00'));
   const [simulationType, setSimulationType] = useState<SimulationType>(SimulationType.VENTANA_CINCO_DIAS);
+  const [kSimulacion, setKSimulacion] = useState<number>(K_SIMULACION);
   const [gestionTab, setGestionTab] = useState<GestionTab>('aeropuertos');
   const [activas, setActivas] = useState<SimulacionActiva[]>([]);
   const [cargandoActivas, setCargandoActivas] = useState(false);
@@ -89,7 +90,7 @@ export function ContenedorSimulacion() {
 
   const abrirSimulacion = (simulacion: SimulacionActiva) => {
     const modo = simulacion.modo ?? '1';
-    const k = simulacion.k ?? K_SIMULACION;
+    const k = [60, 120, 180].includes(simulacion.k ?? 0) ? simulacion.k! : K_SIMULACION;
     const topic = simulacion.websocketTopic ?? `/topic/simulacion/${simulacion.simulacionId}/eventos`;
     const fechaInicio = simulacion.fechaInicio ? `&fechaInicio=${encodeURIComponent(simulacion.fechaInicio)}` : '';
     router.push(`/simulation/${simulacion.simulacionId}?topic=${encodeURIComponent(topic)}&k=${k}&modo=${modo}${fechaInicio}`);
@@ -112,7 +113,7 @@ export function ContenedorSimulacion() {
     const params: ParametrosSimulacion = {
       fechaInicio: formattedStart,
       fechaFin: fechaFin ? formatLocalDateTime(fechaFin) : undefined,
-      k: K_SIMULACION,
+      k: kSimulacion,
       modo: String(modo === SimulationType.VENTANA_CINCO_DIAS ? 1 : 2),
     };
 
@@ -214,6 +215,20 @@ export function ContenedorSimulacion() {
                   selected={startDate}
                 />
               </div>
+
+              <FormControl fullWidth size="small" sx={{ mt: 2 }}>
+                <InputLabel id="k-simulacion-label">Bloque K</InputLabel>
+                <Select
+                  labelId="k-simulacion-label"
+                  value={kSimulacion}
+                  label="Bloque K"
+                  onChange={(event) => setKSimulacion(Number(event.target.value))}
+                >
+                  <MenuItem value={60}>60 minutos</MenuItem>
+                  <MenuItem value={120}>120 minutos</MenuItem>
+                  <MenuItem value={180}>180 minutos</MenuItem>
+                </Select>
+              </FormControl>
 
               <Button fullWidth variant="contained" onClick={crearEscenario} disabled={preparando} sx={{ mt: 2 }}>
                 {preparando ? 'Preparando...' : 'Crear simulacion'}
