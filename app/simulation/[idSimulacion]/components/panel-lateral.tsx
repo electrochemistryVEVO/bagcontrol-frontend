@@ -32,7 +32,7 @@ import Draggable from 'react-draggable';
 import type { AeropuertoSimulacion } from '@/app/shared/types/Aeropuerto';
 import type { EstadoCapacidad, EventoVuelo } from '@/app/shared/types/Evento';
 import type { Envio, MaletaSimulacion } from '@/app/shared/types/Envio';
-import { SimulacionService } from '@/app/services/simulation.service';
+import { SimulacionService, type VueloCancelable } from '@/app/services/simulation.service';
 import { formatShortDateTime } from '@/app/shared/dateTime';
 import {
   calcularOcupacionAeropuerto,
@@ -49,27 +49,15 @@ import {useToast} from "@/app/shared/hooks/useToast";
 type OrdenVuelos = 'ocupacion' | 'salida' | 'llegada' | 'origen' | 'destino';
 type OrdenAeropuertos = 'calcularOcupacion' | 'calcularProximidadSalida' | 'calcularProximidadLlegada';
 type DireccionOrden = 'asc' | 'desc';
-type EstadoEnvio = 'EN_CURSO' | 'ENTREGADO' | 'PLANIFICADO';
+type EstadoEnvio = 'EN_CURSO' | 'ENTREGADO' | 'PLANIFICADO' | 'POR_PLANIFICAR';
 type FiltroEnvio = EstadoEnvio | 'ULTIMAS_HORAS' | '';
+type SeccionPanel = 'vuelos' | 'aeropuertos' | 'envios';
 
 const etiquetaEstadoEnvio: Record<EstadoEnvio, string> = {
   PLANIFICADO: 'Planificado',
+  POR_PLANIFICAR: 'Por planificar',
   EN_CURSO: 'En tránsito',
   ENTREGADO: 'Entregado',
-};
-
-const btnBase: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '6px',
-  padding: '6px 16px',
-  borderRadius: '6px',
-  fontWeight: 600,
-  fontSize: '14px',
-  cursor: 'pointer',
-  border: '2px solid',
-  color: '#111827',
-  transition: 'opacity .15s',
 };
 
 const ESTADOS_CAPACIDAD: EstadoCapacidad[] = ['VACIO', 'VERDE', 'AMARILLO', 'ROJO'];
@@ -128,6 +116,34 @@ function chipVacio(estado: EstadoCapacidad, activo: boolean) {
     : {};
 }
 
+const seccionIntegradaSx = {
+  bgcolor: 'transparent',
+  color: 'inherit',
+  flex: 1,
+  minHeight: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden',
+  '&:before': { display: 'none' },
+  '& > .MuiCollapse-root': {
+    flex: 1,
+    minHeight: 0,
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  '& > .MuiCollapse-root > .MuiCollapse-wrapper': {
+    flex: 1,
+    minHeight: 0,
+    display: 'flex',
+  },
+  '& > .MuiCollapse-root > .MuiCollapse-wrapper > .MuiCollapse-wrapperInner': {
+    flex: 1,
+    minHeight: 0,
+    display: 'flex',
+    flexDirection: 'column',
+  },
+} as const;
+
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export function PanelLateral({
@@ -150,11 +166,13 @@ export function PanelLateral({
   onLimpiarSeleccionRelacionada,
 }: PanelLateralProps) {
   const nodeRef = useRef<HTMLDivElement>(null);
+  const [seccionActiva, setSeccionActiva] = useState<SeccionPanel>('vuelos');
+  const [panelContraido, setPanelContraido] = useState(true);
 
   if (!visible) return null;
 
   return (
-    <Draggable nodeRef={nodeRef as RefObject<HTMLDivElement>} handle=".drag-handle">
+    <Draggable nodeRef={nodeRef as RefObject<HTMLDivElement>} handle=".drag-handle" cancel=".panel-toggle">
       <Paper
         ref={nodeRef}
         elevation={8}
@@ -163,9 +181,10 @@ export function PanelLateral({
           top: 88,
           left: 16,
           zIndex: 21,
-          width: 390,
+          width: panelContraido ? 190 : 430,
           maxWidth: 'calc(100vw - 32px)',
-          maxHeight: '82vh',
+          height: panelContraido ? 'auto' : '82vh',
+          maxHeight: 'calc(100vh - 104px)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -173,6 +192,7 @@ export function PanelLateral({
           color: '#f8fafc',
           border: '1px solid rgba(148, 163, 184, 0.24)',
           borderRadius: 2,
+          transition: 'width 160ms ease',
         }}
       >
         {/* Barra de arrastre */}
@@ -192,10 +212,37 @@ export function PanelLateral({
         >
           <span style={{ fontSize: 13, color: '#94a3b8', letterSpacing: 2 }}>⠿</span>
           <Typography sx={{ fontSize: 12, color: '#64748b' }}>Paneles</Typography>
+          <Button
+            className="panel-toggle"
+            size="small"
+            variant="text"
+            onClick={() => setPanelContraido((actual) => !actual)}
+            aria-expanded={!panelContraido}
+            sx={{ ml: 'auto', minWidth: 0, px: 1, color: '#cbd5e1', textTransform: 'none', fontSize: 11 }}
+          >
+            {panelContraido ? 'Expandir' : 'Contraer'}
+          </Button>
         </Box>
 
-        {/* Contenido scrollable */}
-        <Box sx={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
+        <Box sx={{ display: panelContraido ? 'none' : 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+        <Box sx={{ px: 1.5, py: 1.25, borderBottom: '1px solid rgba(148,163,184,0.15)' }}>
+          <FormControl size="small" fullWidth className={styles.input}>
+            <InputLabel id="seccion-panel-label">Contenido</InputLabel>
+            <Select
+              labelId="seccion-panel-label"
+              value={seccionActiva}
+              label="Contenido"
+              onChange={(event: SelectChangeEvent) => setSeccionActiva(event.target.value as SeccionPanel)}
+            >
+              <MenuItem value="vuelos">Vuelos en aire ({vuelosActivos.length})</MenuItem>
+              <MenuItem value="aeropuertos">Aeropuertos ({aeropuertos.length})</MenuItem>
+              <MenuItem value="envios">Envíos ({envios.length})</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
+
+        {/* La sección seleccionada usa todo el espacio restante. */}
+        <Box sx={{ overflow: 'hidden', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           {haySeleccionRelacionada && (
             <Box sx={{ px: 2, py: 1, borderBottom: '1px solid rgba(148,163,184,0.15)' }}>
               <Button size="small" variant="outlined" onClick={onLimpiarSeleccionRelacionada} fullWidth>
@@ -203,7 +250,7 @@ export function PanelLateral({
               </Button>
             </Box>
           )}
-          <SeccionVuelos
+          {seccionActiva === 'vuelos' && <SeccionVuelos
             idSimulacion={idSimulacion}
             vuelosActivos={vuelosActivos}
             modo={modo}
@@ -213,19 +260,23 @@ export function PanelLateral({
             onEnfocarVuelo={onEnfocarVuelo}
             onFiltradoCambiado={onFiltradoVuelosCambiado}
             onMostrarRutaEnvio={onMostrarRutaEnvio}
-          />
-          <SeccionAeropuertos
+            integrada
+          />}
+          {seccionActiva === 'aeropuertos' && <SeccionAeropuertos
             aeropuertos={aeropuertos}
             onEnfocarAeropuerto={onEnfocarAeropuerto}
             onFiltradoCambiado={onFiltradoAeropuertosCambiado}
             onMostrarRutaEnvio={onMostrarRutaEnvio}
-          />
-          <SeccionEnvios
+            integrada
+          />}
+          {seccionActiva === 'envios' && <SeccionEnvios
             key={idSimulacion}
             envios={envios}
             tiempoSimulacion={tiempoSimulacion}
             onMostrarRutaEnvio={onMostrarRutaEnvio}
-          />
+            integrada
+          />}
+        </Box>
         </Box>
       </Paper>
     </Draggable>
@@ -246,6 +297,7 @@ function SeccionVuelos({
   onEnfocarVuelo,
   onFiltradoCambiado,
   onMostrarRutaEnvio,
+  integrada,
 }: {
   idSimulacion: string;
   vuelosActivos: EventoVuelo[];
@@ -256,6 +308,7 @@ function SeccionVuelos({
   onEnfocarVuelo: (codigoVuelo: string | number) => void;
   onFiltradoCambiado?: (codigos: string[] | null) => void;
   onMostrarRutaEnvio: (idPedido: string) => void;
+  integrada?: boolean;
 }) {
   const [abierto, setAbierto] = useState(false);
   const [busqueda, setBusqueda] = useState('');
@@ -266,25 +319,61 @@ function SeccionVuelos({
   const [enviosPorVuelo, setEnviosPorVuelo] = useState<Record<string, Envio[]>>({});
   const [loadingPorVuelo, setLoadingPorVuelo] = useState<Record<string, boolean>>({});
   const [errorPorVuelo, setErrorPorVuelo] = useState<Record<string, string>>({});
+  const [vuelosCancelables, setVuelosCancelables] = useState<VueloCancelable[]>([]);
+  const [cargandoCancelables, setCargandoCancelables] = useState(false);
+  const [cancelandoVuelo, setCancelandoVuelo] = useState<number | null>(null);
+  const [cancelablesAbiertos, setCancelablesAbiertos] = useState(false);
+  const [origenCancelacion, setOrigenCancelacion] = useState('');
+  const [destinoCancelacion, setDestinoCancelacion] = useState('');
+  const [busquedaCancelablesRealizada, setBusquedaCancelablesRealizada] = useState(false);
   const [page, setPage] = useState(1);
   const rowsPerPage = 20;
   const toast = useToast();
+  const abiertoEfectivo = integrada || abierto;
 
-  const flightCancelDebounce = useRef<boolean>(true);
-  flightCancelDebounce.current = true;
+  const cargarCancelables = useCallback(async () => {
+    if (!abiertoEfectivo || !cancelablesAbiertos || modo !== '1') return;
+    setCargandoCancelables(true);
+    try {
+      const instante = new Date(tiempoSimulacionRef.current).toISOString();
+      const { data } = await SimulacionService.obtenerVuelosCancelables(idSimulacion, instante);
+      setVuelosCancelables(data);
+    } catch {
+      setVuelosCancelables([]);
+    } finally {
+      setCargandoCancelables(false);
+    }
+  }, [abiertoEfectivo, cancelablesAbiertos, idSimulacion, modo, tiempoSimulacionRef]);
 
-  const handleDetener = useCallback((vuelo:EventoVuelo)=>{
-    console.log(flightCancelDebounce.current)
-    //Debounce
-    if(!flightCancelDebounce.current)return;
-    flightCancelDebounce.current = false;
-    //Borrar vuelo de vuelos activos
-    //vuelosActivosRef.current.delete(String(vuelo.codigoVuelo))
-    //Cancelar vuelo en back
-    const ts = new Date(tiempoSimulacionRef.current).toISOString();
-    SimulacionService.cancelarVuelo(idSimulacion, vuelo, ts).then(r  => {})
-        .catch((err)=>{console.error(err);toast.showToast("Error al cancelar vuelo","error")})
-  },[])
+  const vuelosCancelablesFiltrados = useMemo(() => vuelosCancelables.filter((vuelo) =>
+    (!origenCancelacion.trim() || vuelo.origenIata.toUpperCase() === origenCancelacion.trim().toUpperCase())
+    && (!destinoCancelacion.trim() || vuelo.destinoIata.toUpperCase() === destinoCancelacion.trim().toUpperCase())
+  ).slice(0, 5), [destinoCancelacion, origenCancelacion, vuelosCancelables]);
+
+  const buscarCancelables = async () => {
+    if (!origenCancelacion.trim() && !destinoCancelacion.trim()) return;
+    setBusquedaCancelablesRealizada(true);
+    await cargarCancelables();
+  };
+
+  const cancelarProximaOcurrencia = async (vuelo: VueloCancelable) => {
+    const confirmar = window.confirm(
+      `Se cancelará únicamente el vuelo ${vuelo.codigoVuelo} del ${formatShortDateTime(vuelo.horaSalidaUtc)}. ` +
+      'Las demás ocurrencias continuarán disponibles.'
+    );
+    if (!confirmar) return;
+    setCancelandoVuelo(vuelo.codigoVuelo);
+    try {
+      const instante = new Date(tiempoSimulacionRef.current).toISOString();
+      await SimulacionService.cancelarProximaOcurrencia(idSimulacion, vuelo.codigoVuelo, instante);
+      toast.showToast('Cancelación registrada; los envíos serán replanificados', 'success');
+      await cargarCancelables();
+    } catch {
+      toast.showToast('No se pudo registrar la cancelación', 'error');
+    } finally {
+      setCancelandoVuelo(null);
+    }
+  };
 
   const vuelosFiltrados = useMemo(() => {
     const filtro = busqueda.trim().toLowerCase();
@@ -334,18 +423,96 @@ function SeccionVuelos({
 
   return (
     <Accordion
-      expanded={abierto}
-      onChange={(_, v) => setAbierto(v)}
+      expanded={abiertoEfectivo}
+      onChange={(_, v) => { if (!integrada) setAbierto(v); }}
       disableGutters
-      sx={{ bgcolor: 'transparent', color: 'inherit', '&:before': { display: 'none' }, borderBottom: '1px solid rgba(148,163,184,0.15)' }}
+      sx={seccionIntegradaSx}
     >
-      <AccordionSummary className={styles.accordionSummary}>
+      <AccordionSummary className={styles.accordionSummary} sx={{ display: integrada ? 'none' : undefined }}>
         <Typography sx={{ fontWeight: 700 }}>Vuelos en aire</Typography>
         <Chip size="small" label={vuelosActivos.length} color={vuelosActivos.length ? 'primary' : 'default'} />
       </AccordionSummary>
-      <AccordionDetails className={styles.accordionDetails}>
-        {abierto && (
+      <AccordionDetails className={styles.accordionDetails} sx={{ flex: 1, minHeight: 0, maxHeight: 'none' }}>
+        {abiertoEfectivo && (
           <>
+            {modo === '1' && (
+              <Accordion
+                expanded={cancelablesAbiertos}
+                onChange={(_, expandido) => setCancelablesAbiertos(expandido)}
+                disableGutters
+                sx={{ mb: 1.5, flexShrink: 0, bgcolor: 'rgba(120,53,15,0.16)', color: 'inherit', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '4px !important', '&:before': { display: 'none' } }}
+              >
+                <AccordionSummary sx={{ minHeight: '40px !important', px: 1, '& .MuiAccordionSummary-content': { my: 0.75, alignItems: 'center', justifyContent: 'space-between' } }}>
+                  <Typography sx={{ fontSize: 12, fontWeight: 800, color: '#fbbf24' }}>
+                    Vuelos cancelables
+                  </Typography>
+                </AccordionSummary>
+                <AccordionDetails sx={{ px: 1, pt: 0, pb: 1, maxHeight: '38vh', overflowY: 'auto' }}>
+                  <Stack spacing={1}>
+                    <Stack direction="row" spacing={1}>
+                      <TextField
+                        size="small"
+                        value={origenCancelacion}
+                        onChange={(event) => { setOrigenCancelacion(event.target.value); setBusquedaCancelablesRealizada(false); }}
+                        placeholder="Origen"
+                        slotProps={{ htmlInput: { maxLength: 4 } }}
+                        fullWidth
+                        className={styles.input}
+                      />
+                      <TextField
+                        size="small"
+                        value={destinoCancelacion}
+                        onChange={(event) => { setDestinoCancelacion(event.target.value); setBusquedaCancelablesRealizada(false); }}
+                        placeholder="Destino"
+                        slotProps={{ htmlInput: { maxLength: 4 } }}
+                        fullWidth
+                        className={styles.input}
+                      />
+                    </Stack>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      color="warning"
+                      fullWidth
+                      disabled={cargandoCancelables || (!origenCancelacion.trim() && !destinoCancelacion.trim())}
+                      onClick={() => void buscarCancelables()}
+                    >
+                      Buscar
+                    </Button>
+                    {cargandoCancelables && (
+                      <Box sx={{ display: 'flex', justifyContent: 'center', py: 1 }}><CircularProgress size={20} /></Box>
+                    )}
+                    {!cargandoCancelables && busquedaCancelablesRealizada && vuelosCancelablesFiltrados.length === 0 && (
+                      <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                        No hay vuelos futuros con envíos para esa ruta.
+                      </Typography>
+                    )}
+                    {!cargandoCancelables && busquedaCancelablesRealizada && vuelosCancelablesFiltrados.map((vuelo) => (
+                      <Box key={`${vuelo.codigoVuelo}|${vuelo.horaSalidaUtc}`} sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography sx={{ fontSize: 11.5, fontWeight: 700 }}>
+                            {vuelo.codigoVuelo} · {vuelo.origenIata} → {vuelo.destinoIata}
+                          </Typography>
+                          <Typography sx={{ fontSize: 10.5, color: '#cbd5e1' }}>
+                            {formatShortDateTime(vuelo.horaSalidaUtc)} · {vuelo.enviosAfectados.length} envíos · {vuelo.cantidadMaletas} maletas
+                          </Typography>
+                        </Box>
+                        <Button
+                          size="small"
+                          color="warning"
+                          variant="contained"
+                          disabled={cancelandoVuelo === vuelo.codigoVuelo}
+                          onClick={() => void cancelarProximaOcurrencia(vuelo)}
+                          sx={{ flexShrink: 0, fontSize: 10 }}
+                        >
+                          Cancelar
+                        </Button>
+                      </Box>
+                    ))}
+                  </Stack>
+                </AccordionDetails>
+              </Accordion>
+            )}
             <Stack spacing={1.5} className={styles.filtersContainer}>
               <TextField size="small" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar vuelo, origen o destino" fullWidth className={styles.input} />
               <Stack direction="row" spacing={1.5} className={styles.orderContainer}>
@@ -398,6 +565,13 @@ function SeccionVuelos({
                   const maletas = enviosCargados ? envios.reduce((s, e) => s + e.cantidadMaletas, 0) : vuelo.cantidadMaletas;
                   const ocup = calcularOcupacionVuelo(maletas, vuelo.capacidadMax);
                   const estado = enviosCargados ? obtenerEstadoPorOcupacion(ocup) : obtenerEstadoVuelo(vuelo);
+                  const colorCapacidad = estado === 'ROJO'
+                    ? '#dc2626'
+                    : estado === 'AMARILLO'
+                      ? '#d97706'
+                      : estado === 'VERDE'
+                        ? '#16a34a'
+                        : '#475569';
 
                   return (
                     <Box key={codigo} className={styles.airportBoxList}>
@@ -405,11 +579,19 @@ function SeccionVuelos({
                         <Box className={styles.airportContent}>
                           <Stack className={styles.airportHeader}>
                             <Typography className={styles.airportCode}>Vuelo {codigo}</Typography>
-                            <Chip size="small" label={estado} color={colorPorEstado[estado]} />
+                            <Stack className={styles.airportChips}>
+                              <Chip
+                                size="small"
+                                label={`${maletas}/${vuelo.capacidadMax}`}
+                                title={`Capacidad: ${estado}`}
+                                sx={{ bgcolor: colorCapacidad, color: '#fff', fontWeight: 700 }}
+                              />
+                            </Stack>
                           </Stack>
-                          <Typography variant="body2" className={styles.airportLocation}>{vuelo.origenIata} - {vuelo.destinoIata}</Typography>
                           <Stack className={styles.airportFooter}>
-                            <Typography variant="caption" className={styles.airportCapacity}>{maletas}/{vuelo.capacidadMax} maletas</Typography>
+                            <Typography variant="body2" className={styles.airportLocation}>
+                              {vuelo.origenIata} → {vuelo.destinoIata}
+                            </Typography>
                             <Stack className={styles.airportProximidad}>
                               <Typography variant="caption" className={styles.airportProximidadLinea}>
                                 S: {formatShortDateTime(vuelo.horaSalidaUtc)}
@@ -418,23 +600,10 @@ function SeccionVuelos({
                                 L: {formatShortDateTime(vuelo.horaLlegadaUtc)}
                               </Typography>
                             </Stack>
-                            <Typography variant="caption" className={styles.airportOccupation}>{ocup}%</Typography>
                           </Stack>
 
                         </Box>
                       </Button>
-                      {modo === '0' && (<Button fullWidth
-                                                sx={{
-                                                  ...btnBase,
-                                                  borderColor: '#dc2626',
-                                                  background: '#f87171',
-                                                  opacity: 1,
-                                                  cursor: 'pointer',
-                                                }}
-                                                onClick={()=>{handleDetener(vuelo)}}
-                      >
-                        Cancelar
-                      </Button>)}
                       {expandido && (
                         <Box className={styles.expandedContent}>
                           {loadingPorVuelo[codigo] ? (
@@ -523,11 +692,13 @@ function SeccionAeropuertos({
   onEnfocarAeropuerto,
   onFiltradoCambiado,
   onMostrarRutaEnvio,
+  integrada,
 }: {
   aeropuertos: AeropuertoSimulacion[];
   onEnfocarAeropuerto: (iata: string) => void;
   onFiltradoCambiado?: (iatas: string[] | null) => void;
   onMostrarRutaEnvio: (idPedido: string) => void;
+  integrada?: boolean;
 }) {
   const [abierto, setAbierto] = useState(false);
   const [busqueda, setBusqueda] = useState('');
@@ -535,6 +706,7 @@ function SeccionAeropuertos({
   const [filtroEstados, setFiltroEstados] = useState<EstadoCapacidad[]>(ESTADOS_CAPACIDAD);
   const [tipoOrden, setTipoOrden] = useState<OrdenAeropuertos>('calcularOcupacion');
   const [direccionOrden, setDireccionOrden] = useState<DireccionOrden>('desc');
+  const abiertoEfectivo = integrada || abierto;
   const expandido: string | null = null;
   const maletasPorAeropuerto: Record<string, MaletaSimulacion[]> = {};
   const loadingMaletas: Record<string, boolean> = {};
@@ -570,17 +742,17 @@ function SeccionAeropuertos({
 
   return (
     <Accordion
-      expanded={abierto}
-      onChange={(_, v) => setAbierto(v)}
+      expanded={abiertoEfectivo}
+      onChange={(_, v) => { if (!integrada) setAbierto(v); }}
       disableGutters
-      sx={{ bgcolor: 'transparent', color: 'inherit', '&:before': { display: 'none' }, borderBottom: '1px solid rgba(148,163,184,0.15)' }}
+      sx={seccionIntegradaSx}
     >
-      <AccordionSummary className={styles.accordionSummary}>
+      <AccordionSummary className={styles.accordionSummary} sx={{ display: integrada ? 'none' : undefined }}>
         <Typography sx={{ fontWeight: 700 }}>Aeropuertos</Typography>
         <Chip size="small" label={aeropuertos.length} color={aeropuertos.length ? 'primary' : 'default'} />
       </AccordionSummary>
-      <AccordionDetails className={styles.accordionDetails}>
-        {abierto && (
+      <AccordionDetails className={styles.accordionDetails} sx={{ flex: 1, minHeight: 0, maxHeight: 'none' }}>
+        {abiertoEfectivo && (
           <>
             <Stack spacing={1.5} className={styles.filtersContainer}>
               <TextField size="small" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar por código IATA" fullWidth className={styles.input} />
@@ -631,10 +803,16 @@ function SeccionAeropuertos({
             ) : (
               <Stack spacing={1} className={styles.scrollList}>
                 {aeropuertosOrdenados.map((aeropuerto) => {
-                  const ocup = calcularOcupacionAeropuerto(aeropuerto);
                   const estado = obtenerEstadoAeropuerto(aeropuerto);
                   const proximosSLA = aeropuerto.enviosProximosAVencer || [];
                   const estaExpandido = expandido === aeropuerto.codigoIata;
+                  const colorCapacidad = estado === 'ROJO'
+                    ? '#dc2626'
+                    : estado === 'AMARILLO'
+                      ? '#d97706'
+                      : estado === 'VERDE'
+                        ? '#16a34a'
+                        : '#475569';
                   return (
                     <Box key={aeropuerto.codigoIata} className={styles.airportBoxList}>
                       <Button fullWidth onClick={() => toggleExpandido(aeropuerto.codigoIata)} className={styles.airportButton}>
@@ -642,13 +820,18 @@ function SeccionAeropuertos({
                           <Stack className={styles.airportHeader}>
                             <Typography className={styles.airportCode}>{aeropuerto.codigoIata}</Typography>
                             <Stack className={styles.airportChips}>
-                              {proximosSLA.length > 0 && <Chip size="small" label={`${proximosSLA.length} SLA`} color="warning" variant="outlined" />}
-                              <Chip size="small" label={estado} color={colorPorEstado[estado]} />
+                              <Chip
+                                size="small"
+                                label={`${aeropuerto.maletasActuales}/${aeropuerto.capacidadAlmacen}`}
+                                title={`Capacidad: ${estado}`}
+                                sx={{ bgcolor: colorCapacidad, color: '#fff', fontWeight: 700 }}
+                              />
                             </Stack>
                           </Stack>
-                          <Typography variant="body2" className={styles.airportLocation}>{aeropuerto.ciudad} - {aeropuerto.pais}</Typography>
                           <Stack className={styles.airportFooter}>
-                            <Typography variant="caption" className={styles.airportCapacity}>{aeropuerto.maletasActuales}/{aeropuerto.capacidadAlmacen} maletas</Typography>
+                            <Typography variant="body2" className={styles.airportLocation}>
+                              {aeropuerto.ciudad} - {aeropuerto.pais}
+                            </Typography>
                             {proximosSLA.length > 0 && (
                               <Stack className={styles.airportProximidad}>
                                 <Typography variant="caption" className={styles.airportProximidadLinea}>
@@ -659,7 +842,6 @@ function SeccionAeropuertos({
                                 </Typography>
                               </Stack>
                             )}
-                            <Typography variant="caption" className={styles.airportCode}>{ocup}%</Typography>
                           </Stack>
                         </Box>
                       </Button>
@@ -745,10 +927,12 @@ function SeccionEnvios({
   envios,
   tiempoSimulacion,
   onMostrarRutaEnvio,
+  integrada,
 }: {
   envios: Envio[];
   tiempoSimulacion: number;
   onMostrarRutaEnvio: (idPedido: string) => void;
+  integrada?: boolean;
 }) {
   const [abierto, setAbierto] = useState(false);
   const [busquedaOrigen, setBusquedaOrigen] = useState('');
@@ -759,6 +943,7 @@ function SeccionEnvios({
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [expandidoEnvio, setExpandidoEnvio] = useState<string | null>(null);
+  const abiertoEfectivo = integrada || abierto;
 
   const enviosFiltrados = useMemo(() => {
     const inicioIntervalo = tiempoSimulacion - ultimasHoras * 60 * 60 * 1000;
@@ -796,6 +981,8 @@ function SeccionEnvios({
     ? `No hay envíos entregados en las últimas ${ultimasHoras} horas`
     : filtroEstado === 'PLANIFICADO'
       ? 'No hay envíos planificados'
+      : filtroEstado === 'POR_PLANIFICAR'
+        ? 'No hay envíos por planificar'
       : filtroEstado === 'EN_CURSO'
         ? 'No hay envíos en tránsito'
         : filtroEstado === 'ENTREGADO'
@@ -804,17 +991,17 @@ function SeccionEnvios({
 
   return (
     <Accordion
-      expanded={abierto}
-      onChange={(_, v) => setAbierto(v)}
+      expanded={abiertoEfectivo}
+      onChange={(_, v) => { if (!integrada) setAbierto(v); }}
       disableGutters
-      sx={{ bgcolor: 'transparent', color: 'inherit', display: 'flex', flexDirection: 'column', maxHeight: '70vh', minHeight: 0, overflow: 'hidden', '&:before': { display: 'none' } }}
+      sx={seccionIntegradaSx}
     >
-      <AccordionSummary className={styles.accordionSummary}>
+      <AccordionSummary className={styles.accordionSummary} sx={{ display: integrada ? 'none' : undefined }}>
         <Typography sx={{ fontWeight: 700 }}>Envíos</Typography>
         <Chip size="small" label={enviosFiltrados.length} color={enviosFiltrados.length ? 'primary' : 'default'} />
       </AccordionSummary>
-      <AccordionDetails className={styles.accordionDetails} sx={{ flex: 1, minHeight: 0 }}>
-        {abierto && (
+      <AccordionDetails className={styles.accordionDetails} sx={{ flex: 1, minHeight: 0, maxHeight: 'none' }}>
+        {abiertoEfectivo && (
           <>
             <Stack spacing={1.5} className={styles.filtersContainer}>
               <Stack direction="row" spacing={1.5}>
@@ -826,6 +1013,7 @@ function SeccionEnvios({
                 <Select value={filtroEstado} label="Filtrar envíos" onChange={(e: SelectChangeEvent) => { setFiltroEstado(e.target.value as FiltroEnvio); setPage(0); }}>
                   <MenuItem value="">Todos</MenuItem>
                   <MenuItem value="PLANIFICADO">Planificados</MenuItem>
+                  <MenuItem value="POR_PLANIFICAR">Por planificar</MenuItem>
                   <MenuItem value="EN_CURSO">En tránsito</MenuItem>
                   <MenuItem value="ENTREGADO">Entregados</MenuItem>
                   <MenuItem value="ULTIMAS_HORAS">Entregados en las últimas X horas</MenuItem>
@@ -857,8 +1045,8 @@ function SeccionEnvios({
                       <TableRow>
                         <TableCell sx={{ bgcolor: '#1e293b', zIndex: 2, maxWidth: 110 }}>ID</TableCell>
                         <TableCell sx={{ bgcolor: '#1e293b', zIndex: 2 }}>Ruta</TableCell>
+                        <TableCell sx={{ bgcolor: '#1e293b', zIndex: 2 }}>Registro</TableCell>
                         <TableCell sx={{ bgcolor: '#1e293b', zIndex: 2 }}>Estado</TableCell>
-                        <TableCell align="center" sx={{ bgcolor: '#1e293b', zIndex: 2 }}>Maletas</TableCell>
                         <TableCell sx={{ width: 28, bgcolor: '#1e293b', zIndex: 2 }} />
                       </TableRow>
                     </TableHead>
@@ -892,6 +1080,12 @@ function SeccionEnvios({
                               <TableCell sx={{ whiteSpace: 'nowrap', fontSize: 12 }}>
                                 {e.origenIata} → {e.destinoIata}
                               </TableCell>
+                              <TableCell
+                                title={e.fechaHora}
+                                sx={{ whiteSpace: 'nowrap', fontSize: 10.5, color: '#cbd5e1' }}
+                              >
+                                {formatShortDateTime(e.fechaHora)}
+                              </TableCell>
                               {/* Estado como chip */}
                               <TableCell>
                                 <Chip
@@ -900,6 +1094,7 @@ function SeccionEnvios({
                                     e._estado === 'EN_CURSO' ? 'En curso'
                                     : e._estado === 'ENTREGADO' ? 'Entregado'
                                     : e._estado === 'PLANIFICADO' ? 'Planificado'
+                                    : e._estado === 'POR_PLANIFICAR' ? 'Por planificar'
                                     : (e._estado ?? '—')
                                   }
                                   color={
@@ -910,8 +1105,6 @@ function SeccionEnvios({
                                   sx={{ fontSize: 10, height: 20 }}
                                 />
                               </TableCell>
-                              {/* Cantidad de maletas */}
-                              <TableCell align="center">{e.cantidadMaletas}</TableCell>
                               <TableCell align="right" sx={{ color: '#64748b', fontSize: 10, pr: 1 }}>
                                 {expandidoEnvio === e.idPedido ? '▲' : '▼'}
                               </TableCell>

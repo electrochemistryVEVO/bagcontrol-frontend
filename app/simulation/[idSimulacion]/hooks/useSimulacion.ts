@@ -114,6 +114,7 @@ export function useSimulacion(
       simTime('primer evento recibido', `tipo=${lote.eventos[0].tipo}`);
     }
 
+    let cambioInmediato = false;
     // 1. Procesar eventos de control (ciclo de vida)
     for (const e of lote.eventos) {
       const tipo = e.tipo;
@@ -142,24 +143,55 @@ export function useSimulacion(
           setColapso(e as EventoColapso);
           setEstadoSim('colapsada');
           break;*/
-        case 'REPLANIFICACION_ENVIO':
-          setReplanificaciones(actuales => [e as EventoReplanificacionEnvio, ...actuales].slice(0, 20));
+        case 'REPLANIFICACION_ENVIO': {
+          const replanificacion = e as EventoReplanificacionEnvio;
+          setReplanificaciones(actuales => [replanificacion, ...actuales].slice(0, 20));
+          const envioReplanificado = enviosPlanificados.current[replanificacion.idPedido];
+          if (envioReplanificado && envioReplanificado._estado !== 'ENTREGADO') {
+            envioReplanificado._estado = replanificacion.estadoNuevo === 'ASIGNADO'
+              ? 'PLANIFICADO'
+              : 'POR_PLANIFICAR';
+            cambioInmediato = true;
+          }
           break;
+        }
         case 'SIMULACION_DETENIDA':
           //setResumenFinal({vueloFinal:vueloFinalRef.current});
           setEstadoSim('detenida');
           void sincronizarTiemposReales();
           break;
         case 'VUELO_CANCELADO':
-          vuelosActivos.current.delete(String((e as EventoVuelo).codigoVuelo));
           for (const envio of (e as EventoVuelo).codigoEnvios ?? []) {
-            delete enviosPlanificados.current[envio];
+            const envioAfectado = enviosPlanificados.current[envio];
+            if (envioAfectado) {
+              envioAfectado._estado = 'POR_PLANIFICAR';
+              cambioInmediato = true;
+            }
           }
           break;
         case 'ERROR':
           setEstadoSim('error');
           break;
       }
+    }
+
+    // Registrar las asignaciones aunque el lote solo contenga eventos de control.
+    // Antes este bloque estaba después del retorno temprano y una replanificación
+    // podía quedarse indefinidamente como POR_PLANIFICAR.
+    for (const envioNuevo of lote.envios || []) {
+      const anterior = enviosPlanificados.current[envioNuevo.idPedido];
+      const estadoAnterior = anterior?._estado;
+      enviosPlanificados.current[envioNuevo.idPedido] = {
+        ...anterior,
+        ...envioNuevo,
+        _estado: estadoAnterior === 'ENTREGADO'
+          ? 'ENTREGADO'
+          : estadoAnterior === 'EN_CURSO'
+            ? 'EN_CURSO'
+            : 'PLANIFICADO',
+        _llegadaEpoch: anterior?._llegadaEpoch,
+      };
+      cambioInmediato = true;
     }
 
     // 2. Filtrar eventos de física (vuelos, aeropuertos)
@@ -175,7 +207,10 @@ export function useSimulacion(
       return !TIPOS_IGNORADOS.includes(tipo);
     });
 
-    if (eventosFiltrados.length === 0) return;
+    if (eventosFiltrados.length === 0) {
+      if (cambioInmediato) onNuevoLoteRef.current?.();
+      return;
+    }
 
     // 3. Acumular en la cola
     colaEventos.current.push(...eventosFiltrados);
@@ -188,13 +223,6 @@ export function useSimulacion(
       simTime('estado cambia de SINCRONIZANDO a EN_EJECUCION', `primerEvento=${colaEventos.current[0].fechaHoraEvento}`);
       setEstadoSim('en_vivo');
     }
-
-    // 5. Agregar eventos planificados
-    enviosPlanificados.current = {...enviosPlanificados.current,
-    ...(lote.envios || []).reduce((acum:Record<string, Envio>,val)=>{
-      (val as any)._estado = "PLANIFICADO"
-      acum[val.idPedido] = val;
-      return acum;},{})};
 
     onNuevoLoteRef.current?.();
   }, [setEstadoSim, modo, sincronizarTiemposReales]);

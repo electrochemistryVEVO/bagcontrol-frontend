@@ -28,7 +28,7 @@ export default function PageTabs(){
         setUser(AuthService.getUser())
     }, [])
 
-    if (!user) return null
+    if (!user || pathname?.startsWith('/simulation/')) return null
 
     const tabs = allTabs.filter(t => t.roles.includes(user.rol))
     if (tabs.length === 0) return null

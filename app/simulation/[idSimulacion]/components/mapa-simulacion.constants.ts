@@ -16,6 +16,14 @@ export const EMPTY_MAP_STYLE: StyleSpecification = {
   layers: [],
 };
 
+// Punto de partida de ambos mapas. Ajusta `zoom` para acercar o alejar
+// la vista inicial sin tener que modificar el componente.
+export const INITIAL_MAP_VIEW = {
+  longitude: 0,
+  latitude: 10,
+  zoom: 2.2,
+} as const;
+
 // Aeropuertos — ícono con BORDE NEGRO fijo + RELLENO interior coloreado
 // según estadoCapacidad. Antes de recibir datos reales se muestra 'airport-default'
 // (borde negro, interior blanco).
