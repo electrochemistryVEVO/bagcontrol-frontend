@@ -9,6 +9,10 @@ import {
   Chip,
   CircularProgress,
   Collapse,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControl,
   InputLabel,
   MenuItem,
@@ -31,7 +35,7 @@ import Draggable from 'react-draggable';
 
 import type { AeropuertoSimulacion } from '@/app/shared/types/Aeropuerto';
 import type { EstadoCapacidad, EventoVuelo } from '@/app/shared/types/Evento';
-import type { Envio, MaletaSimulacion } from '@/app/shared/types/Envio';
+import type { Envio, EnvioRuta, MaletaSimulacion } from '@/app/shared/types/Envio';
 import { SimulacionService, type VueloCancelable } from '@/app/services/simulation.service';
 import { formatShortDateTime } from '@/app/shared/dateTime';
 import {
@@ -98,6 +102,7 @@ type PanelLateralProps = {
   envios: Envio[];
   tiempoSimulacion: number;
   onMostrarRutaEnvio: (idPedido: string) => void;
+  onObtenerRutaEnvio: (idPedido: string) => Promise<EnvioRuta | null>;
   haySeleccionRelacionada?: boolean;
   onLimpiarSeleccionRelacionada?: () => void;
 };
@@ -162,6 +167,7 @@ export function PanelLateral({
   envios,
   tiempoSimulacion,
   onMostrarRutaEnvio,
+  onObtenerRutaEnvio,
   haySeleccionRelacionada,
   onLimpiarSeleccionRelacionada,
 }: PanelLateralProps) {
@@ -274,6 +280,7 @@ export function PanelLateral({
             envios={envios}
             tiempoSimulacion={tiempoSimulacion}
             onMostrarRutaEnvio={onMostrarRutaEnvio}
+            onObtenerRutaEnvio={onObtenerRutaEnvio}
             integrada
           />}
         </Box>
@@ -927,11 +934,13 @@ function SeccionEnvios({
   envios,
   tiempoSimulacion,
   onMostrarRutaEnvio,
+  onObtenerRutaEnvio,
   integrada,
 }: {
   envios: Envio[];
   tiempoSimulacion: number;
   onMostrarRutaEnvio: (idPedido: string) => void;
+  onObtenerRutaEnvio: (idPedido: string) => Promise<EnvioRuta | null>;
   integrada?: boolean;
 }) {
   const [abierto, setAbierto] = useState(false);
@@ -943,7 +952,13 @@ function SeccionEnvios({
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [expandidoEnvio, setExpandidoEnvio] = useState<string | null>(null);
+  const [rutaSeleccionada, setRutaSeleccionada] = useState<EnvioRuta | null>(null);
   const abiertoEfectivo = integrada || abierto;
+
+  const verRuta = async (idPedido: string) => {
+    const ruta = await onObtenerRutaEnvio(idPedido);
+    if (ruta) setRutaSeleccionada(ruta);
+  };
 
   const enviosFiltrados = useMemo(() => {
     const inicioIntervalo = tiempoSimulacion - ultimasHoras * 60 * 60 * 1000;
@@ -1144,13 +1159,20 @@ function SeccionEnvios({
                                           <Typography variant="caption" sx={{ color: '#94a3b8', whiteSpace: 'nowrap', mr: 0.5, fontSize: 10 }}>
                                             ↓{e._llegadaEpoch ? new Date(e._llegadaEpoch).toLocaleString('es-PE', { timeZone: 'UTC', hour12: false, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
                                           </Typography>
-                                          {/* Boton Ruta */}
-                                          <button
-                                            onClick={(ev) => { ev.stopPropagation(); onMostrarRutaEnvio(e.idPedido); }}
-                                            style={{ border: 'none', borderRadius: 4, padding: '2px 7px', background: '#2563eb', color: '#fff', fontSize: 10, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
-                                          >
-                                            Ruta
-                                          </button>
+                                          <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>
+                                            <button
+                                              onClick={(ev) => { ev.stopPropagation(); onMostrarRutaEnvio(e.idPedido); }}
+                                              style={{ border: 'none', borderRadius: 4, padding: '2px 7px', background: '#2563eb', color: '#fff', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}
+                                            >
+                                              Mapa
+                                            </button>
+                                            <button
+                                              onClick={(ev) => { ev.stopPropagation(); void verRuta(e.idPedido); }}
+                                              style={{ border: '1px solid #60a5fa', borderRadius: 4, padding: '2px 7px', background: 'transparent', color: '#bfdbfe', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}
+                                            >
+                                              Detalle
+                                            </button>
+                                          </Stack>
                                         </Box>
                                       ))}
                                     </Stack>
@@ -1176,6 +1198,37 @@ function SeccionEnvios({
                 labelDisplayedRows={({ from, to, count }) => `${from}–${to} de ${count}`}
                 sx={{ flexShrink: 0, color: '#e2e8f0', borderTop: '1px solid rgba(148,163,184,0.18)', overflow: 'hidden', '& .MuiTablePagination-toolbar': { minHeight: 52, px: 1 }, '& .MuiTablePagination-selectLabel': { fontSize: 11 }, '& .MuiTablePagination-displayedRows': { fontSize: 11 }, '& .MuiSvgIcon-root': { color: '#cbd5e1' } }}
               />
+              <Dialog open={Boolean(rutaSeleccionada)} onClose={() => setRutaSeleccionada(null)} fullWidth maxWidth="sm">
+                <DialogTitle>Ruta del envío {rutaSeleccionada?.envio.idPedido}</DialogTitle>
+                <DialogContent dividers>
+                  {rutaSeleccionada && (
+                    <Stack spacing={1.25}>
+                      <Typography variant="body2">
+                        {rutaSeleccionada.envio.origenIata} → {rutaSeleccionada.envio.destinoIata} · {rutaSeleccionada.envio.cantidadMaletas} maletas
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Estado: {rutaSeleccionada.estado} · Ubicación actual: {rutaSeleccionada.aeropuertoActual ?? 'No disponible'}
+                      </Typography>
+                      {rutaSeleccionada.escalas.length === 0 ? (
+                        <Typography variant="body2">El envío no tiene un itinerario asignado.</Typography>
+                      ) : rutaSeleccionada.escalas.map((escala, index) => (
+                        <Box key={`${escala.codigoVuelo}-${index}`} sx={{ borderLeft: '3px solid #2563eb', pl: 1.5, py: 0.25 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                            {index + 1}. Vuelo {escala.codigoVuelo}: {escala.origenIata} → {escala.destinoIata}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {formatShortDateTime(escala.horaSalidaUtc ?? '')} - {formatShortDateTime(escala.horaLlegadaUtc ?? '')}
+                            {escala.cancelado ? ' · Cancelado' : ''}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Stack>
+                  )}
+                </DialogContent>
+                <DialogActions>
+                  <Button onClick={() => setRutaSeleccionada(null)}>Cerrar</Button>
+                </DialogActions>
+              </Dialog>
             </Box>
           </>
         )}

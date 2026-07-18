@@ -338,7 +338,7 @@ export function MapaSimulacion({
 
   const mostrarRutaEnvio = useCallback(async (idPedido: string) => {
     const id = idPedido.trim();
-    if (!id) return;
+    if (!id) return null;
     try {
       setRutaError(null);
       const ts = new Date(tiempoSimulacionRef.current).toISOString();
@@ -352,10 +352,24 @@ export function MapaSimulacion({
         aeropuertos.add(escala.destinoIata);
       });
       if (data.aeropuertoActual) aeropuertos.add(data.aeropuertoActual);
-      setFiltroRelacion({ envios: new Set([data.envio.idPedido]), vuelos });
+      setFiltroRelacion({ envios: new Set([data.envio.idPedido]), vuelos, aeropuertos });
+      return data;
     } catch {
       setRutaEnvio(null);
       setRutaError(`No se encontró ruta para el envío ${id}`);
+      return null;
+    }
+  }, [idSimulacion, tiempoSimulacionRef]);
+
+  const obtenerRutaEnvio = useCallback(async (idPedido: string) => {
+    const id = idPedido.trim();
+    if (!id) return null;
+    try {
+      const ts = new Date(tiempoSimulacionRef.current).toISOString();
+      const { data } = await SimulacionService.obtenerRutaEnvio(idSimulacion, id, ts);
+      return data;
+    } catch {
+      return null;
     }
   }, [idSimulacion, tiempoSimulacionRef]);
 
@@ -990,6 +1004,7 @@ export function MapaSimulacion({
         envios={enviosPanel}
         tiempoSimulacion={tiempoSimulacionSnapshot}
         onMostrarRutaEnvio={mostrarRutaEnvio}
+        onObtenerRutaEnvio={obtenerRutaEnvio}
         haySeleccionRelacionada={Boolean(filtroRelacion.vuelos || filtroRelacion.aeropuertos || filtroRelacion.envios)}
         onLimpiarSeleccionRelacionada={limpiarSeleccionRelacionada}
       />
