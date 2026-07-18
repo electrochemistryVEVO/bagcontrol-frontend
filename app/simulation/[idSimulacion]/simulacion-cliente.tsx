@@ -23,7 +23,7 @@ interface Props {
 
 export function SimulacionCliente({ id, topic, fechaInicial, k, modo, aeropuertosIniciales, errorInicial }: Props) {
   const router = useRouter();
-  const SaS_SEGUNDOS = modo === '0' ? k * 60 : 30;
+  const SaS_SEGUNDOS = modo === '0' ? k * 60 : 15;
   const { showToast, ToastComponent } = useToast();
   const [segundosPreparando, setSegundosPreparando] = useState(0);
   // Estabilizar fechaInicioReal: solo se calcula una vez (o cuando cambia fechaInicial).
@@ -60,6 +60,7 @@ export function SimulacionCliente({ id, topic, fechaInicial, k, modo, aeropuerto
     mensajeErrorSimulacion,
     fechaHoraInicioReal,
     fechaHoraFinReal,
+    saSegundos,
   } = useSimulacion(
     id,
     topic,
@@ -163,7 +164,7 @@ export function SimulacionCliente({ id, topic, fechaInicial, k, modo, aeropuerto
 
         <div style={{ marginLeft: 'auto' }}>
           <span style={{ fontSize: '0.8rem', color: '#334155' }}>
-            Velocidad: {k} min simulados / {SaS_SEGUNDOS}s reales
+            Velocidad: {k} min simulados / {saSegundos}s reales
           </span>
           {estadoSim === 'preparando' && (
             <span style={{ marginLeft: 12, fontSize: '0.8rem', color: segundosPreparando >= 30 ? '#b45309' : '#334155', fontWeight: 600 }}>

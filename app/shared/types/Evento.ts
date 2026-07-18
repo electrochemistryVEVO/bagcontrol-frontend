@@ -121,6 +121,7 @@ export interface EventoBatch {
     cantidadEventos: number;
     eventos: Evento[];
     envios: Envio[];
+    saMs?: number;
 }
 
 export interface EventoBatchSimulation {

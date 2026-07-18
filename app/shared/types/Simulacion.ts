@@ -20,6 +20,10 @@ export type RespuestaEstadoSimulacionDTO = {
     tiempoSimuladoActual : string;
     fechaHoraInicioReal : string | null;
     fechaHoraFinReal : string | null;
+    sumaSaBloquesMs?: number;
+    sumaDiferenciaSaTaMs?: number;
+    bloquesTaMayorSa?: number;
+    historialAjustesSa?: string[];
 }
 
 export type ResumenFinalSimulacion = {
