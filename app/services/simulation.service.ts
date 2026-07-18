@@ -21,6 +21,42 @@ export type SimulacionActiva = {
   fechaCreacion?: string;
 }
 
+export type VueloCancelable = {
+  codigoVuelo: number;
+  origenIata: string;
+  destinoIata: string;
+  horaSalidaLocal: string;
+  horaSalidaUtc: string;
+  horaLlegadaLocal: string;
+  horaLlegadaUtc: string;
+  capacidadMax: number;
+  enviosAfectados: string[];
+  cantidadMaletas: number;
+}
+
+export type CancelacionVueloRespuesta = {
+  codigoVuelo: number;
+  origenIata: string;
+  destinoIata: string;
+  registradaEnSimulado: string;
+  horaSalidaLocalObjetivo: string;
+  horaSalidaUtcObjetivo: string;
+  enviosAfectados: string[];
+  cantidadMaletas: number;
+  estado: string;
+}
+
+export type VueloInstanciado = {
+  codigoBase: number;
+  origenIata: string;
+  destinoIata: string;
+  fechaHoraSalida: string;
+  fechaHoraLlegada: string;
+  capacidadMax: number;
+  ocupacionActual: number;
+  estaCancelado: boolean;
+}
+
 export const SimulacionService = {
     // Usa timeout extendido: el backend corre el planificador en el primer ciclo
     // y con 9.5M de envíos puede tardar bastante más de 10 segundos.
@@ -39,8 +75,17 @@ export const SimulacionService = {
         axiosApi.get(`/simulacion/${idSimulacion}/snapshot`),
     obtenerEnviosPorVuelo: (idSimulacion: string, flight:EventoVuelo,timestamp:string) =>
         axiosApi.post<Envio[]>(`/simulacion/${idSimulacion}/vuelos/envios`, { flight,timestamp }),
-    cancelarVuelo: (idSimulacion: string, flight:EventoVuelo,timestamp:string) =>
-        axiosApi.post<Envio[]>(`/simulacion/${idSimulacion}/vuelos/cancelar`, { flight,timestamp }),
+    obtenerVuelosCancelables: (idSimulacion: string, instanteSimulado: string) =>
+        axiosApi.get<VueloCancelable[]>(`/simulacion/${idSimulacion}/vuelos/cancelables`, {
+          params: { instanteSimulado },
+        }),
+    obtenerVuelosInstanciados: (fecha: string) =>
+        axiosApi.get<VueloInstanciado[]>('/vuelos/instanciados', { params: { fecha } }),
+    cancelarProximaOcurrencia: (idSimulacion: string, codigoVuelo: number, instanteSimulado: string) =>
+        axiosApi.post<CancelacionVueloRespuesta>(
+          `/simulacion/${idSimulacion}/vuelos/${codigoVuelo}/cancelaciones`,
+          { instanteSimulado, motivo: 'CANCELACION_MANUAL' },
+        ),
     obtenerRutaEnvio: (idSimulacion: string, idPedido: string, timestamp: string) =>
         axiosApi.get<EnvioRuta>(`/simulacion/${idSimulacion}/envios/${idPedido}/ruta`, { params: { timestamp } }),
     obtenerEnviosPorAlmacen: (idSimulacion: string, codigoIata: string, timestamp: string) =>

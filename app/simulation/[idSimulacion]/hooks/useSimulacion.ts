@@ -49,6 +49,8 @@ export function useSimulacion(
   const [mensajeErrorSimulacion, setMensajeErrorSimulacion] = useState<string | null>(null);
   const [fechaHoraInicioReal, setFechaHoraInicioReal] = useState<string | null>(null);
   const [fechaHoraFinReal, setFechaHoraFinReal] = useState<string | null>(null);
+  const saSRef = useRef(SaS);
+  const [saActual, setSaActual] = useState(SaS);
   const primerEventoRecibidoRef = useRef(false);
   const primerLoteRecibidoRef = useRef(false);
   const clockEstadoRef = useRef(0); //Tiempo obtenido del estado al iniciar
@@ -98,6 +100,11 @@ export function useSimulacion(
   const encolarEventos = useCallback((lote: EventoBatch) => {
     if (estadoSimRef.current === 'colapsada') return;
     if (!lote.eventos || !Array.isArray(lote.eventos)) return;
+    if (lote.saMs && lote.saMs > 0) {
+      const siguienteSa = lote.saMs / 1000;
+      saSRef.current = siguienteSa;
+      setSaActual(siguienteSa);
+    }
     if (!primerLoteRecibidoRef.current) {
       primerLoteRecibidoRef.current = true;
       simTime('primer lote recibido', `numero=${lote.numeroLote} eventos=${lote.eventos.length}`);
@@ -107,8 +114,8 @@ export function useSimulacion(
       simTime('primer evento recibido', `tipo=${lote.eventos[0].tipo}`);
     }
 
+    let cambioInmediato = false;
     // 1. Procesar eventos de control (ciclo de vida)
-    //NOTA: Cancelacion de eventos se procesa aqui para realizarse lo mas rapido posible
     for (const e of lote.eventos) {
       const tipo = e.tipo;
       switch (tipo) {
@@ -136,28 +143,55 @@ export function useSimulacion(
           setColapso(e as EventoColapso);
           setEstadoSim('colapsada');
           break;*/
-        case 'REPLANIFICACION_ENVIO':
-          setReplanificaciones(actuales => [e as EventoReplanificacionEnvio, ...actuales].slice(0, 20));
+        case 'REPLANIFICACION_ENVIO': {
+          const replanificacion = e as EventoReplanificacionEnvio;
+          setReplanificaciones(actuales => [replanificacion, ...actuales].slice(0, 20));
+          const envioReplanificado = enviosPlanificados.current[replanificacion.idPedido];
+          if (envioReplanificado && envioReplanificado._estado !== 'ENTREGADO') {
+            envioReplanificado._estado = replanificacion.estadoNuevo === 'ASIGNADO'
+              ? 'PLANIFICADO'
+              : 'POR_PLANIFICAR';
+            cambioInmediato = true;
+          }
           break;
+        }
         case 'SIMULACION_DETENIDA':
           //setResumenFinal({vueloFinal:vueloFinalRef.current});
           setEstadoSim('detenida');
           void sincronizarTiemposReales();
           break;
         case 'VUELO_CANCELADO':
-          console.log(`Vuelo cancelado: ${e}`)
-            vuelosActivos.current.delete(String((e as EventoVuelo).codigoVuelo));
-          console.log(e as EventoVuelo)
-            for(const envio of (e as EventoVuelo).codigoEnvios)
-            {
-              console.log(`Envio ${envio} eliminado`)
-              delete enviosPlanificados.current[envio];
+          for (const envio of (e as EventoVuelo).codigoEnvios ?? []) {
+            const envioAfectado = enviosPlanificados.current[envio];
+            if (envioAfectado) {
+              envioAfectado._estado = 'POR_PLANIFICAR';
+              cambioInmediato = true;
             }
-            break;
+          }
+          break;
         case 'ERROR':
           setEstadoSim('error');
           break;
       }
+    }
+
+    // Registrar las asignaciones aunque el lote solo contenga eventos de control.
+    // Antes este bloque estaba después del retorno temprano y una replanificación
+    // podía quedarse indefinidamente como POR_PLANIFICAR.
+    for (const envioNuevo of lote.envios || []) {
+      const anterior = enviosPlanificados.current[envioNuevo.idPedido];
+      const estadoAnterior = anterior?._estado;
+      enviosPlanificados.current[envioNuevo.idPedido] = {
+        ...anterior,
+        ...envioNuevo,
+        _estado: estadoAnterior === 'ENTREGADO'
+          ? 'ENTREGADO'
+          : estadoAnterior === 'EN_CURSO'
+            ? 'EN_CURSO'
+            : 'PLANIFICADO',
+        _llegadaEpoch: anterior?._llegadaEpoch,
+      };
+      cambioInmediato = true;
     }
 
     // 2. Filtrar eventos de física (vuelos, aeropuertos)
@@ -165,7 +199,7 @@ export function useSimulacion(
       'SIMULACION_INICIADA', 'SIMULACION_PAUSADA', 'SIMULACION_EN_PAUSA',
       'SIMULACION_REANUDADA', 'OPERACION_DIA_ACTIVA',
       //'SIMULACION_FINALIZADA', 'COLAPSO_DETECTADO',
-      'REPLANIFICACION_ENVIO', 'SIMULACION_DETENIDA', 'ERROR',
+      'REPLANIFICACION_ENVIO', 'VUELO_CANCELADO', 'SIMULACION_DETENIDA', 'ERROR',
     ];
 
     const eventosFiltrados = lote.eventos.filter((e: Evento) => {
@@ -173,7 +207,10 @@ export function useSimulacion(
       return !TIPOS_IGNORADOS.includes(tipo);
     });
 
-    if (eventosFiltrados.length === 0) return;
+    if (eventosFiltrados.length === 0) {
+      if (cambioInmediato) onNuevoLoteRef.current?.();
+      return;
+    }
 
     // 3. Acumular en la cola
     colaEventos.current.push(...eventosFiltrados);
@@ -186,13 +223,6 @@ export function useSimulacion(
       simTime('estado cambia de SINCRONIZANDO a EN_EJECUCION', `primerEvento=${colaEventos.current[0].fechaHoraEvento}`);
       setEstadoSim('en_vivo');
     }
-
-    // 5. Agregar eventos planificados
-    enviosPlanificados.current = {...enviosPlanificados.current,
-    ...(lote.envios || []).reduce((acum:Record<string, Envio>,val)=>{
-      (val as any)._estado = "PLANIFICADO"
-      acum[val.idPedido] = val;
-      return acum;},{})};
 
     onNuevoLoteRef.current?.();
   }, [setEstadoSim, modo, sincronizarTiemposReales]);
@@ -274,12 +304,6 @@ export function useSimulacion(
   // ============================================================================
   useEffect(() => {
     const msSimuladosPorLote = K * 60 * 1000;   // ej: 120min → 7_200_000 ms
-    const msRealesPorLote    = SaS * 1000;       // ej: 30s  →    30_000 ms
-    // En operación día a día, el reloj debe avanzar en tiempo real (1s real = 1s sim)
-    // independientemente de K y SaS, para que un vuelo de 2h demore 2h reales
-    const factorAceleracion  = modo === '0'
-      ? 1
-      : msSimuladosPorLote / msRealesPorLote;
     let running = true;
     let ultimoFrame = Date.now();
     let tickCount = 0;
@@ -312,6 +336,9 @@ export function useSimulacion(
         // Cap de seguridad: máximo 200ms por tick para evitar saltos por suspense del sistema
         const safeElapsed = Math.min(elapsed, lastElapsed + 200);
         lastElapsed = safeElapsed;
+        const factorAceleracion = modo === '0'
+          ? 1
+          : msSimuladosPorLote / (saSRef.current * 1000);
         tiempoSimulacion.current = (batchStartClock || clockEstadoRef.current) + safeElapsed * factorAceleracion;
         ultimoFrame = ahora;
       }
@@ -446,7 +473,7 @@ export function useSimulacion(
       running = false;
       if (animationId) cancelAnimationFrame(animationId);
     };
-  }, [K, SaS, modo]); // estadoSim fuera de deps; se accede via ref
+  }, [K, modo]); // estadoSim y SA dinámico se acceden mediante refs
 
   return {
     conectado,
@@ -462,5 +489,6 @@ export function useSimulacion(
     mensajeErrorSimulacion,
     fechaHoraInicioReal,
     fechaHoraFinReal,
+    saSegundos: saActual,
   };
 }

@@ -1,13 +1,29 @@
 'use client';
 
-import { Box, Table, TableBody, TableCell, TablePagination, TableRow } from "@mui/material";
-import { memo, useEffect, useState, RefObject } from "react";
+import { Box, Table, TableBody, TableCell, TableHead, TablePagination, TableRow } from "@mui/material";
+import { memo, useEffect, useMemo, useState, RefObject } from "react";
 import styles from "../../stylesheets/sidepanel.module.css";
 import { AeropuertoSimulacion } from "@/app/shared/types/Aeropuerto";
-import {Envio, EnvioAeropuerto, EnvioAlmacen} from "@/app/shared/types/Envio";
+import { EnvioAlmacen } from "@/app/shared/types/Envio";
 import { MapGeoJSONFeature } from "@vis.gl/react-maplibre";
 import { HourFormat } from "@/app/shared/Utils";
-import { SimulacionService } from "@/app/services/simulation.service";
+import { SimulacionService, type VueloInstanciado } from "@/app/services/simulation.service";
+import { formatShortDateTime } from "@/app/shared/dateTime";
+
+function fechaIsoLocal(epochUtc: number, gmt: number) {
+    return new Date(epochUtc + gmt * 3_600_000).toISOString().slice(0, 19);
+}
+
+function desplazarFecha(fecha: string, dias: number) {
+    const base = new Date(`${fecha}T00:00:00Z`);
+    base.setUTCDate(base.getUTCDate() + dias);
+    return base.toISOString().slice(0, 10);
+}
+
+function formatearFechaVuelo(fechaHora: string) {
+    const [fecha, hora = ''] = fechaHora.split('T');
+    return `${fecha.slice(8, 10)}/${fecha.slice(5, 7)} ${hora.slice(0, 5)}`;
+}
 
 function AeropuertoPanelContents({
     codigoIata,
@@ -31,13 +47,10 @@ function AeropuertoPanelContents({
     // 1. Inicializamos con los datos reactivos del Snapshot de simulación
     const [data, setData] = useState<AeropuertoSimulacion | undefined>();
     
-    // Paginación local para la lista de paquetes críticos
-    const [page, setPage] = useState<number>(0);
-    const [rowsPerPage, setRowsPerPage] = useState<number>(5);
     const [pageAlmacen, setPageAlmacen] = useState<number>(0);
     const [rowsPerPageAlmacen, setRowsPerPageAlmacen] = useState<number>(5);
     const [enviosAlmacen, setEnviosAlmacen] = useState<EnvioAlmacen[]>([]);
-    const [filtroAlmacen, setFiltroAlmacen] = useState<'TODOS' | 'TRANSITO' | 'DESTINO_FINAL'>('TODOS');
+    const [vuelosProgramados, setVuelosProgramados] = useState<VueloInstanciado[]>([]);
 
     // 2. Efecto de sincronización para mantener el Sheet "vivo" al ritmo del motor lógico
     useEffect(() => {
@@ -68,6 +81,62 @@ function AeropuertoPanelContents({
             .catch(() => setEnviosAlmacen([]));
     }, [codigoIata, idSimulacion, isOpen, tiempoSimulacionRef]);
 
+    useEffect(() => {
+        if (!isOpen || !codigoIata) return;
+        let vigente = true;
+        const cargarVuelos = async () => {
+            const aeropuerto = aeropuertosRef.current?.[codigoIata];
+            if (!aeropuerto) return;
+            const fechaLocal = fechaIsoLocal(tiempoSimulacionRef.current, aeropuerto.gmt).slice(0, 10);
+            const fechas = [-1, 0, 1].map((dias) => desplazarFecha(fechaLocal, dias));
+            try {
+                const respuestas = await Promise.all(
+                    fechas.map((fecha) => SimulacionService.obtenerVuelosInstanciados(fecha))
+                );
+                if (!vigente) return;
+                const unicos = new Map<string, VueloInstanciado>();
+                respuestas.flatMap(({ data }) => data).forEach((vuelo) => {
+                    unicos.set(`${vuelo.codigoBase}|${vuelo.fechaHoraSalida}`, vuelo);
+                });
+                setVuelosProgramados([...unicos.values()]);
+            } catch {
+                if (vigente) setVuelosProgramados([]);
+            }
+        };
+        void cargarVuelos();
+        const timer = window.setInterval(() => void cargarVuelos(), 30_000);
+        return () => {
+            vigente = false;
+            window.clearInterval(timer);
+        };
+    }, [aeropuertosRef, codigoIata, isOpen, tiempoSimulacionRef]);
+
+    const maletasAlmacen = useMemo(
+        () => enviosAlmacen.flatMap((item) =>
+            Array.from({ length: item.envio.cantidadMaletas }, (_, index) => ({
+                codigoMaleta: `M${index + 1}`,
+                claveMaleta: `${item.envio.idPedido}-M${index + 1}`,
+                item,
+            }))
+        ),
+        [enviosAlmacen]
+    );
+
+    const vuelosPorAeropuerto = useMemo(() => {
+        const ahoraLocal = fechaIsoLocal(tiempoSimulacionRef.current, data?.gmt ?? 0);
+        const disponibles = vuelosProgramados.filter((vuelo) => !vuelo.estaCancelado);
+        return {
+            salientes: disponibles
+                .filter((vuelo) => vuelo.origenIata === codigoIata && vuelo.fechaHoraSalida >= ahoraLocal)
+                .sort((a, b) => a.fechaHoraSalida.localeCompare(b.fechaHoraSalida))
+                .slice(0, 5),
+            llegantes: disponibles
+                .filter((vuelo) => vuelo.destinoIata === codigoIata && vuelo.fechaHoraLlegada >= ahoraLocal)
+                .sort((a, b) => a.fechaHoraLlegada.localeCompare(b.fechaHoraLlegada))
+                .slice(0, 5),
+        };
+    }, [codigoIata, data?.gmt, tiempoSimulacionRef, vuelosProgramados]);
+
     if (!data) return null;
 
     // Cálculo dinámico de la fecha hora local según el desfase GMT del aeropuerto seleccionado
@@ -91,10 +160,8 @@ function AeropuertoPanelContents({
         data.estadoCapacidad === 'AMARILLO' ? styles["progress-yellow"] :
         styles["progress-green"];
 
-    const listaCriticos = data.enviosProximosAVencer || [];
-
     return (
-        <Box sx={{ width: 500 }} className={styles.panel} role="presentation">
+        <Box sx={{ width: 460, maxWidth: '100vw' }} className={styles.panel} role="presentation">
             <div className={styles.header}>
                 <h1>Aeropuerto {data.codigoIata}</h1>
                 <button className={styles.close} onClick={onClose}>×</button>
@@ -134,52 +201,67 @@ function AeropuertoPanelContents({
                 </div>
             </div>
 
+            <div className={styles.card}>
+                <div className={styles["section-title"]}>Próximos vuelos</div>
+                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, mt: 1 }}>
+                    <ListaVuelosAeropuerto
+                        titulo="Salientes"
+                        vacio="Sin próximas salidas"
+                        vuelos={vuelosPorAeropuerto.salientes}
+                        codigoIata={codigoIata}
+                        tipo="SALIDA"
+                    />
+                    <ListaVuelosAeropuerto
+                        titulo="Llegadas"
+                        vacio="Sin próximas llegadas"
+                        vuelos={vuelosPorAeropuerto.llegantes}
+                        codigoIata={codigoIata}
+                        tipo="LLEGADA"
+                    />
+                </Box>
+            </div>
+
 
             <div className={styles.card}>
                 <div className={styles["card-header"]}>
                     <div className={styles["section-title"]}>
-                        Productos en almacen
+                        Envíos en almacén
                     </div>
-                    <select
-                        value={filtroAlmacen}
-                        onChange={(e) => {
-                            setFiltroAlmacen(e.target.value as 'TODOS' | 'TRANSITO' | 'DESTINO_FINAL');
-                            setPageAlmacen(0);
-                        }}
-                        style={selectStyle}
-                    >
-                        <option value="TODOS">General</option>
-                        <option value="TRANSITO">Tránsito</option>
-                        <option value="DESTINO_FINAL">Destino</option>
-                    </select>
                 </div>
 
                 <div className={styles["subtitle"]}>
-                    Envios en destino final y en transito por este aeropuerto
+                    {enviosAlmacen.length} envíos · {maletasAlmacen.length} maletas
                 </div>
 
                 <Table className={styles["package-list"]}>
+                    <TableHead>
+                        <TableRow className={styles["package-item"]}>
+                            <TableCell className={styles["package-code"]}>Maleta</TableCell>
+                            <TableCell>Código de envío</TableCell>
+                            <TableCell>Registro</TableCell>
+                            <TableCell />
+                        </TableRow>
+                    </TableHead>
                     <TableBody>
-                        {enviosAlmacen.length === 0 ? (
+                        {maletasAlmacen.length === 0 ? (
                             <TableRow>
-                                <TableCell style={{ color: '#94a3b8', textAlign: 'center' }}>
-                                    Sin productos registrados en este almacen
+                                <TableCell colSpan={4} style={{ color: '#94a3b8', textAlign: 'center' }}>
+                                    Sin envíos registrados en este almacén
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            enviosAlmacen
-                                .filter((item) => filtroAlmacen === 'TODOS' || item.tipoAlmacen === filtroAlmacen)
+                            maletasAlmacen
                                 .slice(pageAlmacen * rowsPerPageAlmacen, pageAlmacen * rowsPerPageAlmacen + rowsPerPageAlmacen)
-                                .map((item: EnvioAlmacen) => (
-                                    <TableRow key={item.envio.idPedido} className={styles["package-item"]}>
+                                .map(({ codigoMaleta, claveMaleta, item }) => (
+                                    <TableRow key={claveMaleta} className={styles["package-item"]}>
                                         <TableCell className={styles["package-code"]}>
+                                            {codigoMaleta}
+                                        </TableCell>
+                                        <TableCell>
                                             {item.envio.idPedido}
                                         </TableCell>
-                                        <TableCell>
-                                            {item.tipoAlmacen === 'DESTINO_FINAL' ? 'Destino final' : 'Tránsito'}
-                                        </TableCell>
-                                        <TableCell>
-                                            {item.envio.cantidadMaletas} maletas
+                                        <TableCell sx={{ whiteSpace: 'nowrap', fontSize: 10.5 }} title={item.envio.fechaHora}>
+                                            {formatShortDateTime(item.envio.fechaHora)}
                                         </TableCell>
                                         <TableCell>
                                             <button
@@ -201,7 +283,7 @@ function AeropuertoPanelContents({
                     component="div"
                     rowsPerPageOptions={[5, 10, 15]}
                     page={pageAlmacen}
-                    count={enviosAlmacen.filter((item) => filtroAlmacen === 'TODOS' || item.tipoAlmacen === filtroAlmacen).length}
+                    count={maletasAlmacen.length}
                     onPageChange={(_, value) => setPageAlmacen(value)}
                     onRowsPerPageChange={(e) => {
                         setRowsPerPageAlmacen(Number(e.target.value));
@@ -229,57 +311,6 @@ function AeropuertoPanelContents({
                     </div>
                 </div>
 
-                <div className={styles["packages-header"]}>
-                    <span>Paquetes en riesgo de SLA:</span>
-                    <a href="#" className={styles["view-all"]}>ver todos</a>
-                </div>
-
-                <div className={styles["subtitle"]}>
-                    Mostrando resultados próximos a incumplir plazo
-                </div>
-
-                {/* TABLA DE ENVÍOS CRÍTICOS EXTRAÍDOS DEL INYECTOR DEL WS */}
-                <Table className={styles["package-list"]}>
-                    <TableBody>
-                        {listaCriticos.length === 0 ? (
-                            <TableRow>
-                                <TableCell style={{ color: '#94a3b8', textAlign: 'center' }}>
-                                    Sin alertas críticas de SLA en este aeropuerto
-                                </TableCell>
-                            </TableRow>
-                        ) : (
-                            listaCriticos
-                                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                                .map((envio: EnvioAeropuerto) => (
-                                    <TableRow key={envio.envio.idPedido} className={styles["package-item"]}>
-                                        <TableCell className={styles["package-code"]}>
-                                            Pedido #{envio.envio.idPedido}
-                                        </TableCell>
-                                        <TableCell className={`${styles["package-time"]} ${styles.red}`}>
-                                            Fec. Límite: {envio.envio.fechaHora ? HourFormat(new Date(envio.envio.fechaHora)) : 'No disponible'}
-                                        </TableCell>
-                                        <TableCell style={{ width: 40 }}>
-                                            <svg className={styles["external"]} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                <path d="M14 3h7v7" />
-                                                <path d="M10 14L21 3" />
-                                                <rect x="3" y="7" width="14" height="14" rx="2" />
-                                            </svg>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                        )}
-                    </TableBody>
-                </Table>
-                
-                <TablePagination
-                    rowsPerPage={rowsPerPage}
-                    component="div"
-                    rowsPerPageOptions={[5, 10, 15]}
-                    page={page}
-                    count={listaCriticos.length}
-                    onPageChange={(_, value) => setPage(value)}
-                    onRowsPerPageChange={(e) => setRowsPerPage(Number(e.target.value))}
-                />
             </div>
         </Box>
     );
@@ -325,6 +356,44 @@ export default memo(function AeropuertoSidePanel({
     );
 });
 
+function ListaVuelosAeropuerto({
+    titulo,
+    vacio,
+    vuelos,
+    codigoIata,
+    tipo,
+}: {
+    titulo: string;
+    vacio: string;
+    vuelos: VueloInstanciado[];
+    codigoIata: string;
+    tipo: 'SALIDA' | 'LLEGADA';
+}) {
+    return (
+        <Box sx={{ minWidth: 0 }}>
+            <Box sx={{ color: '#93c5fd', fontWeight: 700, fontSize: 12, mb: 0.75 }}>{titulo}</Box>
+            {vuelos.length === 0 ? (
+                <Box sx={{ color: '#94a3b8', fontSize: 11 }}>{vacio}</Box>
+            ) : vuelos.map((vuelo) => (
+                <Box
+                    key={`${vuelo.codigoBase}|${vuelo.fechaHoraSalida}`}
+                    sx={{ py: 0.65, borderBottom: '1px solid rgba(148,163,184,0.15)', '&:last-child': { borderBottom: 0 } }}
+                >
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, fontSize: 11.5 }}>
+                        <strong>{vuelo.codigoBase}</strong>
+                        <span style={{ color: '#cbd5e1' }}>
+                            {tipo === 'SALIDA' ? `→ ${vuelo.destinoIata}` : `${vuelo.origenIata} →`}
+                        </span>
+                    </Box>
+                    <Box sx={{ color: '#94a3b8', fontSize: 10.5, mt: 0.2 }}>
+                        {formatearFechaVuelo(tipo === 'SALIDA' ? vuelo.fechaHoraSalida : vuelo.fechaHoraLlegada)} · {codigoIata}
+                    </Box>
+                </Box>
+            ))}
+        </Box>
+    );
+}
+
 const miniButtonStyle: React.CSSProperties = {
     border: 'none',
     borderRadius: 6,
@@ -336,13 +405,3 @@ const miniButtonStyle: React.CSSProperties = {
     cursor: 'pointer',
 };
 
-const selectStyle: React.CSSProperties = {
-    border: '1px solid rgba(148, 163, 184, 0.35)',
-    borderRadius: 6,
-    padding: '4px 8px',
-    background: '#1e293b',
-    color: '#f8fafc',
-    fontSize: 12,
-    cursor: 'pointer',
-    outline: 'none',
-};

@@ -79,20 +79,6 @@ function compararTexto(a: string, b: string) {
   return a.localeCompare(b, 'es', { sensitivity: 'base' });
 }
 
-const btnBase: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '6px',
-  padding: '6px 16px',
-  borderRadius: '6px',
-  fontWeight: 600,
-  fontSize: '14px',
-  cursor: 'pointer',
-  border: '2px solid',
-  color: '#111827',
-  transition: 'opacity .15s',
-};
-
 export function PanelVuelos({ idSimulacion, vuelosActivos, tiempoSimulacionRef, visible, seleccionarVuelo, onEnfocarVuelo, onFiltradoCambiado }: PanelVuelosProps) {
 
   const [panelAbierto, setPanelAbierto] = useState(false);
@@ -354,13 +340,6 @@ export function PanelVuelos({ idSimulacion, vuelosActivos, tiempoSimulacionRef, 
                                     )
                                     : obtenerEstadoVuelo(vuelo);
 
-                                const handleDetener = () => {
-                                    //Borrar vuelo de vuelos activos
-                                    //Cancelar vuelo en back
-                                    const ts = new Date(tiempoSimulacionRef.current).toISOString();
-                                    SimulacionService.cancelarVuelo(idSimulacion,vuelo,ts)
-                                }
-
                                 return (
                                     <Box
                                         key={codigoVuelo}
@@ -390,19 +369,6 @@ export function PanelVuelos({ idSimulacion, vuelosActivos, tiempoSimulacionRef, 
                                             >
                                               Vuelo {codigoVuelo}
                                             </Typography>
-
-                                            <button
-                                                style={{
-                                                  ...btnBase,
-                                                  borderColor: '#dc2626',
-                                                  background: '#f87171',
-                                                  opacity: 1,
-                                                  cursor: 'pointer',
-                                                }}
-                                                onClick={handleDetener}
-                                            >
-                                              Detener
-                                            </button>
 
                                             {/*<Chip
                                                 size="small"

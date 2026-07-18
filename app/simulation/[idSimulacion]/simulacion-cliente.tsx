@@ -23,9 +23,15 @@ interface Props {
 
 export function SimulacionCliente({ id, topic, fechaInicial, k, modo, aeropuertosIniciales, errorInicial }: Props) {
   const router = useRouter();
-  const SaS_SEGUNDOS = modo === '0' ? k * 60 : 30;
+  const SaS_SEGUNDOS = modo === '0' ? k * 60 : 28;
   const { showToast, ToastComponent } = useToast();
   const [segundosPreparando, setSegundosPreparando] = useState(0);
+  const [metricas, setMetricas] = useState({
+    ocupacionFlota: 0,
+    ocupacionAeropuertos: 0,
+    maletasPendientes: 0,
+    tiempoPromedioEntregaMs: null as number | null,
+  });
   // Estabilizar fechaInicioReal: solo se calcula una vez (o cuando cambia fechaInicial).
   // Antes se recalculaba en cada render, lo que provocaba que el cronometro
   // "Transcurrido" se reiniciara cada vez que el componente re-renderizaba.
@@ -139,10 +145,16 @@ export function SimulacionCliente({ id, topic, fechaInicial, k, modo, aeropuerto
     transition: 'opacity .15s',
   };
 
+  const formatearDuracion = (ms: number | null) => {
+    if (ms === null || !Number.isFinite(ms) || ms < 0) return '—';
+    const horas = Math.floor(ms / 3_600_000);
+    const minutos = Math.floor((ms % 3_600_000) / 60_000);
+    return `${horas}h ${minutos}m`;
+  };
+
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <header style={{ padding: '0.15rem 1rem', minHeight: '32px', background: '#ffffff', color: '#111827', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: '12px', opacity: 0.8 }}>ID Simulacion: {id}</span>
         <span style={{ color: colorEstado[estadoSim], fontWeight: 600, fontSize: '13px' }}>
           ● {etiquetaEstado[estadoSim]}
         </span>
@@ -161,10 +173,14 @@ export function SimulacionCliente({ id, topic, fechaInicial, k, modo, aeropuerto
           Detener
         </button>
 
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', fontSize: '11px' }}>
+          <IndicadorCabecera label="Flota" valor={`${Math.round(metricas.ocupacionFlota)}%`} />
+          <IndicadorCabecera label="Aeropuertos" valor={`${Math.round(metricas.ocupacionAeropuertos)}%`} />
+          <IndicadorCabecera label="Pendientes" valor={metricas.maletasPendientes.toLocaleString('es-PE')} />
+          <IndicadorCabecera label="Promedio entrega" valor={formatearDuracion(metricas.tiempoPromedioEntregaMs)} />
+        </div>
+
         <div style={{ marginLeft: 'auto' }}>
-          <span style={{ fontSize: '0.8rem', color: '#334155' }}>
-            Velocidad: {k} min simulados / {SaS_SEGUNDOS}s reales
-          </span>
           {estadoSim === 'preparando' && (
             <span style={{ marginLeft: 12, fontSize: '0.8rem', color: segundosPreparando >= 30 ? '#b45309' : '#334155', fontWeight: 600 }}>
               Primer bloque en preparacion: {segundosPreparando}s
@@ -207,6 +223,7 @@ export function SimulacionCliente({ id, topic, fechaInicial, k, modo, aeropuerto
           fechaHoraInicioReal={fechaHoraInicioReal}
           fechaHoraFinReal={fechaHoraFinReal}
           estadoSim={estadoSim}
+          onMetricasCambiadas={setMetricas}
         />
         <PopUpResumen openDialog={resumenFinal!=null}
                       idSimulacion={id}
@@ -215,5 +232,14 @@ export function SimulacionCliente({ id, topic, fechaInicial, k, modo, aeropuerto
         {ToastComponent}
       </div>
     </div>
+  );
+}
+
+function IndicadorCabecera({ label, valor }: { label: string; valor: string }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 5, whiteSpace: 'nowrap' }}>
+      <span style={{ color: '#64748b', fontWeight: 600 }}>{label}</span>
+      <strong style={{ color: '#111827', fontSize: 12 }}>{valor}</strong>
+    </span>
   );
 }

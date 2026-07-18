@@ -26,7 +26,6 @@ import { AeropuertoPopupContent } from './pop-up-aeropuerto';
 import { RelojSimulacionOverlay } from './reloj-simulacion';
 import type { EstadoSimulacion } from '../hooks/useSimulacion';
 import { PanelLateral } from './panel-lateral';
-import { PanelMetricas } from './panel-metricas';
 import AeropuertoSidePanel from '@/app/simulation/components/aeropuerto-sidepanel';
 import AvionSidePanel from '@/app/simulation/components/avion-sidepanel';
 import { Drawer } from '@mui/material';
@@ -34,6 +33,7 @@ import { Drawer } from '@mui/material';
 import {
   COLOR_POR_ESTADO,
   EMPTY_MAP_STYLE,
+  INITIAL_MAP_VIEW,
   layerStyleAeropuertos,
   layerStyleLine,
   layerStyleRutaEnvio,
@@ -67,6 +67,12 @@ interface Props {
   fechaHoraInicioReal?: string | null;
   fechaHoraFinReal?: string | null;
   estadoSim: EstadoSimulacion;
+  onMetricasCambiadas?: (metricas: {
+    ocupacionFlota: number;
+    ocupacionAeropuertos: number;
+    maletasPendientes: number;
+    tiempoPromedioEntregaMs: number | null;
+  }) => void;
 }
 
 type VueloAnimado = EventoVuelo & { _salidaEpoch?: number; _llegadaEpoch?: number };
@@ -98,7 +104,9 @@ function quitarLayer(map: MapLibreNative, layerId: string) {
 }
 
 function reordenarCapasDatos(map: MapLibreNative) {
-  ['routes', 'envio-ruta', 'replanificacion-ruta-line', 'point', 'plane'].forEach((layerId) => {
+  // Las capas movidas al final quedan visualmente arriba. Los aeropuertos
+  // deben conservar prioridad sobre rutas y aviones en todo repintado.
+  ['routes', 'envio-ruta', 'replanificacion-ruta-line', 'plane', 'point'].forEach((layerId) => {
     if (map.getLayer(layerId)) map.moveLayer(layerId);
   });
 }
@@ -127,6 +135,7 @@ export function MapaSimulacion({
   fechaHoraInicioReal,
   fechaHoraFinReal,
   estadoSim,
+  onMetricasCambiadas,
 }: Props) {
   const mapRef = useRef<MapRef>(null);
   const backgroundMapRef = useRef<MapRef>(null);
@@ -329,7 +338,7 @@ export function MapaSimulacion({
 
   const mostrarRutaEnvio = useCallback(async (idPedido: string) => {
     const id = idPedido.trim();
-    if (!id) return;
+    if (!id) return null;
     try {
       setRutaError(null);
       const ts = new Date(tiempoSimulacionRef.current).toISOString();
@@ -343,10 +352,24 @@ export function MapaSimulacion({
         aeropuertos.add(escala.destinoIata);
       });
       if (data.aeropuertoActual) aeropuertos.add(data.aeropuertoActual);
-      setFiltroRelacion({ envios: new Set([data.envio.idPedido]), vuelos });
+      setFiltroRelacion({ envios: new Set([data.envio.idPedido]), vuelos, aeropuertos });
+      return data;
     } catch {
       setRutaEnvio(null);
       setRutaError(`No se encontró ruta para el envío ${id}`);
+      return null;
+    }
+  }, [idSimulacion, tiempoSimulacionRef]);
+
+  const obtenerRutaEnvio = useCallback(async (idPedido: string) => {
+    const id = idPedido.trim();
+    if (!id) return null;
+    try {
+      const ts = new Date(tiempoSimulacionRef.current).toISOString();
+      const { data } = await SimulacionService.obtenerRutaEnvio(idSimulacion, id, ts);
+      return data;
+    } catch {
+      return null;
     }
   }, [idSimulacion, tiempoSimulacionRef]);
 
@@ -606,6 +629,15 @@ export function MapaSimulacion({
     };
   }, [aeropuertosSnapshot, enviosSnapshot, vuelosActivosSnapshot]);
 
+  useEffect(() => {
+    onMetricasCambiadas?.({
+      ocupacionFlota: ocupacionPromedioFlota,
+      ocupacionAeropuertos: metricasGlobales.ocupacionPromedioAeropuertos,
+      maletasPendientes: metricasGlobales.maletasPendientes,
+      tiempoPromedioEntregaMs: metricasGlobales.tiempoPromedioEntregaMs,
+    });
+  }, [metricasGlobales, ocupacionPromedioFlota, onMetricasCambiadas]);
+
   const aeropuertoSeleccionado = useMemo(() => {
     const codigo = selAirport?.properties?.codigoIata;
     return typeof codigo === 'string'
@@ -752,6 +784,37 @@ export function MapaSimulacion({
     };
   }, [asegurarSourcesYLayers]);
 
+  // La carga de imágenes es asíncrona. Esperamos a que React haya montado la
+  // capa y forzamos una actualización completa para no depender de un zoom.
+  useEffect(() => {
+    if (!iconosAeropuertoListos) return;
+    const map = mapRef.current?.getMap();
+    if (!map || !map.isStyleLoaded()) return;
+
+    let segundoFrame = 0;
+    const primerFrame = requestAnimationFrame(() => {
+      segundoFrame = requestAnimationFrame(() => {
+        asegurarLayer(map, layerStyleAeropuertos as LayerSpecification);
+        const todasFeatures = crearFeaturesAeropuertosMapa();
+        const filtradas = filtroAeropuertosRef.current
+          ? todasFeatures.filter((feature) => filtroAeropuertosRef.current!.has(feature.properties?.codigoIata as string))
+          : todasFeatures;
+        const relacionadas = filtroRelacionRef.current.aeropuertos
+          ? filtradas.filter((feature) => filtroRelacionRef.current.aeropuertos!.has(feature.properties?.codigoIata as string))
+          : filtradas;
+        actualizarSourceGeoJson(map, 'aeropuertos-data', crearFeatureCollection(relacionadas));
+        map.setLayoutProperty('point', 'visibility', 'visible');
+        map.resize();
+        map.triggerRepaint();
+      });
+    });
+
+    return () => {
+      cancelAnimationFrame(primerFrame);
+      cancelAnimationFrame(segundoFrame);
+    };
+  }, [crearFeaturesAeropuertosMapa, iconosAeropuertoListos]);
+
   // Sincronizar cámara entre mapa de datos y mapa de fondo. Polling liviano
   // (intervalo corto) hasta detectar que ambas instancias existen, sin depender
   // del evento 'load' de ninguno (que dispara hasta terminar de bajar el basemap).
@@ -858,6 +921,9 @@ export function MapaSimulacion({
       .then(() => {
         if (!map.hasImage('airport-vacio')) throw new Error('airport-vacio no registrado');
         setIconosAeropuertoListos(true);
+        asegurarLayer(map, layerStyleAeropuertos as LayerSpecification);
+        reordenarCapasDatos(map);
+        map.triggerRepaint();
       })
       .catch((err) => {
         console.error('Error al cargar íconos de aeropuerto:', err);
@@ -870,6 +936,9 @@ export function MapaSimulacion({
       .then(() => {
         if (!map.hasImage('airplane-gris')) throw new Error('airplane-gris no registrado');
         setIconosAvionListos(true);
+        asegurarLayer(map, layerStyleAirplane as LayerSpecification);
+        reordenarCapasDatos(map);
+        map.triggerRepaint();
       })
       .catch((err) => {
         console.error('Error al cargar íconos de avión:', err);
@@ -935,16 +1004,9 @@ export function MapaSimulacion({
         envios={enviosPanel}
         tiempoSimulacion={tiempoSimulacionSnapshot}
         onMostrarRutaEnvio={mostrarRutaEnvio}
+        onObtenerRutaEnvio={obtenerRutaEnvio}
         haySeleccionRelacionada={Boolean(filtroRelacion.vuelos || filtroRelacion.aeropuertos || filtroRelacion.envios)}
         onLimpiarSeleccionRelacionada={limpiarSeleccionRelacionada}
-      />
-
-      <PanelMetricas
-        visible={conectado}
-        ocupacionFlota={ocupacionPromedioFlota}
-        ocupacionAeropuertos={metricasGlobales.ocupacionPromedioAeropuertos}
-        maletasPendientes={metricasGlobales.maletasPendientes}
-        tiempoPromedioEntregaMs={metricasGlobales.tiempoPromedioEntregaMs}
       />
 
       {colapso && <PanelColapso colapso={colapso} />}
@@ -1014,6 +1076,7 @@ export function MapaSimulacion({
       <MapLibre
         ref={backgroundMapRef}
         style={{ zIndex: 17, position: 'absolute', inset: 0, pointerEvents: 'none' }}
+        initialViewState={INITIAL_MAP_VIEW}
         mapStyle="https://tiles.openfreemap.org/styles/bright"
         renderWorldCopies={false}
         onLoad={handleBackgroundLoad}
@@ -1021,7 +1084,7 @@ export function MapaSimulacion({
       <MapLibre
         ref={mapRef}
         style={{ position: 'absolute', inset: 0, zIndex: 18, pointerEvents: 'auto' }}
-        initialViewState={{ longitude: 0, latitude: 10, zoom: 1.2 }}
+        initialViewState={INITIAL_MAP_VIEW}
         mapStyle={EMPTY_MAP_STYLE}
         renderWorldCopies={false}
         interactive={true}

@@ -36,13 +36,14 @@ type PanelEnviosProps = {
     onMostrarRutaEnvio: (idPedido: string) => void,
 }
 
-type EstadoEnvio = "EN_CURSO" | "ENTREGADO" | "PLANIFICADO";
+type EstadoEnvio = "EN_CURSO" | "ENTREGADO" | "PLANIFICADO" | "POR_PLANIFICAR";
 
 // Color del chip segun el estado del envio
 const colorEstado: Record<string, 'warning' | 'success' | 'default'> = {
     EN_CURSO: 'warning',
     ENTREGADO: 'success',
     PLANIFICADO: 'default',
+    POR_PLANIFICAR: 'warning',
 };
 
 // Etiqueta corta para que el chip no ocupe demasiado espacio
@@ -50,6 +51,7 @@ const etiquetaEstado: Record<string, string> = {
     EN_CURSO: 'En curso',
     ENTREGADO: 'Entregado',
     PLANIFICADO: 'Planificado',
+    POR_PLANIFICAR: 'Por planificar',
 };
 
 export function PanelEnvios({ aeropuertos, envios, visible, onMostrarRutaEnvio }: PanelEnviosProps) {
@@ -182,6 +184,7 @@ export function PanelEnvios({ aeropuertos, envios, visible, onMostrarRutaEnvio }
                                         >
                                             <MenuItem value="">Todos</MenuItem>
                                             <MenuItem value="PLANIFICADO">Planificados</MenuItem>
+                                            <MenuItem value="POR_PLANIFICAR">Por planificar</MenuItem>
                                             <MenuItem value="EN_CURSO">En vuelos</MenuItem>
                                             <MenuItem value="ENTREGADO">Entregados</MenuItem>
                                         </Select>
