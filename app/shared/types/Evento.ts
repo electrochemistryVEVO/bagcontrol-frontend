@@ -122,6 +122,10 @@ export interface EventoBatch {
     eventos: Evento[];
     envios: Envio[];
     saMs?: number;
+    /** Versión monotónica del plan. Ausente únicamente en servidores antiguos. */
+    versionPlan?: number;
+    /** Índice del bloque físico; los mensajes de control no tienen índice. */
+    indiceFisico?: number | null;
 }
 
 export interface EventoBatchSimulation {
