@@ -182,6 +182,7 @@ export function PanelLateral({
       <Paper
         ref={nodeRef}
         elevation={8}
+        onWheelCapture={(event) => event.stopPropagation()}
         sx={{
           position: 'absolute',
           top: 88,
@@ -199,6 +200,7 @@ export function PanelLateral({
           border: '1px solid rgba(148, 163, 184, 0.24)',
           borderRadius: 2,
           transition: 'width 160ms ease',
+          overscrollBehavior: 'contain',
         }}
       >
         {/* Barra de arrastre */}
@@ -248,7 +250,7 @@ export function PanelLateral({
         </Box>
 
         {/* La sección seleccionada usa todo el espacio restante. */}
-        <Box sx={{ overflow: 'hidden', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ overflowX: 'hidden', overflowY: 'auto', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           {haySeleccionRelacionada && (
             <Box sx={{ px: 2, py: 1, borderBottom: '1px solid rgba(148,163,184,0.15)' }}>
               <Button size="small" variant="outlined" onClick={onLimpiarSeleccionRelacionada} fullWidth>
