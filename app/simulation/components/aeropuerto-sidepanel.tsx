@@ -75,10 +75,20 @@ function AeropuertoPanelContents({
     useEffect(() => {
         if (!isOpen || !codigoIata) return;
 
-        const timestamp = new Date(tiempoSimulacionRef.current).toISOString();
-        SimulacionService.obtenerEnviosPorAlmacen(idSimulacion, codigoIata, timestamp)
-            .then(({ data }) => setEnviosAlmacen(data))
-            .catch(() => setEnviosAlmacen([]));
+        let vigente = true;
+        const cargarEnviosAlmacen = () => {
+            const timestamp = new Date(tiempoSimulacionRef.current).toISOString();
+            SimulacionService.obtenerEnviosPorAlmacen(idSimulacion, codigoIata, timestamp)
+                .then(({ data }) => { if (vigente) setEnviosAlmacen(data); })
+                .catch(() => { if (vigente) setEnviosAlmacen([]); });
+        };
+
+        cargarEnviosAlmacen();
+        const timer = window.setInterval(cargarEnviosAlmacen, 500);
+        return () => {
+            vigente = false;
+            window.clearInterval(timer);
+        };
     }, [codigoIata, idSimulacion, isOpen, tiempoSimulacionRef]);
 
     useEffect(() => {

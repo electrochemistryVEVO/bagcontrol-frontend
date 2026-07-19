@@ -147,6 +147,13 @@ const seccionIntegradaSx = {
     display: 'flex',
     flexDirection: 'column',
   },
+  '& .MuiAccordion-region': {
+    flex: 1,
+    minHeight: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+  },
 } as const;
 
 // ─── Componente principal ─────────────────────────────────────────────────────
@@ -250,7 +257,7 @@ export function PanelLateral({
         </Box>
 
         {/* La sección seleccionada usa todo el espacio restante. */}
-        <Box sx={{ overflowX: 'hidden', overflowY: 'auto', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ overflowX: 'hidden', overflowY: 'auto', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', scrollbarWidth: 'thin', scrollbarColor: '#94a3b8 rgba(15,23,42,0.45)', '&::-webkit-scrollbar': { width: 6 }, '&::-webkit-scrollbar-track': { bgcolor: 'transparent' }, '&::-webkit-scrollbar-thumb': { bgcolor: '#94a3b8', borderRadius: 1 }, '&::-webkit-scrollbar-thumb:hover': { bgcolor: '#cbd5e1' } }}>
           {haySeleccionRelacionada && (
             <Box sx={{ px: 2, py: 1, borderBottom: '1px solid rgba(148,163,184,0.15)' }}>
               <Button size="small" variant="outlined" onClick={onLimpiarSeleccionRelacionada} fullWidth>
@@ -565,7 +572,7 @@ function SeccionVuelos({
             {vuelosFiltrados.length === 0 ? (
               <Box className={styles.empty}>No hay vuelos activos</Box>
             ) : (
-              <Stack spacing={1} className={styles.scrollList}>
+              <Stack spacing={1} className={styles.scrollList} sx={{ '&::-webkit-scrollbar': { width: '6px' }, '&::-webkit-scrollbar-track': { backgroundColor: 'transparent' }, '&::-webkit-scrollbar-thumb': { backgroundColor: '#94a3b8', borderRadius: '4px' }, scrollbarWidth: 'thin', scrollbarColor: '#94a3b8 rgba(15,23,42,0.45)' }}>
                 {vuelosFiltrados.slice((page - 1) * rowsPerPage, page * rowsPerPage).map((vuelo) => {
                   const codigo = String(vuelo.codigoVuelo);
                   const expandido = vueloExpandido === codigo;
@@ -1056,7 +1063,7 @@ function SeccionEnvios({
             </Stack>
 
             <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, border: '1px solid rgba(148,163,184,0.2)', borderRadius: 1, overflow: 'hidden', bgcolor: 'rgba(30,41,59,0.82)' }}>
-              <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', scrollbarWidth: 'thin', scrollbarColor: '#64748b rgba(15,23,42,0.45)' }}>
+              <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', scrollbarWidth: 'thin', scrollbarColor: '#94a3b8 rgba(15,23,42,0.45)', '&::-webkit-scrollbar': { width: 6 }, '&::-webkit-scrollbar-track': { bgcolor: 'transparent' }, '&::-webkit-scrollbar-thumb': { bgcolor: '#94a3b8', borderRadius: 1 }, '&::-webkit-scrollbar-thumb:hover': { bgcolor: '#cbd5e1' } }}>
                   <Table stickyHeader size="small" className={styles.table}>
                     <TableHead>
                       <TableRow>
