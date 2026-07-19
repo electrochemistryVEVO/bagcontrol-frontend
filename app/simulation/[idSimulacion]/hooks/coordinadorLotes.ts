@@ -107,3 +107,14 @@ export class CoordinadorLotes {
     return !!primeroPendiente && primeroPendiente.indiceFisico > this.loteActual.indiceFisico + 1;
   }
 }
+
+export function esLoteFisicoVacio(lote: LoteFisico | null): boolean {
+  return !!lote && lote.eventos.length === 0;
+}
+
+export function instanteInicialLote(lote: LoteFisico): number {
+  const valor = lote.eventos[0]?.fechaHoraEvento ?? lote.ventanaInicio;
+  const epoch = valor ? new Date(valor).getTime() : Number.NaN;
+  if (!Number.isFinite(epoch)) throw new Error('El lote físico no tiene un inicio temporal válido');
+  return epoch;
+}

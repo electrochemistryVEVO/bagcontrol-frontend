@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CoordinadorLotes } from './coordinadorLotes.ts';
+import { CoordinadorLotes, esLoteFisicoVacio, instanteInicialLote } from './coordinadorLotes.ts';
 import type { EventoBatch } from '../../../shared/types/Evento';
 
 const lote = (indice: number | null, version = 1, simulacionId = 'sim'): EventoBatch => ({
@@ -112,4 +112,52 @@ test('dos coordinadores mantienen estado independiente', () => {
   assert.equal(dos.loteActual?.indiceFisico, 8);
   assert.equal(uno.versionPlan, 1);
   assert.equal(dos.versionPlan, 4);
+});
+
+test('primer lote físico vacío conserva metadatos y usa ventanaInicio como reloj', () => {
+  const buffer = new CoordinadorLotes('sim');
+  const vacio = { ...lote(1), eventos: [], cantidadEventos: 0 };
+  assert.equal(buffer.recibir(vacio).estado, 'aceptado');
+  assert.equal(esLoteFisicoVacio(buffer.loteActual), true);
+  assert.equal(instanteInicialLote(buffer.loteActual!), new Date(vacio.ventanaInicio!).getTime());
+});
+
+test('lote vacío seguido de normal se promueve sin inventar eventos', () => {
+  const buffer = new CoordinadorLotes('sim');
+  buffer.recibir({ ...lote(1), eventos: [], cantidadEventos: 0 });
+  buffer.recibir(lote(2));
+  assert.equal(buffer.loteActual?.eventos.length, 0);
+  assert.equal(buffer.promover()?.indiceFisico, 2);
+  assert.equal(esLoteFisicoVacio(buffer.loteActual), false);
+});
+
+test('lote normal seguido de vacío mantiene ambas ventanas', () => {
+  const buffer = new CoordinadorLotes('sim');
+  buffer.recibir(lote(1));
+  buffer.recibir({ ...lote(2), eventos: [], cantidadEventos: 0 });
+  assert.equal(buffer.promover()?.eventos.length, 0);
+});
+
+test('dos lotes vacíos consecutivos se promueven en orden', () => {
+  const buffer = new CoordinadorLotes('sim');
+  buffer.recibir({ ...lote(1), eventos: [], cantidadEventos: 0 });
+  buffer.recibir({ ...lote(2), eventos: [], cantidadEventos: 0 });
+  assert.equal(buffer.promover()?.indiceFisico, 2);
+});
+
+test('duplicado vacío se ignora y versión antigua vacía se descarta', () => {
+  const buffer = new CoordinadorLotes('sim');
+  const vacio = { ...lote(1, 2), eventos: [], cantidadEventos: 0 };
+  buffer.recibir(vacio);
+  assert.equal(buffer.recibir(vacio).estado, 'duplicado');
+  assert.equal(buffer.recibir({ ...lote(2, 1), eventos: [] }).estado, 'obsoleto');
+});
+
+test('snapshot vacío reconectado no repite una ventana consumida', () => {
+  const buffer = new CoordinadorLotes('sim');
+  const vacio = { ...lote(1), eventos: [], cantidadEventos: 0 };
+  buffer.recibir(vacio);
+  buffer.recibir({ ...lote(2), eventos: [], cantidadEventos: 0 });
+  buffer.promover();
+  assert.equal(buffer.recibir(vacio).estado, 'obsoleto');
 });

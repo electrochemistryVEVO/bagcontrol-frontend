@@ -14,7 +14,7 @@ import axios from 'axios';
 import {Envio} from "@/app/shared/types/Envio";
 import { obtenerEstadoAeropuerto } from '@/app/shared/simulation/semaforo';
 import {ResumenFinalSimulacion} from "@/app/shared/types/Simulacion";
-import { CoordinadorLotes, LoteFisico } from './coordinadorLotes';
+import { CoordinadorLotes, esLoteFisicoVacio, instanteInicialLote, LoteFisico } from './coordinadorLotes';
 
 export type EstadoSimulacion = 'conectando' | 'conectado' | 'preparando' | 'en_vivo' | 'pausada' | 'detenida' | 'finalizada' | 'colapsada' | 'error';
 type EventoConTipoAlternativo = Evento & { tipoEvento?: string };
@@ -56,6 +56,7 @@ export function useSimulacion(
   const primerEventoRecibidoRef = useRef(false);
   const primerLoteRecibidoRef = useRef(false);
   const clockEstadoRef = useRef(0); //Tiempo obtenido del estado al iniciar
+  const finalizacionVaciaPendienteRef = useRef(false);
 
   const onNuevoLoteRef = useRef(onNuevoLote);
   useEffect(() => { onNuevoLoteRef.current = onNuevoLote; }, [onNuevoLote]);
@@ -136,11 +137,12 @@ export function useSimulacion(
         case 'SIMULACION_REANUDADA':
           setEstadoSim('en_vivo');
           break;
-          /*
         case 'SIMULACION_FINALIZADA':
-          setResumenFinal({vueloFinal:vueloFinalRef.current});
-          setEstadoSim('finalizada');
+          if (esLoteFisicoVacio(coordinadorLotesRef.current.loteActual)) {
+            finalizacionVaciaPendienteRef.current = true;
+          }
           break;
+          /*
         case 'COLAPSO_DETECTADO':
           setColapso(e as EventoColapso);
           setEstadoSim('colapsada');
@@ -244,10 +246,17 @@ export function useSimulacion(
 
     // 4. Arrancar el motor solo cuando tenemos ≥2 lotes (colchón de seguridad)
     if (['conectando', 'conectado', 'preparando'].includes(estadoSimRef.current)) {
-      tiempoSimulacion.current = new Date(colaEventos.current[0].fechaHoraEvento).getTime();
+      if (!actual) return;
+      tiempoSimulacion.current = instanteInicialLote(actual);
       clockEstadoRef.current = tiempoSimulacion.current;
-      simTime('estado cambia de SINCRONIZANDO a EN_EJECUCION', `primerEvento=${colaEventos.current[0].fechaHoraEvento}`);
+      const vacio = esLoteFisicoVacio(actual);
+      setMensajeErrorSimulacion(vacio ? 'Sin envíos en esta ventana' : null);
+      simTime('estado cambia de SINCRONIZANDO a EN_EJECUCION', vacio
+        ? `ventanaVacia=${actual.ventanaInicio}->${actual.ventanaFin}`
+        : `primerEvento=${actual.eventos[0].fechaHoraEvento}`);
       setEstadoSim('en_vivo');
+    } else if (!esLoteFisicoVacio(actual)) {
+      setMensajeErrorSimulacion(null);
     }
 
     onNuevoLoteRef.current?.();
@@ -281,7 +290,7 @@ export function useSimulacion(
               try {
                 const { data: snapshot } = await SimulacionService.obtenerSnapshot(id);
                 simTime('snapshot recibido', `numero=${snapshot?.numeroLote ?? 'n/a'} eventos=${snapshot?.eventos?.length ?? 0}`);
-                if (snapshot?.eventos?.length) encolarEventos(snapshot);
+                if (snapshot?.indiceFisico != null || snapshot?.eventos?.length) encolarEventos(snapshot);
               } catch (snapshotError) {
                 console.warn('[WS] No se pudo cargar snapshot inicial:', snapshotError);
               }
@@ -323,6 +332,7 @@ export function useSimulacion(
       arrancadoRef.current = false;
       primerEventoRecibidoRef.current = false;
       primerLoteRecibidoRef.current = false;
+      finalizacionVaciaPendienteRef.current = false;
     };
   }, [id, topic, encolarEventos]);
 
@@ -345,6 +355,8 @@ export function useSimulacion(
 
     function cargarLotePromovido(lote: LoteFisico) {
       colaEventos.current = [...lote.eventos];
+      tiempoSimulacion.current = Math.max(tiempoSimulacion.current, instanteInicialLote(lote));
+      setMensajeErrorSimulacion(esLoteFisicoVacio(lote) ? 'Sin envíos en esta ventana' : null);
       batchStartTime = Date.now();
       batchStartClock = tiempoSimulacion.current;
       lastElapsed = 0;
@@ -399,7 +411,12 @@ export function useSimulacion(
             tiempoSimulacion.current = fronteraSimulada;
             const promovido = coordinadorLotesRef.current.promover();
             if (promovido) cargarLotePromovido(promovido);
-            else ultimoFrame = Date.now();
+            else if (finalizacionVaciaPendienteRef.current) {
+              finalizacionVaciaPendienteRef.current = false;
+              setResumenFinal({vueloFinal: vueloFinalRef.current});
+              setEstadoSim('finalizada');
+              void sincronizarTiemposReales();
+            } else ultimoFrame = Date.now();
           }
         } else if(modo==="0") elapseTime();
         else ultimoFrame = Date.now();
