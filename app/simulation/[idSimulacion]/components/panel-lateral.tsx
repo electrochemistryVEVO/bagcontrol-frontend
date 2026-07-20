@@ -962,11 +962,21 @@ function SeccionEnvios({
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [expandidoEnvio, setExpandidoEnvio] = useState<string | null>(null);
   const [rutaSeleccionada, setRutaSeleccionada] = useState<EnvioRuta | null>(null);
+  const [detalleRutaAbierto, setDetalleRutaAbierto] = useState(false);
+  const [cargandoRuta, setCargandoRuta] = useState(false);
   const abiertoEfectivo = integrada || abierto;
 
   const verRuta = async (idPedido: string) => {
+    setDetalleRutaAbierto(true);
+    setCargandoRuta(true);
     const ruta = await onObtenerRutaEnvio(idPedido);
-    if (ruta) setRutaSeleccionada(ruta);
+    setRutaSeleccionada(ruta);
+    setCargandoRuta(false);
+  };
+
+  const toggleEnvio = (idPedido: string) => {
+    if (expandidoEnvio !== idPedido) void onObtenerRutaEnvio(idPedido);
+    setExpandidoEnvio((actual) => actual === idPedido ? null : idPedido);
   };
 
   const enviosFiltrados = useMemo(() => {
@@ -1090,7 +1100,7 @@ function SeccionEnvios({
                           <React.Fragment key={rowKey}>
                             <TableRow
                               key={`${rowKey}-main`}
-                              onClick={() => setExpandidoEnvio(cur => cur === e.idPedido ? null : e.idPedido)}
+                              onClick={() => toggleEnvio(e.idPedido)}
                               sx={{ cursor: 'pointer', '&:hover': { bgcolor: 'rgba(56,189,248,0.08)' }, bgcolor: expandidoEnvio === e.idPedido ? 'rgba(56,189,248,0.1)' : 'transparent' }}
                             >
                               {/* ID truncado; hover muestra el completo */}
@@ -1207,10 +1217,12 @@ function SeccionEnvios({
                 labelDisplayedRows={({ from, to, count }) => `${from}–${to} de ${count}`}
                 sx={{ flexShrink: 0, color: '#e2e8f0', borderTop: '1px solid rgba(148,163,184,0.18)', overflow: 'hidden', '& .MuiTablePagination-toolbar': { minHeight: 52, px: 1 }, '& .MuiTablePagination-selectLabel': { fontSize: 11 }, '& .MuiTablePagination-displayedRows': { fontSize: 11 }, '& .MuiSvgIcon-root': { color: '#cbd5e1' } }}
               />
-              <Dialog open={Boolean(rutaSeleccionada)} onClose={() => setRutaSeleccionada(null)} fullWidth maxWidth="sm">
+              <Dialog open={detalleRutaAbierto} onClose={() => setDetalleRutaAbierto(false)} fullWidth maxWidth="sm">
                 <DialogTitle>Ruta del envío {rutaSeleccionada?.envio.idPedido}</DialogTitle>
                 <DialogContent dividers>
-                  {rutaSeleccionada && (
+                  {cargandoRuta ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}><CircularProgress size={24} /></Box>
+                  ) : rutaSeleccionada ? (
                     <Stack spacing={1.25}>
                       <Typography variant="body2">
                         {rutaSeleccionada.envio.origenIata} → {rutaSeleccionada.envio.destinoIata} · {rutaSeleccionada.envio.cantidadMaletas} maletas
@@ -1232,10 +1244,12 @@ function SeccionEnvios({
                         </Box>
                       ))}
                     </Stack>
+                  ) : (
+                    <Typography variant="body2">No se pudo cargar la ruta del envío.</Typography>
                   )}
                 </DialogContent>
                 <DialogActions>
-                  <Button onClick={() => setRutaSeleccionada(null)}>Cerrar</Button>
+                  <Button onClick={() => setDetalleRutaAbierto(false)}>Cerrar</Button>
                 </DialogActions>
               </Dialog>
             </Box>

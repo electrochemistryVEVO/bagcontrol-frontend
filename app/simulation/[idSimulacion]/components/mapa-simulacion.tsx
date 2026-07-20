@@ -59,6 +59,7 @@ interface Props {
   idSimulacion: string;
   conectado: boolean;
   fechaInicio: string;
+  kMinutos: number;
   modo?: string;
   colapso?: EventoColapso | null;
   replanificaciones: EventoReplanificacionEnvio[];
@@ -127,6 +128,7 @@ export function MapaSimulacion({
   idSimulacion,
   conectado,
   fechaInicio,
+  kMinutos,
   modo,
   colapso,
   replanificaciones,
@@ -145,6 +147,7 @@ export function MapaSimulacion({
   const mapasAuditadosRef = useRef<Set<string>>(new Set());
   const vuelosConCoordenadasInvalidasRef = useRef<Set<string>>(new Set());
   const ultimoDiagnosticoAeropuertosRef = useRef('');
+  const rutasEnvioCacheRef = useRef<Map<string, EnvioRuta>>(new Map());
 
   const [showPopup, setShowPopup] = useState(false);
   const [selFeature, setSelFeature] = useState<MapGeoJSONFeature | null>(null);
@@ -163,6 +166,7 @@ export function MapaSimulacion({
 
   const [panelOpen, setPanelOpen] = useState(false);
   const [selFlight, setSelFlight] = useState<MapGeoJSONFeature | null>(null);
+  const [vueloSeguido, setVueloSeguido] = useState<string | null>(null);
   const [airportPanelOpen, setAirportPanelOpen] = useState(false);
   const [selAirport, setSelAirport] = useState<MapGeoJSONFeature | null>(null);
   const [idEnvioBusqueda, setIdEnvioBusqueda] = useState('');
@@ -333,16 +337,42 @@ export function MapaSimulacion({
 
   const enfocarVueloSeleccionado = useCallback(() => {
     const coords = obtenerCoordenadasFeature(selFlight);
+    const codigoVuelo = selFlight?.properties?.codigoVuelo;
+    if (typeof codigoVuelo === 'string' || typeof codigoVuelo === 'number') {
+      setVueloSeguido(String(codigoVuelo));
+    }
     if (coords) enfocarCoordenadas(coords, 6.5);
   }, [enfocarCoordenadas, selFlight]);
+
+  const obtenerRutaEnvio = useCallback(async (idPedido: string) => {
+    const id = idPedido.trim();
+    if (!id) return null;
+    try {
+      const ts = new Date(tiempoSimulacionRef.current).toISOString();
+      const inicio = Date.parse(fechaInicio);
+      const lote = Number.isFinite(inicio)
+        ? Math.max(1, Math.floor((tiempoSimulacionRef.current - inicio) / (kMinutos * 60_000)) + 1)
+        : 0;
+      const clave = `${id}|${lote}`;
+      const cacheada = rutasEnvioCacheRef.current.get(clave);
+      if (cacheada) return cacheada;
+      const { data } = await SimulacionService.obtenerRutaEnvio(idSimulacion, id, ts);
+      rutasEnvioCacheRef.current.set(clave, data);
+      if (rutasEnvioCacheRef.current.size > 100) {
+        rutasEnvioCacheRef.current.delete(rutasEnvioCacheRef.current.keys().next().value!);
+      }
+      return data;
+    } catch {
+      return null;
+    }
+  }, [fechaInicio, idSimulacion, kMinutos, tiempoSimulacionRef]);
 
   const mostrarRutaEnvio = useCallback(async (idPedido: string) => {
     const id = idPedido.trim();
     if (!id) return null;
-    try {
-      setRutaError(null);
-      const ts = new Date(tiempoSimulacionRef.current).toISOString();
-      const { data } = await SimulacionService.obtenerRutaEnvio(idSimulacion, id, ts);
+    setRutaError(null);
+    const data = await obtenerRutaEnvio(id);
+    if (data) {
       setRutaEnvio(data);
       setIdEnvioBusqueda(id);
       const vuelos = new Set(data.escalas.map((escala) => String(escala.codigoVuelo)));
@@ -354,24 +384,15 @@ export function MapaSimulacion({
       if (data.aeropuertoActual) aeropuertos.add(data.aeropuertoActual);
       setFiltroRelacion({ envios: new Set([data.envio.idPedido]), vuelos, aeropuertos });
       return data;
-    } catch {
-      setRutaEnvio(null);
-      setRutaError(`No se encontró ruta para el envío ${id}`);
-      return null;
     }
-  }, [idSimulacion, tiempoSimulacionRef]);
+    setRutaEnvio(null);
+    setRutaError(`No se encontró ruta para el envío ${id}`);
+    return null;
+  }, [obtenerRutaEnvio]);
 
-  const obtenerRutaEnvio = useCallback(async (idPedido: string) => {
-    const id = idPedido.trim();
-    if (!id) return null;
-    try {
-      const ts = new Date(tiempoSimulacionRef.current).toISOString();
-      const { data } = await SimulacionService.obtenerRutaEnvio(idSimulacion, id, ts);
-      return data;
-    } catch {
-      return null;
-    }
-  }, [idSimulacion, tiempoSimulacionRef]);
+  useEffect(() => {
+    rutasEnvioCacheRef.current.clear();
+  }, [replanificaciones]);
 
   const featuresRutaEnvio = useMemo<Feature[]>(() => {
     if (!rutaEnvio) return [];
@@ -438,6 +459,7 @@ export function MapaSimulacion({
 
       setSelFlight(feature);
       setPanelOpen(true);
+      setVueloSeguido(codigoVuelo);
       const vueloSeleccionado = feature.properties as EventoVuelo;
       setFiltroRelacion({
         vuelos: new Set([codigoVuelo]),
@@ -710,6 +732,9 @@ export function MapaSimulacion({
         let p = (fin - ini) > 0 ? (t - ini) / (fin - ini) : 1;
         p = Math.max(0, Math.min(1, p));
         const pos = interpolar(o, d, p);
+        if (vueloSeguido === codigoVuelo) {
+          map.jumpTo({ center: pos });
+        }
         const bearing = calcularBearing(o, d);
         featuresAviones.push({
           type: 'Feature',
@@ -754,7 +779,7 @@ export function MapaSimulacion({
 
     animar();
     return () => cancelAnimationFrame(rafId);
-  }, [asegurarSourcesYLayers, crearFeaturesAeropuertosMapa, crearFeaturesVuelosMapa, logDiagnosticoAeropuertos]);
+  }, [asegurarSourcesYLayers, crearFeaturesAeropuertosMapa, crearFeaturesVuelosMapa, logDiagnosticoAeropuertos, vueloSeguido]);
 
   // Capa de ruta de envío: se actualiza solo cuando cambia la ruta buscada
   useEffect(() => {
@@ -1094,9 +1119,9 @@ export function MapaSimulacion({
         touchZoomRotate={true}
         keyboard={true}
         boxZoom={true}
-        onDragStart={(e) => registrarInteraccionUsuario(e.target, 'dragstart')}
+        onDragStart={(e) => { setVueloSeguido(null); registrarInteraccionUsuario(e.target, 'dragstart'); }}
         onDragEnd={(e) => registrarInteraccionUsuario(e.target, 'dragend')}
-        onZoomStart={(e) => registrarInteraccionUsuario(e.target, 'zoomstart')}
+        onZoomStart={(e) => { setVueloSeguido(null); registrarInteraccionUsuario(e.target, 'zoomstart'); }}
         onZoomEnd={(e) => registrarInteraccionUsuario(e.target, 'zoomend')}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={() => setShowPopup(false)}
@@ -1107,6 +1132,7 @@ export function MapaSimulacion({
           if (props.isAirplane) {
             setSelFlight(feature ?? null);
             setPanelOpen(true);
+            setVueloSeguido(String(props.codigoVuelo));
             const coords = obtenerCoordenadasFeature(feature ?? null);
             if (coords) enfocarCoordenadas(coords, 6.5);
             if (typeof props.codigoVuelo === 'string' || typeof props.codigoVuelo === 'number') {

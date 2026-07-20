@@ -215,6 +215,7 @@ export function SimulacionCliente({ id, topic, fechaInicial, k, modo, aeropuerto
           idSimulacion={id}
           conectado={conectado}
           fechaInicio={fechaInicioReal}
+          kMinutos={k}
           modo={modo}
           colapso={colapso}
           replanificaciones={replanificaciones}
