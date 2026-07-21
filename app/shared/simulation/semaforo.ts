@@ -22,13 +22,20 @@ export function esVueloVacio(vuelo: Pick<EventoVuelo, 'cantidadMaletas' | 'capac
   return (vuelo.cantidadMaletas ?? 0) === 0 || calcularOcupacionVuelo(vuelo.cantidadMaletas, vuelo.capacidadMax) === 0;
 }
 
+export function calcularEstadoCapacidadAeropuerto(
+  aeropuerto: Pick<AeropuertoSimulacion, 'maletasActuales' | 'capacidadAlmacen' | 'porcentajeOcupacion'>,
+): EstadoCapacidad {
+  if (Number(aeropuerto.maletasActuales ?? 0) <= 0) return 'VACIO';
+  const ocupacion = calcularOcupacionAeropuerto(aeropuerto as AeropuertoSimulacion);
+  if (ocupacion >= 85) return 'ROJO';
+  if (ocupacion >= 60) return 'AMARILLO';
+  return 'VERDE';
+}
+
 export function obtenerEstadoAeropuerto(aeropuerto: AeropuertoSimulacion): EstadoCapacidad {
   if (esAeropuertoVacio(aeropuerto)) return 'VACIO';
   if (aeropuerto.estadoCapacidad === 'VACIO') {
-    const ocupacion = calcularOcupacionAeropuerto(aeropuerto);
-    const estadoCorregido: EstadoCapacidad = ocupacion >= 85
-      ? 'ROJO'
-      : ocupacion >= 60 ? 'AMARILLO' : 'VERDE';
+    const estadoCorregido = calcularEstadoCapacidadAeropuerto(aeropuerto);
     console.warn('[AIRPORT-FRONT-INCONSISTENCY]', {
       iata: aeropuerto.codigoIata,
       ocupacion: aeropuerto.maletasActuales,

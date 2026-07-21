@@ -10,7 +10,7 @@ import { SimulacionService } from '@/app/services/simulation.service';
 import { simulacionWS } from '@/app/services/config/webSocket';
 import {PopUpResumen} from "@/app/simulation/[idSimulacion]/components/pop-up-resumen";
 import { getUsuarioGuardado, UsuarioGuardado } from '@/app/shared/hooks/LoginModal';
-import { obtenerEstadoAeropuerto } from '@/app/shared/simulation/semaforo';
+import { calcularEstadoCapacidadAeropuerto } from '@/app/shared/simulation/semaforo';
 
 interface Props {
   id: string;
@@ -90,11 +90,19 @@ export function SimulacionCliente({ id, topic, fechaInicial, k, modo, aeropuerto
           const actual = aeropuertosRef.current[aeropuerto.codigoIata];
           if (!actual) return;
           const maletasActuales = porIata.get(aeropuerto.codigoIata)?.cantidadMaletas ?? 0;
-          actual.maletasActuales = maletasActuales;
-          actual.porcentajeOcupacion = actual.capacidadAlmacen > 0
+          const porcentajeOcupacion = actual.capacidadAlmacen > 0
             ? (maletasActuales * 100) / actual.capacidadAlmacen : 0;
-          actual.estadoCapacidad = obtenerEstadoAeropuerto(actual);
-          actual.tieneDatos = true;
+          const estadoCapacidad = calcularEstadoCapacidadAeropuerto({
+            maletasActuales,
+            porcentajeOcupacion,
+            capacidadAlmacen: actual.capacidadAlmacen,
+          });
+          Object.assign(actual, {
+            maletasActuales,
+            porcentajeOcupacion,
+            estadoCapacidad,
+            tieneDatos: true,
+          });
         });
       } catch {
         // Conserva la ultima fotografia operativa si una consulta transitoria falla.
