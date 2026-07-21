@@ -52,3 +52,20 @@ export type MaletaSimulacion = {
     estadoEnvio: string;
     cantidadMaletasEnvio: number;
 }
+
+export type EnvioInventarioOperativo = {
+    idPedido: string;
+    origenIata: string;
+    destinoIata: string;
+    fechaHora: string;
+    cantidadMaletas: number;
+    aeropuertoActual: string;
+    estado: string;
+}
+
+export type InventarioOperativoAeropuerto = {
+    codigoIata: string;
+    cantidadEnvios: number;
+    cantidadMaletas: number;
+    envios: EnvioInventarioOperativo[];
+}

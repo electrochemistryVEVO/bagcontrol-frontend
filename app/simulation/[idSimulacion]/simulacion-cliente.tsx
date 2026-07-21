@@ -10,6 +10,7 @@ import { SimulacionService } from '@/app/services/simulation.service';
 import { simulacionWS } from '@/app/services/config/webSocket';
 import {PopUpResumen} from "@/app/simulation/[idSimulacion]/components/pop-up-resumen";
 import { getUsuarioGuardado, UsuarioGuardado } from '@/app/shared/hooks/LoginModal';
+import { obtenerEstadoAeropuerto } from '@/app/shared/simulation/semaforo';
 
 interface Props {
   id: string;
@@ -76,6 +77,36 @@ export function SimulacionCliente({ id, topic, fechaInicial, k, modo, aeropuerto
     modo,
     () => showToast('Nuevo lote de eventos recibido', 'info'),
   );
+
+  useEffect(() => {
+    if (modo !== '0') return;
+    let vigente = true;
+    const sincronizarInventarioOperativo = async () => {
+      try {
+        const { data } = await SimulacionService.obtenerInventarioOperacionDia();
+        if (!vigente) return;
+        const porIata = new Map(data.map((inventario) => [inventario.codigoIata, inventario]));
+        aeropuertosIniciales.forEach((aeropuerto) => {
+          const actual = aeropuertosRef.current[aeropuerto.codigoIata];
+          if (!actual) return;
+          const maletasActuales = porIata.get(aeropuerto.codigoIata)?.cantidadMaletas ?? 0;
+          actual.maletasActuales = maletasActuales;
+          actual.porcentajeOcupacion = actual.capacidadAlmacen > 0
+            ? (maletasActuales * 100) / actual.capacidadAlmacen : 0;
+          actual.estadoCapacidad = obtenerEstadoAeropuerto(actual);
+          actual.tieneDatos = true;
+        });
+      } catch {
+        // Conserva la ultima fotografia operativa si una consulta transitoria falla.
+      }
+    };
+    void sincronizarInventarioOperativo();
+    const timer = window.setInterval(() => void sincronizarInventarioOperativo(), 1000);
+    return () => {
+      vigente = false;
+      window.clearInterval(timer);
+    };
+  }, [aeropuertosIniciales, aeropuertosRef, modo]);
 
   const handleDetener = async () => {
     try {

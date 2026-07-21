@@ -9,6 +9,7 @@ import { MapGeoJSONFeature } from "@vis.gl/react-maplibre";
 import { HourFormat } from "@/app/shared/Utils";
 import { SimulacionService, type VueloInstanciado } from "@/app/services/simulation.service";
 import { formatShortDateTime } from "@/app/shared/dateTime";
+import { useSearchParams } from "next/navigation";
 
 function fechaIsoLocal(epochUtc: number, gmt: number) {
     return new Date(epochUtc + gmt * 3_600_000).toISOString().slice(0, 19);
@@ -44,6 +45,8 @@ function AeropuertoPanelContents({
     onEnfocarAeropuerto: (codigoIata: string) => void;
     onClose?: () => void;
 }) {
+    const searchParams = useSearchParams();
+    const esOperacionDia = searchParams.get('modo') === '0';
     // 1. Inicializamos con los datos reactivos del Snapshot de simulación
     const [data, setData] = useState<AeropuertoSimulacion | undefined>();
     
@@ -81,13 +84,31 @@ function AeropuertoPanelContents({
         // puede estar varios minutos simulados adelante del momento del aterrizaje.
         const epochConsulta = data?._ultimaActualizacionEpoch ?? tiempoSimulacionRef.current;
         const timestamp = new Date(epochConsulta).toISOString();
-        SimulacionService.obtenerEnviosPorAlmacen(idSimulacion, codigoIata, timestamp)
-            .then(({ data }) => { if (vigente) setEnviosAlmacen(data); })
+        const consulta = esOperacionDia
+            ? SimulacionService.obtenerInventarioOperacionDiaPorAeropuerto(codigoIata)
+                .then(({ data }) => data.envios.map((envio) => ({
+                    envio: {
+                        idPedido: envio.idPedido,
+                        origenIata: envio.origenIata,
+                        destinoIata: envio.destinoIata,
+                        fechaHora: envio.fechaHora,
+                        cantidadMaletas: envio.cantidadMaletas,
+                        idCliente: '',
+                        esOperacionDia: true,
+                    },
+                    codigoAeropuerto: envio.aeropuertoActual,
+                    tipoAlmacen: envio.aeropuertoActual === envio.destinoIata ? 'DESTINO_FINAL' : 'TRANSITO',
+                    estadoEnvio: envio.estado,
+                } as EnvioAlmacen)))
+            : SimulacionService.obtenerEnviosPorAlmacen(idSimulacion, codigoIata, timestamp)
+                .then(({ data }) => data);
+        consulta
+            .then((envios) => { if (vigente) setEnviosAlmacen(envios); })
             .catch(() => { if (vigente) setEnviosAlmacen([]); });
 
         return () => { vigente = false; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [codigoIata, idSimulacion, isOpen, tiempoSimulacionRef, data?.maletasActuales, data?._ultimaActualizacionEpoch]);
+    }, [codigoIata, esOperacionDia, idSimulacion, isOpen, tiempoSimulacionRef, data?.maletasActuales, data?._ultimaActualizacionEpoch]);
 
     useEffect(() => {
         if (!isOpen || !codigoIata) return;

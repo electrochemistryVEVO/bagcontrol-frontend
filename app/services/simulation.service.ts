@@ -1,5 +1,5 @@
 import { RespuestaEstadoSimulacionDTO, RespuestaInicioSimulacionDTO } from '../shared/types/Simulacion';
-import { Envio, EnvioAlmacen, EnvioRuta, MaletaSimulacion } from '@/app/shared/types/Envio';
+import { Envio, EnvioAlmacen, EnvioRuta, InventarioOperativoAeropuerto, MaletaSimulacion } from '@/app/shared/types/Envio';
 import axiosApi, { axiosSimulacion } from './config/axios';
 import {EventoVuelo} from "@/app/shared/types/Evento";
 
@@ -92,6 +92,12 @@ export const SimulacionService = {
         axiosApi.get<EnvioAlmacen[]>(`/simulacion/${idSimulacion}/aeropuertos/${codigoIata}/envios`, { params: { timestamp } }),
     obtenerMaletasPorAeropuerto: (idSimulacion: string, codigoIata: string, timestamp: string) =>
         axiosApi.get<MaletaSimulacion[]>(`/simulacion/${idSimulacion}/aeropuertos/${codigoIata}/maletas`, { params: { timestamp } }),
+    obtenerInventarioOperacionDia: () =>
+        axiosApi.get<InventarioOperativoAeropuerto[]>('/operacion-dia/aeropuertos/inventario'),
+    obtenerInventarioOperacionDiaPorAeropuerto: (codigoIata: string) =>
+        axiosApi.get<InventarioOperativoAeropuerto>(
+          `/operacion-dia/aeropuertos/${encodeURIComponent(codigoIata)}/inventario`,
+        ),
     pausar: (idSimulacion: string) =>
         axiosApi.post(`/simulacion/${idSimulacion}/pausar`),
 
