@@ -4,12 +4,10 @@ import { useRouter } from 'next/navigation'
 import { AeropuertoService } from '@/app/services/aeropuerto.service'
 import { EnvioService, NuevoEnvioDTO } from '@/app/services/envio.service'
 import { Aeropuerto } from '@/app/shared/types/Aeropuerto'
-import { getUsuarioGuardado, cerrarSesion, UsuarioGuardado } from '@/app/shared/hooks/LoginModal'
-import { AuthService } from '@/app/services/auth.service'
+import { getUsuarioGuardado, UsuarioGuardado } from '@/app/shared/hooks/LoginModal'
 import {
-  toDateTimeLocalInput,
+  formatAirportLocalDisplay,
   formatGmtOffset,
-  convertLocalToUtcDisplay,
 } from '@/app/shared/dateTime'
 
 export default function RegistroPage() {
@@ -18,15 +16,13 @@ export default function RegistroPage() {
   const [aeropuertos, setAeropuertos] = useState<Aeropuerto[]>([])
   const [form, setForm] = useState({
     destinoIata: '',
-    idCliente: '',
     cantidadMaletas: 1,
-    fechaHora: toDateTimeLocalInput(new Date()),
   })
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [exito, setExito] = useState(false)
   const [cargandoArchivo, setCargandoArchivo] = useState(false)
-  const [mostrarSelectorAeropuerto, setMostrarSelectorAeropuerto] = useState(false)
+  const [ahora, setAhora] = useState(() => new Date())
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -44,6 +40,8 @@ export default function RegistroPage() {
     AeropuertoService.listarAeropuertos()
       .then(({ data }) => setAeropuertos(data))
       .catch(() => setError('No se pudieron cargar los aeropuertos'))
+    const reloj = window.setInterval(() => setAhora(new Date()), 1000)
+    return () => window.clearInterval(reloj)
   }, [router])
 
   if (!usuario) return null
@@ -53,7 +51,7 @@ export default function RegistroPage() {
 
   const handleSubmit = async () => {
     setError(null)
-    if (!origenIata || !form.destinoIata || !form.idCliente) {
+    if (!origenIata || !form.destinoIata) {
       setError('Completa todos los campos obligatorios')
       return
     }
@@ -70,26 +68,21 @@ export default function RegistroPage() {
       const payload: NuevoEnvioDTO = {
         origenIata,
         destinoIata: form.destinoIata,
-        idCliente: form.idCliente,
+        idCliente: '0007729',
         cantidadMaletas: form.cantidadMaletas,
-        fechaHora: form.fechaHora || toDateTimeLocalInput(new Date()),
+        fechaHora: new Date().toISOString(),
         esOperacionDia: true,
       }
       await EnvioService.registrarEnvio(payload)
       setExito(true)
-      setForm(prev => ({ ...prev, idCliente: '', cantidadMaletas: 1, fechaHora: toDateTimeLocalInput(new Date()) }))
+      setForm(prev => ({ ...prev, cantidadMaletas: 1 }))
+      setError(null)
       setTimeout(() => setExito(false), 3000)
     } catch {
       setError('Error al registrar el envio. Verifica que el servidor este activo.')
     } finally {
       setGuardando(false)
     }
-  }
-
-  const handleCambiarAeropuerto = (codigoIata: string) => {
-    AuthService.updateUser({ aeropuerto: codigoIata })
-    setUsuario(prev => prev ? { ...prev, aeropuerto: codigoIata } : null)
-    setMostrarSelectorAeropuerto(false)
   }
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -105,7 +98,7 @@ export default function RegistroPage() {
         setError(`Archivo procesado: ${data.insertados} insertados, ${data.errores.length} errores. ${data.errores.slice(0, 3).join('; ')}`)
       }
     } catch {
-      setError('Error al procesar el archivo. Verifica el formato: idPedido-aaaammdd-hh-mm-dest-###-idCliente')
+      setError('Error al procesar el archivo. Verifica el formato: id_envio-aaaammdd-hh-mm-dest-###-0007729')
     } finally {
       setCargandoArchivo(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -134,26 +127,11 @@ export default function RegistroPage() {
                 ? `${aeropuertoActual.codigoIata} — ${formatGmtOffset(aeropuertoActual.gmt)}`
                 : origenIata || 'No asignado'}
             </span>
-            <button
-              onClick={() => setMostrarSelectorAeropuerto(!mostrarSelectorAeropuerto)}
-              style={S.btnSmall}
-            >
-              Cambiar
-            </button>
           </div>
-          {mostrarSelectorAeropuerto && (
-            <select
-              style={{ ...S.select, width: 260, marginTop: 4, fontSize: 12 }}
-              value={origenIata}
-              onChange={e => handleCambiarAeropuerto(e.target.value)}
-            >
-              <option value="">Sin aeropuerto</option>
-              {aeropuertos.map(a => (
-                <option key={a.codigoIata} value={a.codigoIata}>
-                  {a.codigoIata} — {a.ciudad}, {a.pais} ({formatGmtOffset(a.gmt)})
-                </option>
-              ))}
-            </select>
+          {aeropuertoActual && (
+            <div style={{ fontSize: 12, color: '#1d4ed8' }}>
+              Hora local: {formatAirportLocalDisplay(ahora, aeropuertoActual, true)}
+            </div>
           )}
         </div>
       </div>
@@ -174,47 +152,16 @@ export default function RegistroPage() {
           </div>
 
           <div>
-            <label style={S.label}>Cliente (RUC o codigo)</label>
-            <input type="text" style={S.input} placeholder="RUC o codigo de cliente"
-              value={form.idCliente}
-              onChange={e => setForm(f => ({ ...f, idCliente: e.target.value }))} />
-          </div>
-
-          <div>
             <label style={S.label}>Cantidad de maletas</label>
             <input type="number" min={1} style={S.input}
               value={form.cantidadMaletas}
               onChange={e => setForm(f => ({ ...f, cantidadMaletas: Math.max(1, Number(e.target.value)) }))} />
           </div>
 
-          <div>
-            <label style={S.label}>
-              Fecha y hora de ingreso
-              {aeropuertoActual && (
-                <span style={{ marginLeft: 8, fontSize: 12, color: '#1d4ed8', fontWeight: 600 }}>
-                  ({formatGmtOffset(aeropuertoActual.gmt)})
-                </span>
-              )}
-            </label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input type="datetime-local" style={{ ...S.input, flex: 1 }} value={form.fechaHora}
-                onChange={e => setForm(f => ({ ...f, fechaHora: e.target.value }))} />
-              <button type="button"
-                onClick={() => setForm(f => ({ ...f, fechaHora: toDateTimeLocalInput(new Date()) }))}
-                style={S.btnSecondary}>
-                Ahora
-              </button>
-            </div>
-            {aeropuertoActual && form.fechaHora && (
-              <p style={{ ...S.hint, color: '#1d4ed8' }}>
-                Equivale a: {convertLocalToUtcDisplay(form.fechaHora, aeropuertoActual.gmt)}
-              </p>
-            )}
-          </div>
         </div>
 
         {error && <div style={S.alertError}>{error}</div>}
-        {exito && <div style={S.alertSuccess}>Envio registrado exitosamente</div>}
+        {exito && <div style={S.alertSuccess}>Envío recibido. Se planificará junto con los registros de los próximos 5 segundos.</div>}
 
         <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
           <button onClick={handleSubmit} disabled={guardando} style={{
@@ -223,7 +170,7 @@ export default function RegistroPage() {
           }}>
             {guardando ? 'Guardando...' : 'Registrar envio'}
           </button>
-          <button onClick={() => setForm({ destinoIata: '', idCliente: '', cantidadMaletas: 1, fechaHora: toDateTimeLocalInput(new Date()) })}
+          <button onClick={() => setForm({ destinoIata: '', cantidadMaletas: 1 })}
             style={S.btnSecondary}>
             Limpiar
           </button>
@@ -233,7 +180,7 @@ export default function RegistroPage() {
       <div style={{ ...S.card, marginTop: 20 }}>
         <h3 style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', marginBottom: 8 }}>Carga masiva de envios</h3>
         <p style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>
-          Formato: <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: 4 }}>idPedido-aaaammdd-hh-mm-dest-###-idCliente</code>
+          Formato: <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: 4 }}>id_envio-aaaammdd-hh-mm-dest-###-0007729</code>
           &nbsp;· Origen asumido: <strong>{origenIata}</strong>
         </p>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
