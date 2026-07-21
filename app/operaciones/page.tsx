@@ -4,12 +4,17 @@ import { useRouter } from 'next/navigation'
 import { Box, Button, Typography } from '@mui/material'
 import { getUsuarioGuardado, UsuarioGuardado } from '@/app/shared/hooks/LoginModal'
 import { SimulacionService } from '@/app/services/simulation.service'
+import { GestionAeropuertos } from '@/app/management/components/GestionAeropuertos'
+import { GestionVuelos } from '@/app/management/components/GestionVuelos'
+
+type SeccionPreparacion = 'inicio' | 'vuelos' | 'aeropuertos'
 
 export default function OperacionesPage() {
   const router = useRouter()
   const [usuario, setUsuario] = useState<UsuarioGuardado | null>(null)
   const [iniciando, setIniciando] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [seccion, setSeccion] = useState<SeccionPreparacion>('inicio')
 
   useEffect(() => {
     const u = getUsuarioGuardado()
@@ -39,16 +44,44 @@ export default function OperacionesPage() {
   }
 
   return (
-    <Box sx={{ maxWidth: 600, mx: 'auto', py: 8, px: 2, textAlign: 'center' }}>
-      <Typography variant="h4" sx={{ fontWeight: 800, color: '#0f172a', mb: 1 }}>
-        Visualizador de Operaciones
-      </Typography>
-      <Typography variant="body1" sx={{ color: '#475569', mb: 1 }}>
-        Inicia el mapa de operaciones en tiempo real. Solo una instancia activa permitida.
-      </Typography>
-      <Typography variant="body2" sx={{ color: '#64748b', mb: 4 }}>
-        {usuario.nombre} — {usuario.rol}
-      </Typography>
+    <Box sx={{ maxWidth: seccion === 'inicio' ? 720 : 1280, mx: 'auto', py: 5, px: 3 }}>
+      <Box sx={{ textAlign: seccion === 'inicio' ? 'center' : 'left', mb: 3 }}>
+        <Typography variant="overline" sx={{ color: '#0f766e', fontWeight: 800, letterSpacing: 1 }}>
+          OPERACION DIA A DIA
+        </Typography>
+        <Typography variant="h4" sx={{ fontWeight: 800, color: '#0f172a', mb: 1 }}>
+          {seccion === 'inicio' ? 'Visualizador de Operaciones' : 'Preparación de entidades'}
+        </Typography>
+        <Typography variant="body1" sx={{ color: '#475569', mb: 1 }}>
+          {seccion === 'inicio'
+            ? 'Inicia el mapa de operaciones en tiempo real. Solo una instancia activa permitida.'
+            : 'Carga los planes adicionales y ajusta capacidades antes de iniciar la operación.'}
+        </Typography>
+        <Typography variant="body2" sx={{ color: '#64748b' }}>
+          {usuario.nombre} — {usuario.rol}
+        </Typography>
+      </Box>
+
+      {usuario.rol === 'ADMINISTRADOR' && (
+        <Box sx={{ display: 'flex', gap: 0.5, mb: 4, borderBottom: '1px solid #e2e8f0' }}>
+          {([
+            ['inicio', 'Inicio'],
+            ['vuelos', 'Planes de vuelo'],
+            ['aeropuertos', 'Aeropuertos'],
+          ] as const).map(([id, etiqueta]) => (
+            <Button key={id} onClick={() => setSeccion(id)} sx={{
+              textTransform: 'none', fontWeight: 700, color: seccion === id ? '#0f766e' : '#64748b',
+              borderBottom: seccion === id ? '2px solid #0f766e' : '2px solid transparent', borderRadius: 0,
+            }}>
+              {etiqueta}
+            </Button>
+          ))}
+        </Box>
+      )}
+
+      {seccion === 'vuelos' && <GestionVuelos />}
+      {seccion === 'aeropuertos' && <GestionAeropuertos />}
+      {seccion === 'inicio' && <Box sx={{ textAlign: 'center' }}>
 
       {error && (
         <Box sx={{ mb: 3, p: 1.5, borderRadius: 1, bgcolor: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: 13 }}>
@@ -75,6 +108,7 @@ export default function OperacionesPage() {
       <Typography variant="body2" sx={{ color: '#94a3b8', mt: 3 }}>
         Los envios registrados desde la pantalla REG. MALETAS apareceran en el mapa en tiempo real.
       </Typography>
+      </Box>}
     </Box>
   )
 }

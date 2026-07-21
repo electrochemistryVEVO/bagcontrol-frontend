@@ -31,7 +31,7 @@ export function useSimulacion(
   SaS: number,
   fechaInicio: string,
   modo: string = '',
-  onNuevoLote?: () => void
+  onNuevoLote?: (resumen: { enviosPlanificados: number; replanificaciones: number; cancelaciones: number }) => void
 ) {
   const [conectado, setConectado] = useState(false);
   const arrancadoRef = useRef(false);
@@ -118,6 +118,18 @@ export function useSimulacion(
     }
 
     let cambioInmediato = false;
+    const resumenNotificacion = {
+      enviosPlanificados: lote.envios?.length ?? 0,
+      replanificaciones: lote.eventos.filter(e => e.tipo === 'REPLANIFICACION_ENVIO').length,
+      cancelaciones: lote.eventos.filter(e => e.tipo === 'VUELO_CANCELADO').length,
+    };
+    const notificarSiEsOperativo = () => {
+      if (resumenNotificacion.enviosPlanificados > 0
+          || resumenNotificacion.replanificaciones > 0
+          || resumenNotificacion.cancelaciones > 0) {
+        onNuevoLoteRef.current?.(resumenNotificacion);
+      }
+    };
     // 1. Procesar eventos de control (ciclo de vida)
     for (const e of lote.eventos) {
       const tipo = e.tipo;
@@ -215,7 +227,7 @@ export function useSimulacion(
       // Los controles pueden elevar versionPlan (p. ej. una cancelación) y deben
       // invalidar inmediatamente el futuro, pero nunca cuentan como lote físico.
       coordinadorLotesRef.current.recibir(lote);
-      if (cambioInmediato) onNuevoLoteRef.current?.();
+      notificarSiEsOperativo();
       return;
     }
 
@@ -229,7 +241,6 @@ export function useSimulacion(
           versionPlan: lote.versionPlan,
         });
       }
-      if (cambioInmediato) onNuevoLoteRef.current?.();
       return;
     }
     if (resultado.huecoDetectado) {
@@ -250,7 +261,7 @@ export function useSimulacion(
       tiempoSimulacion.current = instanteInicialLote(actual);
       clockEstadoRef.current = tiempoSimulacion.current;
       const vacio = esLoteFisicoVacio(actual);
-      setMensajeErrorSimulacion(vacio ? 'Sin envíos en esta ventana' : null);
+      setMensajeErrorSimulacion(null);
       simTime('estado cambia de SINCRONIZANDO a EN_EJECUCION', vacio
         ? `ventanaVacia=${actual.ventanaInicio}->${actual.ventanaFin}`
         : `primerEvento=${actual.eventos[0].fechaHoraEvento}`);
@@ -259,7 +270,7 @@ export function useSimulacion(
       setMensajeErrorSimulacion(null);
     }
 
-    onNuevoLoteRef.current?.();
+    notificarSiEsOperativo();
   }, [setEstadoSim, modo, sincronizarTiemposReales]);
 
   // ============================================================================
@@ -356,12 +367,11 @@ export function useSimulacion(
     function cargarLotePromovido(lote: LoteFisico) {
       colaEventos.current = [...lote.eventos];
       tiempoSimulacion.current = Math.max(tiempoSimulacion.current, instanteInicialLote(lote));
-      setMensajeErrorSimulacion(esLoteFisicoVacio(lote) ? 'Sin envíos en esta ventana' : null);
+      setMensajeErrorSimulacion(null);
       batchStartTime = Date.now();
       batchStartClock = tiempoSimulacion.current;
       lastElapsed = 0;
       colaEstabaVacia = true;
-      onNuevoLoteRef.current?.();
     }
 
     function tick() {

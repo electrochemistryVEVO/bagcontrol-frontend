@@ -75,7 +75,15 @@ export function SimulacionCliente({ id, topic, fechaInicial, k, modo, aeropuerto
     SaS_SEGUNDOS,
     fechaInicioReal,
     modo,
-    () => showToast('Nuevo lote de eventos recibido', 'info'),
+    ({ enviosPlanificados, replanificaciones, cancelaciones }) => {
+      if (enviosPlanificados > 0) {
+        showToast(`${enviosPlanificados} envío${enviosPlanificados === 1 ? '' : 's'} planificado${enviosPlanificados === 1 ? '' : 's'}`, 'success');
+      } else if (replanificaciones > 0) {
+        showToast(`${replanificaciones} envío${replanificaciones === 1 ? '' : 's'} replanificado${replanificaciones === 1 ? '' : 's'}`, 'info');
+      } else if (cancelaciones > 0) {
+        showToast('Vuelo cancelado; se inició la reasignación de envíos', 'warning');
+      }
+    },
   );
 
   useEffect(() => {
@@ -238,12 +246,6 @@ export function SimulacionCliente({ id, topic, fechaInicial, k, modo, aeropuerto
           {mensajeErrorSimulacion}
         </div>
       )}
-      {modo === '0' && estadoSim === 'en_vivo' && (
-        <div style={{ padding: '8px 16px', background: '#ecfdf5', color: '#047857', fontSize: 13 }}>
-          Operacion activa. Registra envios para iniciar la planificacion.
-        </div>
-      )}
-
       <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
         <MapaSimulacion
           aeropuertosIniciales={aeropuertosIniciales}

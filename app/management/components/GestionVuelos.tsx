@@ -22,6 +22,7 @@ export function GestionVuelos() {
   const [exito, setExito] = useState<string | null>(null)
   const [pagina, setPagina] = useState(1)
   const [csvAbierto, setCsvAbierto] = useState(false)
+  const [busqueda, setBusqueda] = useState('')
 
   const registrarError = (contexto: string, error: unknown) => {
     console.error(`[VUELO-FRONT] ${contexto} - error completo`, error)
@@ -160,8 +161,11 @@ export function GestionVuelos() {
     </div>
   )
 
-  const totalPaginas = Math.max(1, Math.ceil(vuelos.length / POR_PAGINA))
-  const filas = vuelos.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA)
+  const vuelosFiltrados = vuelos.filter(vuelo =>
+    `${vuelo.codigo ?? ''} ${vuelo.origenIata} ${vuelo.destinoIata}`.toLowerCase().includes(busqueda.trim().toLowerCase()),
+  )
+  const totalPaginas = Math.max(1, Math.ceil(vuelosFiltrados.length / POR_PAGINA))
+  const filas = vuelosFiltrados.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA)
 
   return (
     <div>
@@ -176,6 +180,13 @@ export function GestionVuelos() {
           <button onClick={abrirCrear} style={S.btnPrimary}>Registrar Vuelo</button>
         </div>
       </div>
+
+      <input
+        value={busqueda}
+        onChange={e => { setBusqueda(e.target.value); setPagina(1) }}
+        placeholder="Buscar por ID, origen o destino"
+        style={{ ...S.input, maxWidth: 360, marginBottom: 16 }}
+      />
 
       {csvAbierto && (
         <CargaCsvModal

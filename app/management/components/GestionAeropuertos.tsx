@@ -25,6 +25,7 @@ export function GestionAeropuertos() {
   const [exito, setExito] = useState<string | null>(null)
   const [pagina, setPagina] = useState(1)
   const [csvAbierto, setCsvAbierto] = useState(false)
+  const [busqueda, setBusqueda] = useState('')
 
   const cargar = async (mostrarError = true): Promise<boolean> => {
     try {
@@ -143,8 +144,11 @@ export function GestionAeropuertos() {
     </div>
   )
 
-  const totalPaginas = Math.max(1, Math.ceil(aeropuertos.length / POR_PAGINA))
-  const filas = aeropuertos.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA)
+  const aeropuertosFiltrados = aeropuertos.filter(aeropuerto =>
+    `${aeropuerto.codigoIata} ${aeropuerto.ciudad} ${aeropuerto.pais}`.toLowerCase().includes(busqueda.trim().toLowerCase()),
+  )
+  const totalPaginas = Math.max(1, Math.ceil(aeropuertosFiltrados.length / POR_PAGINA))
+  const filas = aeropuertosFiltrados.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA)
 
   return (
     <div>
@@ -159,6 +163,13 @@ export function GestionAeropuertos() {
           <button onClick={abrirCrear} style={S.btnPrimary}>Registrar Aeropuerto</button>
         </div>
       </div>
+
+      <input
+        value={busqueda}
+        onChange={e => { setBusqueda(e.target.value); setPagina(1) }}
+        placeholder="Buscar por IATA, ciudad o país"
+        style={{ ...S.input, maxWidth: 360, marginBottom: 16 }}
+      />
 
       {csvAbierto && (
         <CargaCsvModal
