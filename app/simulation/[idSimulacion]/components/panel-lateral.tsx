@@ -36,7 +36,7 @@ import Draggable from 'react-draggable';
 import type { AeropuertoSimulacion } from '@/app/shared/types/Aeropuerto';
 import type { EstadoCapacidad, EventoVuelo } from '@/app/shared/types/Evento';
 import type { Envio, EnvioRuta, MaletaSimulacion } from '@/app/shared/types/Envio';
-import { SimulacionService, type VueloCancelable } from '@/app/services/simulation.service';
+import { SimulacionService, type VueloCancelable, type VueloInstanciado } from '@/app/services/simulation.service';
 import { formatShortDateTime } from '@/app/shared/dateTime';
 import {
   calcularOcupacionAeropuerto,
@@ -108,6 +108,26 @@ type PanelLateralProps = {
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// Convierte un instante UTC (epoch ms) a un string ISO local para un GMT dado.
+// toISOString() es puramente UTC (no aplica conversion del navegador), por eso
+// es seguro sumar el offset del aeropuerto directamente sobre el epoch.
+function fechaIsoLocal(epochUtc: number, gmt: number) {
+  return new Date(epochUtc + gmt * 3_600_000).toISOString().slice(0, 19);
+}
+
+function desplazarFecha(fecha: string, dias: number) {
+  const base = new Date(`${fecha}T00:00:00Z`);
+  base.setUTCDate(base.getUTCDate() + dias);
+  return base.toISOString().slice(0, 10);
+}
+
+// Formatea un fechaHoraSalida/Llegada (string local sin 'Z') sin pasar por Date,
+// para no arrastrar el timezone del navegador.
+function formatVueloLocal(fechaHora: string) {
+  const [fecha, hora = ''] = fechaHora.split('T');
+  return `${fecha.slice(8, 10)}/${fecha.slice(5, 7)}/${fecha.slice(2, 4)}-${hora.slice(0, 5)}`;
+}
 
 function chipVacio(estado: EstadoCapacidad, activo: boolean) {
   return estado === 'VACIO'
@@ -278,6 +298,8 @@ export function PanelLateral({
             integrada
           />}
           {seccionActiva === 'aeropuertos' && <SeccionAeropuertos
+            idSimulacion={idSimulacion}
+            tiempoSimulacionRef={tiempoSimulacionRef}
             aeropuertos={aeropuertos}
             onEnfocarAeropuerto={onEnfocarAeropuerto}
             onFiltradoCambiado={onFiltradoAeropuertosCambiado}
@@ -691,25 +713,17 @@ function SeccionVuelos({
 // SECCIÓN AEROPUERTOS
 // ══════════════════════════════════════════════════════════════════════════════
 
-const ordenAeropuertoFns: Record<OrdenAeropuertos, (a: AeropuertoSimulacion) => number> = {
-  calcularOcupacion: (a) => calcularOcupacionAeropuerto(a),
-  calcularProximidadSalida: (a) => {
-    if (!a.enviosProximosAVencer?.length) return Number.MAX_VALUE;
-    return Date.now() - new Date(a.enviosProximosAVencer[0].fechaHoraSalidaUtc).getTime();
-  },
-  calcularProximidadLlegada: (a) => {
-    if (!a.enviosProximosAVencer?.length) return Number.MAX_VALUE;
-    return Date.now() - new Date(a.enviosProximosAVencer[0].fechaHoraLlegadaUtc).getTime();
-  },
-};
-
 function SeccionAeropuertos({
+  idSimulacion,
+  tiempoSimulacionRef,
   aeropuertos,
   onEnfocarAeropuerto,
   onFiltradoCambiado,
   onMostrarRutaEnvio,
   integrada,
 }: {
+  idSimulacion: string;
+  tiempoSimulacionRef: RefObject<number>;
   aeropuertos: AeropuertoSimulacion[];
   onEnfocarAeropuerto: (iata: string) => void;
   onFiltradoCambiado?: (iatas: string[] | null) => void;
@@ -724,6 +738,70 @@ function SeccionAeropuertos({
   const [direccionOrden, setDireccionOrden] = useState<DireccionOrden>('desc');
   const abiertoEfectivo = integrada || abierto;
   const expandido: string | null = null;
+
+  const [vuelosProgramados, setVuelosProgramados] = useState<VueloInstanciado[]>([]);
+
+  useEffect(() => {
+    if (!abiertoEfectivo) return;
+    let vigente = true;
+    const cargarVuelos = async () => {
+      // Ventana amplia en base a UTC (gmt=0): cubre el desfase de hasta 1 dia
+      // que puede existir entre la fecha local de origen/destino de cada vuelo
+      // y la fecha UTC de referencia, sin depender de un aeropuerto especifico.
+      const fechaUtc = fechaIsoLocal(tiempoSimulacionRef.current, 0).slice(0, 10);
+      const fechas = [-1, 0, 1].map((dias) => desplazarFecha(fechaUtc, dias));
+      try {
+        const respuestas = await Promise.all(
+          fechas.map((fecha) => SimulacionService.obtenerVuelosInstanciados(fecha))
+        );
+        if (!vigente) return;
+        const unicos = new Map<string, VueloInstanciado>();
+        respuestas.flatMap(({ data }) => data).forEach((vuelo) => {
+          unicos.set(`${vuelo.codigoBase}|${vuelo.fechaHoraSalida}`, vuelo);
+        });
+        setVuelosProgramados([...unicos.values()]);
+      } catch {
+        if (vigente) setVuelosProgramados([]);
+      }
+    };
+    void cargarVuelos();
+    const timer = window.setInterval(() => void cargarVuelos(), 30_000);
+    return () => {
+      vigente = false;
+      window.clearInterval(timer);
+    };
+  }, [abiertoEfectivo, idSimulacion, tiempoSimulacionRef]);
+
+  // Proxima salida/llegada REAL (mismo criterio que "Proximos vuelos" del
+  // detalle del aeropuerto): el siguiente vuelo del catalogo, comparado contra
+  // la hora local de cada aeropuerto. No confundir con enviosProximosAVencer,
+  // que es sobre riesgo de SLA, no sobre el horario de vuelos.
+  const proximoVueloPorAeropuerto = useMemo(() => {
+    const salida = new Map<string, VueloInstanciado>();
+    const llegada = new Map<string, VueloInstanciado>();
+    const gmtPorIata = new Map(aeropuertos.map((a) => [a.codigoIata, a.gmt]));
+    const disponibles = vuelosProgramados.filter((v) => !v.estaCancelado);
+
+    for (const vuelo of disponibles) {
+      const gmtOrigen = gmtPorIata.get(vuelo.origenIata);
+      if (gmtOrigen !== undefined) {
+        const ahoraOrigen = fechaIsoLocal(tiempoSimulacionRef.current, gmtOrigen);
+        if (vuelo.fechaHoraSalida >= ahoraOrigen) {
+          const actual = salida.get(vuelo.origenIata);
+          if (!actual || vuelo.fechaHoraSalida < actual.fechaHoraSalida) salida.set(vuelo.origenIata, vuelo);
+        }
+      }
+      const gmtDestino = gmtPorIata.get(vuelo.destinoIata);
+      if (gmtDestino !== undefined) {
+        const ahoraDestino = fechaIsoLocal(tiempoSimulacionRef.current, gmtDestino);
+        if (vuelo.fechaHoraLlegada >= ahoraDestino) {
+          const actual = llegada.get(vuelo.destinoIata);
+          if (!actual || vuelo.fechaHoraLlegada < actual.fechaHoraLlegada) llegada.set(vuelo.destinoIata, vuelo);
+        }
+      }
+    }
+    return { salida, llegada };
+  }, [aeropuertos, vuelosProgramados, tiempoSimulacionRef]);
   const maletasPorAeropuerto: Record<string, MaletaSimulacion[]> = {};
   const loadingMaletas: Record<string, boolean> = {};
   const errorMaletas: Record<string, string> = {};
@@ -737,6 +815,18 @@ function SeccionAeropuertos({
   const toggleExpandido = seleccionar;
 
   const aeropuertosOrdenados = useMemo(() => {
+    const claveOrden = (a: AeropuertoSimulacion) => {
+      if (tipoOrden === 'calcularOcupacion') return calcularOcupacionAeropuerto(a);
+      // El string local (sin 'Z') interpretado como si fuera UTC da la hora de
+      // pared correcta; restando el gmt del propio aeropuerto se obtiene el
+      // instante UTC real, comparable entre aeropuertos con distinto gmt.
+      if (tipoOrden === 'calcularProximidadSalida') {
+        const vuelo = proximoVueloPorAeropuerto.salida.get(a.codigoIata);
+        return vuelo ? Date.parse(`${vuelo.fechaHoraSalida}Z`) - a.gmt * 3_600_000 : Number.MAX_VALUE;
+      }
+      const vuelo = proximoVueloPorAeropuerto.llegada.get(a.codigoIata);
+      return vuelo ? Date.parse(`${vuelo.fechaHoraLlegada}Z`) - a.gmt * 3_600_000 : Number.MAX_VALUE;
+    };
     return [...aeropuertos]
       .filter((a) => {
         const txt = busqueda.trim().toLowerCase();
@@ -745,10 +835,10 @@ function SeccionAeropuertos({
           && filtroEstados.includes(obtenerEstadoAeropuerto(a));
       })
       .sort((a, b) => {
-        const d = ordenAeropuertoFns[tipoOrden](a) - ordenAeropuertoFns[tipoOrden](b);
+        const d = claveOrden(a) - claveOrden(b);
         return direccionOrden === 'asc' ? d : -d;
       });
-  }, [aeropuertos, busqueda, filtroContinente, filtroEstados, tipoOrden, direccionOrden]);
+  }, [aeropuertos, busqueda, filtroContinente, filtroEstados, tipoOrden, direccionOrden, proximoVueloPorAeropuerto]);
 
   const hayFiltro = busqueda.trim() !== '' || filtroContinente !== '' || filtroEstados.length < ESTADOS_CAPACIDAD.length;
   useEffect(() => {
@@ -820,7 +910,8 @@ function SeccionAeropuertos({
               <Stack spacing={1} className={styles.scrollList}>
                 {aeropuertosOrdenados.map((aeropuerto) => {
                   const estado = obtenerEstadoAeropuerto(aeropuerto);
-                  const proximosSLA = aeropuerto.enviosProximosAVencer || [];
+                  const proximaSalida = proximoVueloPorAeropuerto.salida.get(aeropuerto.codigoIata);
+                  const proximaLlegada = proximoVueloPorAeropuerto.llegada.get(aeropuerto.codigoIata);
                   const estaExpandido = expandido === aeropuerto.codigoIata;
                   const colorCapacidad = estado === 'ROJO'
                     ? '#dc2626'
@@ -848,14 +939,18 @@ function SeccionAeropuertos({
                             <Typography variant="body2" className={styles.airportLocation}>
                               {aeropuerto.ciudad} - {aeropuerto.pais}
                             </Typography>
-                            {proximosSLA.length > 0 && (
+                            {(proximaSalida || proximaLlegada) && (
                               <Stack className={styles.airportProximidad}>
-                                <Typography variant="caption" className={styles.airportProximidadLinea}>
-                                  S: {formatShortDateTime(proximosSLA[0].fechaHoraSalidaUtc)}
-                                </Typography>
-                                <Typography variant="caption" className={styles.airportProximidadLinea}>
-                                  L: {formatShortDateTime(proximosSLA[0].fechaHoraLlegadaUtc)}
-                                </Typography>
+                                {proximaSalida && (
+                                  <Typography variant="caption" className={styles.airportProximidadLinea}>
+                                    S: {formatVueloLocal(proximaSalida.fechaHoraSalida)}
+                                  </Typography>
+                                )}
+                                {proximaLlegada && (
+                                  <Typography variant="caption" className={styles.airportProximidadLinea}>
+                                    L: {formatVueloLocal(proximaLlegada.fechaHoraLlegada)}
+                                  </Typography>
+                                )}
                               </Stack>
                             )}
                           </Stack>

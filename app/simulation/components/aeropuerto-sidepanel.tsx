@@ -76,20 +76,18 @@ function AeropuertoPanelContents({
         if (!isOpen || !codigoIata) return;
 
         let vigente = true;
-        const cargarEnviosAlmacen = () => {
-            const timestamp = new Date(tiempoSimulacionRef.current).toISOString();
-            SimulacionService.obtenerEnviosPorAlmacen(idSimulacion, codigoIata, timestamp)
-                .then(({ data }) => { if (vigente) setEnviosAlmacen(data); })
-                .catch(() => { if (vigente) setEnviosAlmacen([]); });
-        };
+        // Usamos _ultimaActualizacionEpoch (el instante simulado exacto del evento
+        // AEROPUERTO_ACTUALIZADO) en vez de tiempoSimulacionRef.current, que ya
+        // puede estar varios minutos simulados adelante del momento del aterrizaje.
+        const epochConsulta = data?._ultimaActualizacionEpoch ?? tiempoSimulacionRef.current;
+        const timestamp = new Date(epochConsulta).toISOString();
+        SimulacionService.obtenerEnviosPorAlmacen(idSimulacion, codigoIata, timestamp)
+            .then(({ data }) => { if (vigente) setEnviosAlmacen(data); })
+            .catch(() => { if (vigente) setEnviosAlmacen([]); });
 
-        cargarEnviosAlmacen();
-        const timer = window.setInterval(cargarEnviosAlmacen, 500);
-        return () => {
-            vigente = false;
-            window.clearInterval(timer);
-        };
-    }, [codigoIata, idSimulacion, isOpen, tiempoSimulacionRef]);
+        return () => { vigente = false; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [codigoIata, idSimulacion, isOpen, tiempoSimulacionRef, data?.maletasActuales, data?._ultimaActualizacionEpoch]);
 
     useEffect(() => {
         if (!isOpen || !codigoIata) return;
@@ -383,7 +381,7 @@ function ListaVuelosAeropuerto({
         <Box sx={{ minWidth: 0 }}>
             <Box sx={{ color: '#93c5fd', fontWeight: 700, fontSize: 12, mb: 0.75 }}>{titulo}</Box>
             {vuelos.length === 0 ? (
-                <Box sx={{ color: '#94a3b8', fontSize: 11 }}>{vacio}</Box>
+                <Box sx={{ color: '#1a1a1a', fontSize: 11 }}>{vacio}</Box>
             ) : vuelos.map((vuelo) => (
                 <Box
                     key={`${vuelo.codigoBase}|${vuelo.fechaHoraSalida}`}
@@ -391,11 +389,11 @@ function ListaVuelosAeropuerto({
                 >
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, fontSize: 11.5 }}>
                         <strong>{vuelo.codigoBase}</strong>
-                        <span style={{ color: '#cbd5e1' }}>
+                        <span style={{ color: '#1a1a1a' }}>
                             {tipo === 'SALIDA' ? `→ ${vuelo.destinoIata}` : `${vuelo.origenIata} →`}
                         </span>
                     </Box>
-                    <Box sx={{ color: '#94a3b8', fontSize: 10.5, mt: 0.2 }}>
+                    <Box sx={{ color: '#1a1a1a', fontSize: 10.5, mt: 0.2 }}>
                         {formatearFechaVuelo(tipo === 'SALIDA' ? vuelo.fechaHoraSalida : vuelo.fechaHoraLlegada)} · {codigoIata}
                     </Box>
                 </Box>
