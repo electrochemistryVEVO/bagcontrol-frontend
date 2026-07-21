@@ -856,6 +856,40 @@ export function MapaSimulacion({
     };
   }, [crearFeaturesAeropuertosMapa, iconosAeropuertoListos]);
 
+  // En operacion diaria la fotografia REST puede llegar mientras MapLibre aun
+  // esta procesando los iconos y los buckets iniciales. El primer zoom provoca
+  // el siguiente ciclo estable de render; completamos ese mismo paso una sola
+  // vez en `idle`, sin alterar la camara ni el flujo de simulacion.
+  useEffect(() => {
+    if (modo !== '0' || !iconosAeropuertoListos) return;
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+
+    const completarMontajeDiario = () => {
+      if (!map.isStyleLoaded()
+        || !map.hasImage('airport-vacio')
+        || !map.getSource('aeropuertos-data')) return;
+
+      asegurarLayer(map, layerStyleAeropuertos as LayerSpecification);
+      actualizarSourceGeoJson(
+        map,
+        'aeropuertos-data',
+        crearFeatureCollection(crearFeaturesAeropuertosMapa()),
+      );
+      map.setLayoutProperty('point', 'visibility', 'visible');
+      reordenarCapasDatos(map);
+      map.resize();
+      map.triggerRepaint();
+      map.off('idle', completarMontajeDiario);
+    };
+
+    map.on('idle', completarMontajeDiario);
+    map.triggerRepaint();
+    return () => {
+      map.off('idle', completarMontajeDiario);
+    };
+  }, [crearFeaturesAeropuertosMapa, iconosAeropuertoListos, modo]);
+
   // Sincronizar cámara entre mapa de datos y mapa de fondo. Polling liviano
   // (intervalo corto) hasta detectar que ambas instancias existen, sin depender
   // del evento 'load' de ninguno (que dispara hasta terminar de bajar el basemap).
