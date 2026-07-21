@@ -24,7 +24,7 @@ import { SimulacionService } from '@/app/services/simulation.service';
 import { formatUtcDisplay } from '@/app/shared/dateTime';
 import { AeropuertoPopupContent } from './pop-up-aeropuerto';
 import { RelojSimulacionOverlay } from './reloj-simulacion';
-import { debeMostrarRelojSimulado } from './reloj-simulacion.visibility';
+import { debeMostrarSeccionSimulada } from './reloj-simulacion.visibility';
 import type { EstadoSimulacion } from '../hooks/useSimulacion';
 import { PanelLateral } from './panel-lateral';
 import AeropuertoSidePanel from '@/app/simulation/components/aeropuerto-sidepanel';
@@ -1212,7 +1212,8 @@ export function MapaSimulacion({
         )}
       </MapLibre>
 
-      {debeMostrarRelojSimulado(modo) && <RelojSimulacionOverlay
+      <RelojSimulacionOverlay
+        mostrarSimulado={debeMostrarSeccionSimulada(modo)}
         tiempoRef={tiempoSimulacionRef}
         ocupacionFlota={ocupacionPromedioFlota}
         fechaInicio={fechaInicio}
@@ -1223,7 +1224,7 @@ export function MapaSimulacion({
         fechaHoraInicioReal={fechaHoraInicioReal}
         fechaHoraFinReal={fechaHoraFinReal}
         estadoSim={estadoSim}
-      />}
+      />
     </div>
   );
 }

@@ -19,6 +19,7 @@ function formatearTiempoReal(ms: number) {
 }
 
 export function RelojSimulacionOverlay({
+  mostrarSimulado,
   tiempoRef,
   fechaInicio,
   gmtUsuario,
@@ -27,6 +28,7 @@ export function RelojSimulacionOverlay({
   fechaHoraFinReal,
   estadoSim,
 }: {
+  mostrarSimulado: boolean;
   tiempoRef: RefObject<number>;
   ocupacionFlota?: number;
   fechaInicio: string;
@@ -113,14 +115,14 @@ export function RelojSimulacionOverlay({
           pointerEvents: 'auto',
         }}
       >
-      <div style={{ padding: '9px 12px 8px' }}>
+      {mostrarSimulado && <div style={{ padding: '9px 12px 8px' }}>
         <div style={{ marginBottom: 3, color: '#38bdf8', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
           Simulado
         </div>
         <div style={fila}><span style={{ color: '#94a3b8' }}>Transcurrido</span><strong>{tiempoSimulado}</strong></div>
         <div style={fila}><span style={{ color: '#94a3b8' }}>Fecha sim.</span><strong>{fechaSimulada}</strong></div>
-      </div>
-      <div style={{ padding: '8px 12px 9px', borderTop: '1px solid rgba(148, 163, 184, 0.2)', background: 'rgba(30, 41, 59, 0.42)' }}>
+      </div>}
+      <div style={{ padding: '8px 12px 9px', borderTop: mostrarSimulado ? '1px solid rgba(148, 163, 184, 0.2)' : undefined, background: 'rgba(30, 41, 59, 0.42)' }}>
         <div style={{ marginBottom: 3, color: '#38bdf8', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
           Real
         </div>
