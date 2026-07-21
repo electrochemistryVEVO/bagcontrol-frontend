@@ -465,6 +465,7 @@ export function useSimulacion(
 
         if (tipo === 'VUELO_DESPEGA') {
           const evVuelo = ev as EventoVuelo;
+          if(modo==="0")console.log(`Vuelo: ${evVuelo.codigoVuelo}`);
           (evVuelo as any)._salidaEpoch = new Date(evVuelo.horaSalidaUtc).getTime();
           (evVuelo as any)._llegadaEpoch = new Date(evVuelo.horaLlegadaUtc).getTime()
           const vuelo = vuelosActivos.current.get(evVuelo.codigoVuelo.toString());
