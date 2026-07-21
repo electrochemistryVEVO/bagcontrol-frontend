@@ -507,6 +507,10 @@ export function useSimulacion(
             });
             aeropuertosSimulacion.current[codigo].enviosProximosAVencer = evAero.enviosProximosAVencer || [];
             aeropuertosSimulacion.current[codigo].tieneDatos = true;
+            // Guardamos el instante simulado exacto de este evento para que la consulta
+            // REST de enviosAlmacen use este timestamp y no tiempoSimulacionRef.current
+            // (que ya puede estar minutos simulados adelante del aterrizaje real).
+            aeropuertosSimulacion.current[codigo]._ultimaActualizacionEpoch = tiempoActual;
           }
         }
         else if (tipo === "SIMULACION_FINALIZADA"){

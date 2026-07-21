@@ -156,6 +156,11 @@ export function MapaSimulacion({
   // monten en paralelo sin bloquearse entre sí.
   const [iconosAeropuertoListos, setIconosAeropuertoListos] = useState(false);
   const [iconosAvionListos, setIconosAvionListos] = useState(false);
+  // Refs paralelas a los estados de carga de iconos para evitar closures stale
+  // en asegurarSourcesYLayers, que se registra como listener de 'styledata'
+  // y puede dispararse con valores desactualizados del closure de useCallback.
+  const iconosAeropuertoListosRef = useRef(false);
+  const iconosAvionListosRef = useRef(false);
 
   const [vuelosActivosSnapshot, setVuelosActivosSnapshot] = useState<EventoVuelo[]>([]);
   const [enviosSnapshot, setEnviosSnapshot] = useState<Envio[]>([]);
@@ -566,15 +571,20 @@ export function MapaSimulacion({
     });
     if (iconosAeropuertoListos) {
       asegurarLayer(map, layerStyleAeropuertos as LayerSpecification);
-    } else {
-      quitarLayer(map, 'point');
     }
+    // No quitamos la capa 'point' si los iconos aun no estan listos:
+    // asegurarSourcesYLayers se registra como listener de 'styledata' que puede
+    // disparar con un closure viejo (iconosAeropuertoListos=false) justo despues
+    // de que handleMapLoad agrego la capa imperativa. Eso borraria la capa recien
+    // agregada y los aeropuertos no se veian hasta que el usuario movia el mapa.
 
     if (iconosAvionListos) {
       asegurarLayer(map, layerStyleAirplane as LayerSpecification);
-    } else {
-      quitarLayer(map, 'plane');
     }
+    // Mismo caso que 'point': no removemos 'plane' aqui si los iconos aun no
+    // estan listos, para no pisar la capa que handleMapLoad ya agrego de forma
+    // imperativa apenas resuelve la promesa de carga de iconos (ver comentario
+    // equivalente arriba, en la seccion de aeropuertos).
     reordenarCapasDatos(map);
     logDiagnosticoAeropuertos(map, featuresAeropuertos, 'asegurarSourcesYLayers');
   }, [
