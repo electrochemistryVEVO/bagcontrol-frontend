@@ -23,6 +23,7 @@ export default async function SimulacionPage({
     const k = Number(resolvedSearchParams.k ?? 120);
   return (
     <SimulacionCliente
+      key={`${resolvedParams.idSimulacion}|${resolvedSearchParams.fechaInicio ?? ''}|${resolvedSearchParams.modo ?? ''}`}
       id={resolvedParams.idSimulacion}
       topic={resolvedSearchParams.topic ?? ''}
       k={Number.isFinite(k) && k > 0 ? k : 120}

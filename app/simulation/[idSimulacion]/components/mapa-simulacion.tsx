@@ -569,7 +569,7 @@ export function MapaSimulacion({
         'line-dasharray': [1, 1.2],
       },
     });
-    if (iconosAeropuertoListos) {
+    if (iconosAeropuertoListosRef.current) {
       asegurarLayer(map, layerStyleAeropuertos as LayerSpecification);
     }
     // No quitamos la capa 'point' si los iconos aun no estan listos:
@@ -578,7 +578,7 @@ export function MapaSimulacion({
     // de que handleMapLoad agrego la capa imperativa. Eso borraria la capa recien
     // agregada y los aeropuertos no se veian hasta que el usuario movia el mapa.
 
-    if (iconosAvionListos) {
+    if (iconosAvionListosRef.current) {
       asegurarLayer(map, layerStyleAirplane as LayerSpecification);
     }
     // Mismo caso que 'point': no removemos 'plane' aqui si los iconos aun no
@@ -592,8 +592,6 @@ export function MapaSimulacion({
     crearFeaturesVuelosMapa,
     featuresReplanificacion,
     featuresRutaEnvio,
-    iconosAeropuertoListos,
-    iconosAvionListos,
     logDiagnosticoAeropuertos,
   ]);
 
@@ -827,21 +825,28 @@ export function MapaSimulacion({
     if (!map || !map.isStyleLoaded()) return;
 
     let segundoFrame = 0;
+    const pintarAeropuertosIniciales = () => {
+      if (!map.isStyleLoaded() || !map.getSource('aeropuertos-data')) return;
+      asegurarLayer(map, layerStyleAeropuertos as LayerSpecification);
+      const todasFeatures = crearFeaturesAeropuertosMapa();
+      const filtradas = filtroAeropuertosRef.current
+        ? todasFeatures.filter((feature) => filtroAeropuertosRef.current!.has(feature.properties?.codigoIata as string))
+        : todasFeatures;
+      const relacionadas = filtroRelacionRef.current.aeropuertos
+        ? filtradas.filter((feature) => filtroRelacionRef.current.aeropuertos!.has(feature.properties?.codigoIata as string))
+        : filtradas;
+      actualizarSourceGeoJson(map, 'aeropuertos-data', crearFeatureCollection(relacionadas));
+      map.setLayoutProperty('point', 'visibility', 'visible');
+      reordenarCapasDatos(map);
+      map.resize();
+      map.triggerRepaint();
+    };
+
+    // El primer frame crea los buckets de simbolos y el segundo repinta una vez
+    // que MapLibre ya proceso tanto la fuente como las imagenes agregadas.
     const primerFrame = requestAnimationFrame(() => {
-      segundoFrame = requestAnimationFrame(() => {
-        asegurarLayer(map, layerStyleAeropuertos as LayerSpecification);
-        const todasFeatures = crearFeaturesAeropuertosMapa();
-        const filtradas = filtroAeropuertosRef.current
-          ? todasFeatures.filter((feature) => filtroAeropuertosRef.current!.has(feature.properties?.codigoIata as string))
-          : todasFeatures;
-        const relacionadas = filtroRelacionRef.current.aeropuertos
-          ? filtradas.filter((feature) => filtroRelacionRef.current.aeropuertos!.has(feature.properties?.codigoIata as string))
-          : filtradas;
-        actualizarSourceGeoJson(map, 'aeropuertos-data', crearFeatureCollection(relacionadas));
-        map.setLayoutProperty('point', 'visibility', 'visible');
-        map.resize();
-        map.triggerRepaint();
-      });
+      pintarAeropuertosIniciales();
+      segundoFrame = requestAnimationFrame(pintarAeropuertosIniciales);
     });
 
     return () => {
@@ -955,13 +960,17 @@ export function MapaSimulacion({
     })
       .then(() => {
         if (!map.hasImage('airport-vacio')) throw new Error('airport-vacio no registrado');
+        iconosAeropuertoListosRef.current = true;
         setIconosAeropuertoListos(true);
         asegurarLayer(map, layerStyleAeropuertos as LayerSpecification);
+        actualizarSourceGeoJson(map, 'aeropuertos-data', crearFeatureCollection(crearFeaturesAeropuertosMapa()));
         reordenarCapasDatos(map);
+        map.resize();
         map.triggerRepaint();
       })
       .catch((err) => {
         console.error('Error al cargar íconos de aeropuerto:', err);
+        iconosAeropuertoListosRef.current = false;
         setIconosAeropuertoListos(false);
       });
 
@@ -970,6 +979,7 @@ export function MapaSimulacion({
     })
       .then(() => {
         if (!map.hasImage('airplane-gris')) throw new Error('airplane-gris no registrado');
+        iconosAvionListosRef.current = true;
         setIconosAvionListos(true);
         asegurarLayer(map, layerStyleAirplane as LayerSpecification);
         reordenarCapasDatos(map);
@@ -977,9 +987,10 @@ export function MapaSimulacion({
       })
       .catch((err) => {
         console.error('Error al cargar íconos de avión:', err);
+        iconosAvionListosRef.current = false;
         setIconosAvionListos(false);
       });
-  }, [asegurarSourcesYLayers, auditarCargaMapa]);
+  }, [asegurarSourcesYLayers, auditarCargaMapa, crearFeaturesAeropuertosMapa]);
 
   const handleMouseEnter = (event: MapLayerMouseEvent) => {
     setSelFeature(event.features?.[0] ?? null);
