@@ -176,7 +176,7 @@ export function GestionVuelos() {
           <p style={S.pageSubtitle}>Administra los planes de vuelo y sus capacidades</p>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={() => setCsvAbierto(true)} style={S.btnSecondary}>⬆ Cargar CSV</button>
+          <button onClick={() => setCsvAbierto(true)} style={S.btnSecondary}>⬆ Cargar TXT</button>
           <button onClick={abrirCrear} style={S.btnPrimary}>Registrar Vuelo</button>
         </div>
       </div>
@@ -190,10 +190,13 @@ export function GestionVuelos() {
 
       {csvAbierto && (
         <CargaCsvModal
-          titulo="Cargar vuelos desde CSV"
+          titulo="Cargar vuelos desde TXT"
           formato="ORIGEN-DESTINO-HH:MM-HH:MM-CAPACIDAD"
           ejemplo="SPIM-SBBR-10:30-22:45-150"
-          onCargar={VueloService.cargarCsv}
+          extension=".txt"
+          accept=".txt,text/plain"
+          mensajeArchivoInvalido="Solo se permiten archivos TXT con el formato ORIGEN-DESTINO-HH:MM-HH:MM-CAPACIDAD"
+          onCargar={VueloService.cargarTxt}
           onCerrar={() => setCsvAbierto(false)}
           onExito={() => { setCsvAbierto(false); cargar() }}
         />

@@ -53,11 +53,11 @@ export const VueloService = {
   eliminarVuelo: (id: number) =>
     axiosApi.delete(`/vuelos/${id}`),
 
-  cargarCsv: (archivo: File) => {
+  cargarTxt: (archivo: File) => {
     const fd = new FormData()
     fd.append('archivo', archivo)
     return axiosApi.post<{ insertados: number; errores: string[]; totalFilas: number }>(
-      '/vuelos/cargar-csv', fd,
+      '/vuelos/cargar-txt', fd,
       { headers: { 'Content-Type': 'multipart/form-data' } }
     )
   },

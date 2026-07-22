@@ -1,5 +1,6 @@
 'use client'
 import { useRef, useState, useCallback } from 'react'
+import { hasAllowedExtension } from '@/app/shared/fileUpload'
 
 type ResultadoCarga = {
   insertados: number
@@ -14,9 +15,16 @@ type Props = {
   onCargar: (archivo: File) => Promise<{ data: ResultadoCarga }>
   onCerrar: () => void
   onExito: () => void
+  extension?: string
+  accept?: string
+  mensajeArchivoInvalido?: string
 }
 
-export function CargaCsvModal({ titulo, formato, ejemplo, onCargar, onCerrar, onExito }: Props) {
+export function CargaCsvModal({
+  titulo, formato, ejemplo, onCargar, onCerrar, onExito,
+  extension = '.csv', accept = '.csv,text/csv',
+  mensajeArchivoInvalido = 'Solo se permiten archivos CSV.',
+}: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [archivo, setArchivo] = useState<File | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -26,6 +34,13 @@ export function CargaCsvModal({ titulo, formato, ejemplo, onCargar, onCerrar, on
 
   const aceptarArchivo = (f: File | null) => {
     if (!f) return
+    if (!hasAllowedExtension(f.name, extension)) {
+      setArchivo(null)
+      setResultado(null)
+      setErrorGeneral(mensajeArchivoInvalido)
+      if (inputRef.current) inputRef.current.value = ''
+      return
+    }
     setArchivo(f)
     setResultado(null)
     setErrorGeneral(null)
@@ -159,16 +174,16 @@ export function CargaCsvModal({ titulo, formato, ejemplo, onCargar, onCerrar, on
               ) : (
                 <>
                   <p style={{ fontSize: 13, color: '#1e293b', marginTop: 10 }}>
-                    Arrastra un archivo <strong>.csv</strong> aquí o haz clic para seleccionar
+                    Arrastra un archivo <strong>{extension}</strong> aquí o haz clic para seleccionar
                   </p>
-                  <p style={{ fontSize: 11, color: '#374151', marginTop: 4 }}>Solo archivos .csv</p>
+                  <p style={{ fontSize: 11, color: '#374151', marginTop: 4 }}>Solo archivos {extension}</p>
                 </>
               )}
 
               <input
                 ref={inputRef}
                 type="file"
-                accept=".csv,text/csv"
+                accept={accept}
                 style={{ display: 'none' }}
                 onChange={onInputChange}
               />
