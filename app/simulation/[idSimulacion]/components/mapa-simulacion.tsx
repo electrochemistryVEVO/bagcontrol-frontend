@@ -180,6 +180,7 @@ export function MapaSimulacion({
   const [rutaError, setRutaError] = useState<string | null>(null);
   const [replanificacionSeleccionada, setReplanificacionSeleccionada] = useState<EventoReplanificacionEnvio | null>(null);
   const [filtroRelacion, setFiltroRelacion] = useState<FiltroRelacion>({});
+  const [mapaCargado,setMapaCargado] = useState<boolean>(false);
 
   const coordsAeropuertos = useMemo(() => {
     const dict: Record<string, number[]> = {};
@@ -982,10 +983,15 @@ export function MapaSimulacion({
   }, []);
 
   const handleMapLoad = useCallback((e: MapLibreEvent) => {
+    if(mapaCargado)return;
+    setMapaCargado(true);
+    console.log(`[MAP-RENDER] Tipo: ${e.type}`)
+    //if(e.type!=="load")return;
+    console.log("[MAP-RENDER] Inicio de carga de mapa")
     const map = e.target;
     auditarCargaMapa(map, 'principal');
     asegurarSourcesYLayers(map);
-
+    console.log("[MAP-RENDER] Inicio de carga de icono de aeropuertos")
     cargarIconosAeropuerto(map, '/aeropuerto.png', 'airport', {
       verde:    '#22c55e',
       amarillo: '#eab308',
@@ -996,6 +1002,7 @@ export function MapaSimulacion({
       .then(() => {
         if (!map.hasImage('airport-vacio')) throw new Error('airport-vacio no registrado');
         iconosAeropuertoListosRef.current = true;
+        console.log("[MAP-RENDER] Icono de aeropuertos cargado")
         setIconosAeropuertoListos(true);
         asegurarLayer(map, layerStyleAeropuertos as LayerSpecification);
         actualizarSourceGeoJson(map, 'aeropuertos-data', crearFeatureCollection(crearFeaturesAeropuertosMapa()));
@@ -1025,7 +1032,7 @@ export function MapaSimulacion({
         iconosAvionListosRef.current = false;
         setIconosAvionListos(false);
       });
-  }, [asegurarSourcesYLayers, auditarCargaMapa, crearFeaturesAeropuertosMapa]);
+  }, [asegurarSourcesYLayers, auditarCargaMapa, crearFeaturesAeropuertosMapa,mapaCargado]);
 
   const handleMouseEnter = (event: MapLayerMouseEvent) => {
     setSelFeature(event.features?.[0] ?? null);
@@ -1040,6 +1047,7 @@ export function MapaSimulacion({
     map.setLayoutProperty('label_country_1', 'text-field', ['get', `name:${language}`]);
     map.setLayoutProperty('label_country_2', 'text-field', ['get', `name:${language}`]);
     map.setLayoutProperty('label_country_3', 'text-field', ['get', `name:${language}`]);
+    mapRef.current?.redraw();
   }, [auditarCargaMapa]);
 
   return (
@@ -1173,6 +1181,7 @@ export function MapaSimulacion({
         scrollZoom={true}
         doubleClickZoom={true}
         touchZoomRotate={true}
+        cancelPendingTileRequestsWhileZooming={false}
         keyboard={true}
         boxZoom={true}
         onDragStart={(e) => { setVueloSeguido(null); registrarInteraccionUsuario(e.target, 'dragstart'); }}
@@ -1201,7 +1210,7 @@ export function MapaSimulacion({
           }
         }}
         interactiveLayerIds={['point', 'plane']}
-        onLoad={handleMapLoad}
+        onStyleData={handleMapLoad}
       >
         <Source id="rutas-data" type="geojson" data={crearFeatureCollection([])}>
           <Layer {...layerStyleLine} />
@@ -1222,7 +1231,7 @@ export function MapaSimulacion({
           />
         </Source>
         <Source id="aeropuertos-data" type="geojson" data={crearFeatureCollection(featuresAeropuertosIniciales)}>
-          {iconosAeropuertoListos && <Layer {...layerStyleAeropuertos} />}
+          {/*iconosAeropuertoListos && <Layer {...layerStyleAeropuertos} />*/}
         </Source>
         <Source id="aviones-data" type="geojson" data={crearFeatureCollection([])}>
           {iconosAvionListos && <Layer {...layerStyleAirplane} />}
