@@ -22,6 +22,7 @@ export type SimulacionActiva = {
 }
 
 export type VueloCancelable = {
+  claveOcurrencia: string;
   codigoVuelo: number;
   origenIata: string;
   destinoIata: string;
@@ -35,6 +36,7 @@ export type VueloCancelable = {
 }
 
 export type CancelacionVueloRespuesta = {
+  claveOcurrencia: string;
   codigoVuelo: number;
   origenIata: string;
   destinoIata: string;
@@ -43,6 +45,8 @@ export type CancelacionVueloRespuesta = {
   horaSalidaUtcObjetivo: string;
   enviosAfectados: string[];
   cantidadMaletas: number;
+  preparacionInvalidada: boolean;
+  versionPlan: number;
   estado: string;
 }
 
@@ -79,6 +83,8 @@ export const SimulacionService = {
         axiosApi.get<VueloCancelable[]>(`/simulacion/${idSimulacion}/vuelos/cancelables`, {
           params: { instanteSimulado },
         }),
+    obtenerVuelosCancelablesOperacionDia: () =>
+        axiosApi.get<VueloCancelable[]>('/operacion-dia/vuelos/cancelables'),
     obtenerVuelosInstanciados: (fecha: string) =>
         axiosApi.get<VueloInstanciado[]>('/vuelos/instanciados', { params: { fecha } }),
     cancelarProximaOcurrencia: (idSimulacion: string, codigoVuelo: number, instanteSimulado: string) =>
@@ -98,6 +104,11 @@ export const SimulacionService = {
         axiosApi.get<InventarioOperativoAeropuerto>(
           `/operacion-dia/aeropuertos/${encodeURIComponent(codigoIata)}/inventario`,
         ),
+    cancelarOcurrenciaOperacionDia: (vuelo: Pick<VueloCancelable, 'codigoVuelo' | 'horaSalidaUtc'>) =>
+        axiosApi.post<CancelacionVueloRespuesta>('/operacion-dia/vuelos/cancelaciones', {
+          codigoVuelo: vuelo.codigoVuelo,
+          salidaUtc: vuelo.horaSalidaUtc,
+        }),
     pausar: (idSimulacion: string) =>
         axiosApi.post(`/simulacion/${idSimulacion}/pausar`),
 

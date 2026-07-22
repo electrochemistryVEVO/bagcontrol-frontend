@@ -370,11 +370,15 @@ function SeccionVuelos({
   const abiertoEfectivo = integrada || abierto;
 
   const cargarCancelables = useCallback(async () => {
-    if (!abiertoEfectivo || !cancelablesAbiertos || modo !== '1') return;
+    if (!abiertoEfectivo || !cancelablesAbiertos || (modo !== '0' && modo !== '1')) return;
     setCargandoCancelables(true);
     try {
-      const instante = new Date(tiempoSimulacionRef.current).toISOString();
-      const { data } = await SimulacionService.obtenerVuelosCancelables(idSimulacion, instante);
+      const { data } = modo === '0'
+        ? await SimulacionService.obtenerVuelosCancelablesOperacionDia()
+        : await SimulacionService.obtenerVuelosCancelables(
+            idSimulacion,
+            new Date(tiempoSimulacionRef.current).toISOString(),
+          );
       setVuelosCancelables(data);
     } catch {
       setVuelosCancelables([]);
@@ -402,12 +406,27 @@ function SeccionVuelos({
     if (!confirmar) return;
     setCancelandoVuelo(vuelo.codigoVuelo);
     try {
-      const instante = new Date(tiempoSimulacionRef.current).toISOString();
-      await SimulacionService.cancelarProximaOcurrencia(idSimulacion, vuelo.codigoVuelo, instante);
-      toast.showToast('Cancelación registrada; los envíos serán replanificados', 'success');
+      const { data } = modo === '0'
+        ? await SimulacionService.cancelarOcurrenciaOperacionDia(vuelo)
+        : await SimulacionService.cancelarProximaOcurrencia(
+            idSimulacion,
+            vuelo.codigoVuelo,
+            new Date(tiempoSimulacionRef.current).toISOString(),
+          );
+      toast.showToast(
+        `Cancelación registrada: ${data.enviosAfectados.length} envíos y ${data.cantidadMaletas} maletas serán replanificados`,
+        'success',
+      );
       await cargarCancelables();
-    } catch {
-      toast.showToast('No se pudo registrar la cancelación', 'error');
+    } catch (error: any) {
+      const conflicto = error?.response?.status === 409;
+      const detalle = error?.response?.data?.message || error?.response?.data?.detail;
+      toast.showToast(
+        conflicto
+          ? (detalle || 'El vuelo ya no puede cancelarse porque su estado cambió')
+          : 'No se pudo registrar la cancelación',
+        'error',
+      );
     } finally {
       setCancelandoVuelo(null);
     }
@@ -473,7 +492,7 @@ function SeccionVuelos({
       <AccordionDetails className={styles.accordionDetails} sx={{ flex: 1, minHeight: 0, maxHeight: 'none' }}>
         {abiertoEfectivo && (
           <>
-            {modo === '1' && (
+            {(modo === '0' || modo === '1') && (
               <Accordion
                 expanded={cancelablesAbiertos}
                 onChange={(_, expandido) => setCancelablesAbiertos(expandido)}
@@ -482,7 +501,7 @@ function SeccionVuelos({
               >
                 <AccordionSummary sx={{ minHeight: '40px !important', px: 1, '& .MuiAccordionSummary-content': { my: 0.75, alignItems: 'center', justifyContent: 'space-between' } }}>
                   <Typography sx={{ fontSize: 12, fontWeight: 800, color: '#fbbf24' }}>
-                    Vuelos cancelables
+                    {modo === '0' ? 'Vuelos por salir' : 'Vuelos cancelables'}
                   </Typography>
                 </AccordionSummary>
                 <AccordionDetails sx={{ px: 1, pt: 0, pb: 1, maxHeight: '38vh', overflowY: 'auto' }}>
