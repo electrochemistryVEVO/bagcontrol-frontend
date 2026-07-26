@@ -390,7 +390,7 @@ function SeccionVuelos({
   const vuelosCancelablesFiltrados = useMemo(() => vuelosCancelables.filter((vuelo) =>
     (!origenCancelacion.trim() || vuelo.origenIata.toUpperCase() === origenCancelacion.trim().toUpperCase())
     && (!destinoCancelacion.trim() || vuelo.destinoIata.toUpperCase() === destinoCancelacion.trim().toUpperCase())
-  ).slice(0, 5), [destinoCancelacion, origenCancelacion, vuelosCancelables]);
+  ), [destinoCancelacion, origenCancelacion, vuelosCancelables]);
 
   const buscarCancelables = async () => {
     if (!origenCancelacion.trim() && !destinoCancelacion.trim()) return;
@@ -541,7 +541,7 @@ function SeccionVuelos({
                     )}
                     {!cargandoCancelables && busquedaCancelablesRealizada && vuelosCancelablesFiltrados.length === 0 && (
                       <Typography variant="caption" sx={{ color: '#94a3b8' }}>
-                        No hay vuelos futuros con envíos para esa ruta.
+                        No hay vuelos futuros para esa ruta.
                       </Typography>
                     )}
                     {!cargandoCancelables && busquedaCancelablesRealizada && vuelosCancelablesFiltrados.map((vuelo) => (
@@ -1286,7 +1286,7 @@ function SeccionEnvios({
                                           </Typography>
                                           {/* Salida (fecha registro del pedido) */}
                                           <Typography variant="caption" sx={{ color: '#94a3b8', whiteSpace: 'nowrap', mr: 0.5, fontSize: 10 }}>
-                                            ↑{e.fechaHora ? new Date(e.fechaHora).toLocaleString('es-PE', { timeZone: 'UTC', hour12: false, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
+                                            ↑{formatShortDateTime(e.fechaHora)}
                                           </Typography>
                                           {/* Llegada estimada */}
                                           <Typography variant="caption" sx={{ color: '#94a3b8', whiteSpace: 'nowrap', mr: 0.5, fontSize: 10 }}>

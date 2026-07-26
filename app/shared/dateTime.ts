@@ -2,12 +2,18 @@ import { Aeropuerto } from './types/Aeropuerto';
 
 const pad = (value: number) => value.toString().padStart(2, '0');
 
+function parseUtcInstant(value: string | number | Date): Date {
+  if (value instanceof Date || typeof value === 'number') return new Date(value);
+  const tieneZona = /[zZ]$|[+-]\d{2}:?\d{2}$/.test(value);
+  return new Date(tieneZona ? value : `${value}Z`);
+}
+
 export function formatUtcDisplay(
   value: string | number | Date | null | undefined,
   showSeconds?: boolean,
 ): string {
   if (value == null) return 'No disponible';
-  const date = value instanceof Date ? value : new Date(value);
+  const date = parseUtcInstant(value);
   if (Number.isNaN(date.getTime())) return 'No disponible';
   const sec = showSeconds ? `:${pad(date.getUTCSeconds())}` : '';
   return `${pad(date.getUTCDate())}/${pad(date.getUTCMonth() + 1)}/${date.getUTCFullYear()} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}${sec} UTC`;
@@ -17,7 +23,7 @@ export function formatShortDateTime(
   value: string | number | Date | null | undefined,
 ): string {
   if (value == null) return '--';
-  const date = value instanceof Date ? value : new Date(value);
+  const date = parseUtcInstant(value);
   if (Number.isNaN(date.getTime())) return '--';
   const yy = String(date.getUTCFullYear()).slice(-2);
   return `${pad(date.getUTCDate())}/${pad(date.getUTCMonth() + 1)}/${yy}-${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
@@ -29,7 +35,7 @@ export function formatAirportLocalDisplay(
   showSeconds?: boolean,
 ): string {
   if (value == null || !aeropuerto) return 'No disponible';
-  const date = value instanceof Date ? value : new Date(value);
+  const date = parseUtcInstant(value);
   if (Number.isNaN(date.getTime())) return 'No disponible';
   const localMs = date.getTime() + aeropuerto.gmt * 60 * 60 * 1000;
   const local = new Date(localMs);
